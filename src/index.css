@@ -28,6 +28,7 @@
   --ui-radius-2xl: 20px;
   --node-radius: 12px;
   --node-inner-radius: var(--node-radius);
+  --app-top-chrome-height: 0px;
 }
 
 .dark {
@@ -168,6 +169,16 @@ html[data-platform='macos'] #root {
 .react-flow__handle {
   width: 8px;
   height: 8px;
+}
+
+.app-top-chrome-height {
+  height: var(--app-top-chrome-height);
+}
+
+.ui-content-overlay-inset {
+  inset-inline: 0;
+  bottom: 0;
+  top: var(--app-top-chrome-height);
 }
 
 .ui-panel {

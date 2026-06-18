@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import { APP_TOP_CHROME_HEIGHT_CLASS, useAppTopChromeHeight } from '@/components/ui/layout';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { Minus, X, Maximize2, Settings, ArrowLeft } from 'lucide-react';
 import { Moon, Sun } from 'lucide-react';
@@ -18,6 +19,7 @@ interface TitleBarProps {
 }
 
 export function TitleBar({ onSettingsClick, showBackButton, onBackClick }: TitleBarProps) {
+  useAppTopChromeHeight();
   const { theme, toggleTheme } = useThemeStore();
   const currentProjectName = useProjectStore((state) => state.currentProject?.name);
 
@@ -59,7 +61,7 @@ export function TitleBar({ onSettingsClick, showBackButton, onBackClick }: Title
   }, [toggleTheme]);
 
   return (
-    <div className="h-10 flex items-center justify-between bg-surface-dark border-b border-border-dark select-none z-50 relative">
+    <div className={`${APP_TOP_CHROME_HEIGHT_CLASS} flex items-center justify-between bg-surface-dark border-b border-border-dark select-none z-50 relative`}>
       {isMac ? (
         <div className="group flex items-center h-full pl-3 pr-2 gap-2" data-no-drag="true">
           <button
