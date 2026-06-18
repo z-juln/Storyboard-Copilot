@@ -27,7 +27,7 @@ export function TitleBar({ onSettingsClick, showBackButton, onBackClick }: Title
   const isMac =
     typeof navigator !== 'undefined'
     && /(Mac|iPhone|iPad|iPod)/i.test(`${navigator.platform} ${navigator.userAgent}`);
-  const appTitle = '分镜助手';
+  const appTitle = 'Video-Copilot';
   const titleText = currentProjectName ? `${currentProjectName} - ${appTitle}` : appTitle;
 
   const handleMinimize = useCallback(async () => {

@@ -1018,7 +1018,7 @@ export function SettingsDialog({
                     <div className="flex items-start gap-4">
                       <img
                         src="/app-icon.png"
-                        alt={'分镜助手'}
+                        alt={'Video-Copilot'}
                         className="h-14 w-14 rounded-lg border border-border-dark object-cover"
                       />
                       <div className="min-w-0 flex-1">
@@ -1028,7 +1028,7 @@ export function SettingsDialog({
                           rel="noreferrer"
                           className="text-base font-semibold text-accent hover:underline"
                         >
-                          {'分镜助手'}
+                          {'Video-Copilot'}
                         </a>
                         <p className="mt-1 text-sm text-text-muted">
                           {'基于节点画布的 AI 分镜工作台，一站式完成图片生成、编辑与分镜流程。'}
