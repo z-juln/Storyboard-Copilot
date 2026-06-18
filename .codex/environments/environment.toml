@@ -3,4 +3,4 @@ version = 1
 name = "run"
 
 [setup]
-script = "npm i && npm run dev"
+script = "npm i && npm run tauri dev"
