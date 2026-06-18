@@ -10,7 +10,6 @@ import {
 } from 'react';
 import { Handle, Position, useUpdateNodeInternals, type NodeProps } from '@xyflow/react';
 import { Sparkles } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
 
 import {
   AUTO_REQUEST_ASPECT_RATIO,
@@ -225,7 +224,6 @@ function buildAiResultNodeTitle(prompt: string, fallbackTitle: string): string {
 }
 
 export const ImageEditNode = memo(({ id, data, selected, width, height }: ImageEditNodeProps) => {
-  const { t, i18n } = useTranslation();
   const updateNodeInternals = useUpdateNodeInternals();
   const [error, setError] = useState<string | null>(null);
 
@@ -302,9 +300,9 @@ export const ImageEditNode = memo(({ id, data, selected, width, height }: ImageE
   const aspectRatioOptions = useMemo<AspectRatioChoice[]>(
     () => [{
       value: AUTO_REQUEST_ASPECT_RATIO,
-      label: t('modelParams.autoAspectRatio'),
+      label: '自动',
     }, ...selectedModel.aspectRatios],
-    [selectedModel.aspectRatios, t]
+    [selectedModel.aspectRatios]
   );
 
   const selectedAspectRatio = useMemo(
@@ -327,7 +325,6 @@ export const ImageEditNode = memo(({ id, data, selected, width, height }: ImageE
         ? resolveModelPriceDisplay(selectedModel, {
           resolution: selectedResolution.value,
           extraParams: effectiveExtraParams,
-          language: i18n.language,
           settings: {
             displayCurrencyMode: priceDisplayCurrencyMode,
             usdToCnyRate,
@@ -338,7 +335,6 @@ export const ImageEditNode = memo(({ id, data, selected, width, height }: ImageE
         : null,
     [
       grsaiCreditTierId,
-      i18n.language,
       preferDiscountedPrice,
       priceDisplayCurrencyMode,
       effectiveExtraParams,
@@ -355,26 +351,21 @@ export const ImageEditNode = memo(({ id, data, selected, width, height }: ImageE
 
     const lines = [resolvedPriceDisplay.label];
     if (resolvedPriceDisplay.nativeLabel) {
-      lines.push(t('pricing.nativePrice', { value: resolvedPriceDisplay.nativeLabel }));
+      lines.push(`原币种：${resolvedPriceDisplay.nativeLabel}`);
     }
     if (resolvedPriceDisplay.originalLabel) {
-      lines.push(t('pricing.originalPrice', { value: resolvedPriceDisplay.originalLabel }));
+      lines.push(`原价：${resolvedPriceDisplay.originalLabel}`);
     }
     if (resolvedPriceDisplay.pointsCost) {
-      lines.push(t('pricing.pointsCost', { count: resolvedPriceDisplay.pointsCost }));
+      lines.push(`积分消耗：${resolvedPriceDisplay.pointsCost}`);
     }
     if (resolvedPriceDisplay.grsaiCreditTier) {
       lines.push(
-        t('pricing.grsaiTier', {
-          price: resolvedPriceDisplay.grsaiCreditTier.priceCny.toFixed(2),
-          credits: resolvedPriceDisplay.grsaiCreditTier.credits.toLocaleString(
-            i18n.language.startsWith('zh') ? 'zh-CN' : 'en-US'
-          ),
-        })
+        `积分档位：¥${resolvedPriceDisplay.grsaiCreditTier.priceCny.toFixed(2)} / ${resolvedPriceDisplay.grsaiCreditTier.credits.toLocaleString('zh-CN')} 积分`
       );
     }
     return lines.join('\n');
-  }, [i18n.language, resolvedPriceDisplay, t]);
+  }, [resolvedPriceDisplay]);
 
   const supportedAspectRatioValues = useMemo(
     () => selectedModel.aspectRatios.map((item) => item.value),
@@ -459,22 +450,22 @@ export const ImageEditNode = memo(({ id, data, selected, width, height }: ImageE
   const handleGenerate = useCallback(async () => {
     const prompt = promptDraft.replace(/@(?=图\d+)/g, '').trim();
     if (!prompt) {
-      const errorMessage = t('node.imageEdit.promptRequired');
+      const errorMessage = '请输入提示词';
       setError(errorMessage);
-      void showErrorDialog(errorMessage, t('common.error'));
+      void showErrorDialog(errorMessage, '错误');
       return;
     }
 
     if (!providerApiKey) {
-      const errorMessage = t('node.imageEdit.apiKeyRequired');
+      const errorMessage = '请在设置中填写 API Key';
       setError(errorMessage);
-      void showErrorDialog(errorMessage, t('common.error'));
+      void showErrorDialog(errorMessage, '错误');
       return;
     }
 
     const generationDurationMs = selectedModel.expectedDurationMs ?? 60000;
     const generationStartedAt = Date.now();
-    const resultNodeTitle = buildAiResultNodeTitle(prompt, t('node.imageEdit.resultTitle'));
+    const resultNodeTitle = buildAiResultNodeTitle(prompt, '结果图片');
     const runtimeDiagnostics = await getRuntimeDiagnostics();
     setError(null);
 
@@ -549,7 +540,7 @@ export const ImageEditNode = memo(({ id, data, selected, width, height }: ImageE
         generationDebugContext,
       });
     } catch (generationError) {
-      const resolvedError = resolveErrorContent(generationError, t('ai.error'));
+      const resolvedError = resolveErrorContent(generationError, '生成失败');
       const generationDebugContext: GenerationDebugContext = {
         sourceType: 'imageEdit',
         providerId: selectedModel.providerId,
@@ -574,7 +565,7 @@ export const ImageEditNode = memo(({ id, data, selected, width, height }: ImageE
       setError(resolvedError.message);
       void showErrorDialog(
         resolvedError.message,
-        t('common.error'),
+        '错误',
         resolvedError.details,
         reportText
       );
@@ -605,7 +596,6 @@ export const ImageEditNode = memo(({ id, data, selected, width, height }: ImageE
     selectedModel.providerId,
     selectedResolution.value,
     supportedAspectRatioValues,
-    t,
     updateNodeData,
   ]);
 
@@ -762,7 +752,7 @@ export const ImageEditNode = memo(({ id, data, selected, width, height }: ImageE
             onKeyDown={handlePromptKeyDown}
             onScroll={syncPromptHighlightScroll}
             onMouseDown={(event) => event.stopPropagation()}
-            placeholder={t('node.imageEdit.promptPlaceholder')}
+            placeholder="描述任何你想要生成或编辑的内容"
             className="ui-scrollbar nodrag nowheel relative z-10 h-full w-full resize-none overflow-y-auto overflow-x-hidden border-none bg-transparent px-1 py-0.5 text-sm leading-6 text-transparent caret-text-dark outline-none placeholder:text-text-muted/80 focus:border-transparent whitespace-pre-wrap break-words"
             style={{ scrollbarGutter: 'stable' }}
           />
@@ -864,7 +854,7 @@ export const ImageEditNode = memo(({ id, data, selected, width, height }: ImageE
           className={`shrink-0 ${NODE_CONTROL_PRIMARY_BUTTON_CLASS}`}
         >
           <Sparkles className={NODE_CONTROL_ICON_CLASS} strokeWidth={2.8} />
-          {t('canvas.generate')}
+          生成
         </UiButton>
       </div>
 

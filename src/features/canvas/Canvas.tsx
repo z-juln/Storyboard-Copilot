@@ -21,7 +21,6 @@ import {
   type OnConnectStartParams,
   type Viewport,
 } from '@xyflow/react';
-import { useTranslation } from 'react-i18next';
 import '@xyflow/react/dist/style.css';
 
 import { useCanvasStore } from '@/stores/canvasStore';
@@ -231,7 +230,6 @@ interface PreviewConnectionLine {
 }
 
 export function Canvas() {
-  const { t } = useTranslation();
   const reactFlowInstance = useReactFlow();
   const wrapperRef = useRef<HTMLDivElement>(null);
   const suppressNextPaneClickRef = useRef(false);
@@ -522,7 +520,7 @@ export function Canvas() {
                 errorDetails: status.error ?? undefined,
                 context: currentData.generationDebugContext,
               });
-              void showErrorDialog(errorMessage, t('common.error'), status.error ?? undefined, reportText);
+              void showErrorDialog(errorMessage, '错误', status.error ?? undefined, reportText);
             }
             updateNodeData(pendingNode.id, {
               isGenerating: false,
@@ -1573,13 +1571,12 @@ export function Canvas() {
         <div className="flex max-w-3xl flex-col items-center gap-5 px-6 text-center">
           {configuredApiKeyCount === 0 && <MissingApiKeyHint />}
           <div>
-            <div className="mb-2 text-2xl text-text-muted">{t('canvas.emptyHintTitle')}</div>
-            <div className="text-sm text-text-muted opacity-60">{t('canvas.emptyHintSubtitle')}</div>
+            <div className="text-2xl text-text-muted">双击鼠标添加节点</div>
           </div>
         </div>
       </div>
     ),
-    [configuredApiKeyCount, t]
+    [configuredApiKeyCount]
   );
 
   return (

@@ -42,6 +42,7 @@ const DEFAULT_PRICING_SETTINGS: PricingSettingsSnapshot = {
   grsaiCreditTierId: DEFAULT_GRSAI_CREDIT_TIER_ID,
 };
 
+const PER_RUN_SUFFIX = '/次';
 
 function toFiniteAmount(value: number): number {
   return Number.isFinite(value) ? Math.max(0, value) : 0;
@@ -64,10 +65,8 @@ function convertCurrency(amount: number, from: PriceCurrency, to: PriceCurrency,
   return amount / safeRate;
 }
 
-function formatCurrency(amount: number, currency: PriceCurrency, language: string): string {
-  const locale = language.startsWith('zh') ? 'zh-CN' : 'en-US';
-
-  return new Intl.NumberFormat(locale, {
+function formatCurrency(amount: number, currency: PriceCurrency): string {
+  return new Intl.NumberFormat('zh-CN', {
     style: 'currency',
     currency,
     minimumFractionDigits: 2,
@@ -75,19 +74,12 @@ function formatCurrency(amount: number, currency: PriceCurrency, language: strin
   }).format(toFiniteAmount(amount));
 }
 
-export function resolvePriceDisplayCurrency(
-  language: string,
-  mode: PriceDisplayCurrencyMode
-): PriceCurrency {
-  if (mode === 'cny') {
-    return 'CNY';
-  }
-
+export function resolvePriceDisplayCurrency(mode: PriceDisplayCurrencyMode): PriceCurrency {
   if (mode === 'usd') {
     return 'USD';
   }
 
-  return language.startsWith('zh') ? 'CNY' : 'USD';
+  return 'CNY';
 }
 
 export function getGrsaiCreditTier(
@@ -180,7 +172,6 @@ export function resolveModelPriceDisplay(
     resolution: string;
     extraParams?: Record<string, unknown>;
     settings?: Partial<PricingSettingsSnapshot>;
-    language: string;
   }
 ): ModelPriceDisplay | null {
   if (!model.pricing) {
@@ -200,21 +191,17 @@ export function resolveModelPriceDisplay(
     return null;
   }
 
-  const displayCurrency = resolvePriceDisplayCurrency(
-    options.language,
-    pricingSettings.displayCurrencyMode
-  );
+  const displayCurrency = resolvePriceDisplayCurrency(pricingSettings.displayCurrencyMode);
   const displayAmount = convertCurrency(
     quote.amount,
     quote.currency,
     displayCurrency,
     pricingSettings.usdToCnyRate
   );
-  const perRunSuffix = options.language.startsWith('zh') ? '/次' : '/run';
   const nativeLabel =
     quote.currency === displayCurrency
       ? undefined
-      : `${formatCurrency(quote.amount, quote.currency, options.language)}${perRunSuffix}`;
+      : `${formatCurrency(quote.amount, quote.currency)}${PER_RUN_SUFFIX}`;
   const originalDisplayAmount =
     quote.originalAmount != null
       ? convertCurrency(
@@ -227,11 +214,11 @@ export function resolveModelPriceDisplay(
   const grsaiCreditTierId = normalizeStringParam(quote.metadata?.grsaiCreditTierId);
 
   return {
-    label: `${formatCurrency(displayAmount, displayCurrency, options.language)}${perRunSuffix}`,
+    label: `${formatCurrency(displayAmount, displayCurrency)}${PER_RUN_SUFFIX}`,
     nativeLabel,
     originalLabel:
       originalDisplayAmount != null
-        ? `${formatCurrency(originalDisplayAmount, displayCurrency, options.language)}${perRunSuffix}`
+        ? `${formatCurrency(originalDisplayAmount, displayCurrency)}${PER_RUN_SUFFIX}`
         : undefined,
     pointsCost: quote.pointsCost,
     grsaiCreditTier: grsaiCreditTierId ? getGrsaiCreditTier(grsaiCreditTierId) : undefined,
@@ -241,9 +228,3 @@ export function resolveModelPriceDisplay(
 export function isHighThinkingEnabled(extraParams: Record<string, unknown> | undefined): boolean {
   return normalizeStringParam(extraParams?.thinking_level) === 'high';
 }
-
-
-
-
-
-

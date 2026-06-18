@@ -27,7 +27,6 @@
 | 新工具 | `tools/types.ts`, `builtInTools.ts`, `tool-editors/`, `toolProcessor.ts` |
 | 新模型/供应商 | `models/image/<provider>/`, `models/providers/`, `src-tauri/src/ai/providers/` |
 | 持久化 | `projectStore.ts`, `projectState.ts`, `project_state.rs` |
-| 文案 | `src/i18n/locales/zh.json`, `src/i18n/locales/en.json` |
 
 ## 硬约束
 
@@ -49,13 +48,6 @@
 - 大图渲染优先用 `previewImageUrl`，模型/工具处理使用原图 `imageUrl`。
 - 新增图片字段需同步 `imagePool + __img_ref__` 编码/解码。
 - SQLite 表结构变化必须在 `ensure_projects_table` 中做自愈迁移。
-
-## i18n
-
-- 组件文案使用 `useTranslation()` + `t('key.path')`。
-- 新 key 同步写入 `src/i18n/locales/zh.json` 和 `src/i18n/locales/en.json`。
-- key 稳定、模块化，避免把中文句子当 key。
-- 切换中英文后，不应出现 key 泄露或按钮文案截断。
 
 ## 验证
 

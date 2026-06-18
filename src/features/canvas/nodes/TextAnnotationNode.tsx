@@ -4,7 +4,6 @@ import { FileText } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
-import { useTranslation } from 'react-i18next';
 import { openUrl } from '@tauri-apps/plugin-opener';
 
 import { CANVAS_NODE_TYPES, type TextAnnotationNodeData } from '@/features/canvas/domain/canvasNodes';
@@ -33,7 +32,6 @@ export const TextAnnotationNode = memo(({
   width,
   height,
 }: TextAnnotationNodeProps) => {
-  const { t } = useTranslation();
   const setSelectedNode = useCanvasStore((state) => state.setSelectedNode);
   const updateNodeData = useCanvasStore((state) => state.updateNodeData);
   const content = typeof data.content === 'string' ? data.content : '';
@@ -81,7 +79,7 @@ export const TextAnnotationNode = memo(({
             const nextValue = event.target.value;
             updateNodeData(id, { content: nextValue });
           }}
-          placeholder={t('node.textAnnotation.placeholder')}
+          placeholder="输入 Markdown 文本，取消选中后会渲染预览"
           className="nodrag nowheel h-full w-full resize-none border-none bg-transparent px-1 py-0.5 text-sm leading-6 text-text-dark outline-none placeholder:text-text-muted/70"
         />
       ) : (
@@ -111,7 +109,7 @@ export const TextAnnotationNode = memo(({
               </ReactMarkdown>
             </div>
           ) : (
-            <div className="pt-1 text-text-muted">{t('node.textAnnotation.empty')}</div>
+            <div className="pt-1 text-text-muted">空注释</div>
           )}
         </div>
       )}

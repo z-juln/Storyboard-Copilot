@@ -1,5 +1,4 @@
 import { useMemo, useState, useEffect, useCallback } from 'react';
-import { useTranslation } from 'react-i18next';
 
 import {
   NODE_TOOL_TYPES,
@@ -25,7 +24,6 @@ import { AnnotateToolEditor } from './tool-editors/AnnotateToolEditor';
 import { SplitStoryboardToolEditor } from './tool-editors/SplitStoryboardToolEditor';
 
 export function NodeToolDialog() {
-  const { t } = useTranslation();
   const activeToolDialog = useCanvasStore((state) => state.activeToolDialog);
   const nodes = useCanvasStore((state) => state.nodes);
   const addDerivedExportNode = useCanvasStore((state) => state.addDerivedExportNode);
@@ -175,29 +173,29 @@ export function NodeToolDialog() {
       return '';
     }
     if (toolType === NODE_TOOL_TYPES.crop) {
-      return t('tool.crop');
+      return '裁剪';
     }
     if (toolType === NODE_TOOL_TYPES.annotate) {
-      return t('tool.annotate');
+      return '标注';
     }
     if (toolType === NODE_TOOL_TYPES.splitStoryboard) {
-      return t('tool.split');
+      return '切割';
     }
     return '';
-  }, [t]);
+  }, []);
   const resolveResultNodeTitle = useCallback((toolType: NodeToolType | undefined) => {
     if (toolType === NODE_TOOL_TYPES.crop) {
-      return t('toolDialog.cropResultTitle');
+      return '裁剪结果';
     }
     if (toolType === NODE_TOOL_TYPES.annotate) {
-      return t('toolDialog.annotateResultTitle');
+      return '标注结果';
     }
     return EXPORT_RESULT_DISPLAY_NAME.generic;
-  }, [t]);
+  }, []);
 
   const handleApply = useCallback(async () => {
     if (!activeToolDialog || !sourceNode || !sourceImageUrl || !activePlugin) {
-      setError(t('toolDialog.noProcessableImage'));
+      setError('当前节点没有可处理的图片');
       return;
     }
 
@@ -242,7 +240,7 @@ export function NodeToolDialog() {
 
       closeDialog();
     } catch (processError) {
-      setError(processError instanceof Error ? processError.message : t('toolDialog.processFailed'));
+      setError(processError instanceof Error ? processError.message : '处理失败');
     } finally {
       setIsProcessing(false);
     }
@@ -257,7 +255,6 @@ export function NodeToolDialog() {
     addEdge,
     closeDialog,
     resolveResultNodeTitle,
-    t,
   ]);
 
   const widthClassName = useMemo(() => {
@@ -329,16 +326,16 @@ export function NodeToolDialog() {
   return (
     <UiModal
       isOpen={isOpen}
-      title={`${resolveToolLabel(activePlugin?.type)}${t('toolDialog.suffix')}`}
+      title={`${resolveToolLabel(activePlugin?.type)}工具`}
       onClose={closeDialog}
       widthClassName={widthClassName}
       footer={
         <>
           <UiButton variant="ghost" size="sm" onClick={closeDialog}>
-            {t('common.cancel')}
+            取消
           </UiButton>
           <UiButton size="sm" variant="primary" onClick={handleApply} disabled={isProcessing || !sourceImageUrl}>
-            {isProcessing ? t('toolDialog.processing') : t('toolDialog.apply')}
+            {isProcessing ? '处理中...' : '应用'}
           </UiButton>
         </>
       }

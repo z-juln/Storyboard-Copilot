@@ -1,5 +1,4 @@
 import { memo, useCallback } from 'react';
-import { useTranslation } from 'react-i18next';
 import {
   Plus,
   ZoomIn,
@@ -20,7 +19,6 @@ interface CanvasToolbarProps {
 }
 
 export const CanvasToolbar = memo(({ isLocked, onToggleLock }: CanvasToolbarProps) => {
-  const { t } = useTranslation();
   const { zoomIn, zoomOut, fitView } = useReactFlow();
   const addNode = useCanvasStore((state) => state.addNode);
   const clearCanvas = useCanvasStore((state) => state.clearCanvas);
@@ -46,7 +44,7 @@ export const CanvasToolbar = memo(({ isLocked, onToggleLock }: CanvasToolbarProp
         `}
       >
         <Plus className="h-4 w-4" />
-        {t('canvas.addImage')}
+        添加图片
       </button>
 
       <div className="h-6 w-px bg-border-dark" />
@@ -55,7 +53,7 @@ export const CanvasToolbar = memo(({ isLocked, onToggleLock }: CanvasToolbarProp
         onClick={() => zoomIn()}
         disabled={isLocked}
         className="rounded p-1.5 transition-colors hover:bg-bg-dark disabled:opacity-50"
-        title={t('canvas.toolbar.zoomIn')}
+        title="放大"
       >
         <ZoomIn className="h-4 w-4 text-text-muted" />
       </button>
@@ -64,7 +62,7 @@ export const CanvasToolbar = memo(({ isLocked, onToggleLock }: CanvasToolbarProp
         onClick={() => zoomOut()}
         disabled={isLocked}
         className="rounded p-1.5 transition-colors hover:bg-bg-dark disabled:opacity-50"
-        title={t('canvas.toolbar.zoomOut')}
+        title="缩小"
       >
         <ZoomOut className="h-4 w-4 text-text-muted" />
       </button>
@@ -72,7 +70,7 @@ export const CanvasToolbar = memo(({ isLocked, onToggleLock }: CanvasToolbarProp
       <button
         onClick={() => fitView({ padding: 0.2 })}
         className="rounded p-1.5 transition-colors hover:bg-bg-dark"
-        title={t('canvas.toolbar.fitView')}
+        title="适应视图"
       >
         <Maximize2 className="h-4 w-4 text-text-muted" />
       </button>
@@ -82,7 +80,7 @@ export const CanvasToolbar = memo(({ isLocked, onToggleLock }: CanvasToolbarProp
       <button
         onClick={onToggleLock}
         className="rounded p-1.5 transition-colors hover:bg-bg-dark"
-        title={isLocked ? t('canvas.toolbar.unlock') : t('canvas.toolbar.lock')}
+        title={isLocked ? '解锁画布' : '锁定画布'}
       >
         {isLocked ? <Lock className="h-4 w-4 text-accent" /> : <Unlock className="h-4 w-4 text-text-muted" />}
       </button>
@@ -91,7 +89,7 @@ export const CanvasToolbar = memo(({ isLocked, onToggleLock }: CanvasToolbarProp
         onClick={clearCanvas}
         disabled={isLocked}
         className="rounded p-1.5 transition-colors hover:bg-red-500/10 disabled:opacity-50"
-        title={t('common.delete')}
+        title="删除"
       >
         <Trash2 className="h-4 w-4 text-red-500" />
       </button>

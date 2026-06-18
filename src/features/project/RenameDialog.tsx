@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { useTranslation } from 'react-i18next';
 import { UI_CONTENT_OVERLAY_INSET_CLASS, UI_DIALOG_TRANSITION_MS } from '@/components/ui/motion';
 import { useDialogTransition } from '@/components/ui/useDialogTransition';
 
@@ -18,7 +17,6 @@ export function RenameDialog({
   onClose,
   onConfirm,
 }: RenameDialogProps) {
-  const { t } = useTranslation();
   const [name, setName] = useState(defaultValue);
   const { shouldRender, isVisible } = useDialogTransition(isOpen, UI_DIALOG_TRANSITION_MS);
 
@@ -62,7 +60,7 @@ export function RenameDialog({
           value={name}
           onChange={(e) => setName(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={t('project.namePlaceholder')}
+          placeholder="请输入项目名称"
           className="w-full px-3 py-2 bg-bg-dark border border-border-dark rounded text-text-dark placeholder-text-muted focus:outline-none focus:border-primary"
           autoFocus
         />
@@ -72,7 +70,7 @@ export function RenameDialog({
             onClick={onClose}
             className="px-4 py-2 text-text-muted hover:text-text-dark transition-colors"
           >
-            {t('common.cancel')}
+            取消
           </button>
           <button
             type="button"
@@ -84,7 +82,7 @@ export function RenameDialog({
                 : 'bg-bg-dark text-text-muted cursor-not-allowed'
             }`}
           >
-            {t('common.confirm')}
+            确认
           </button>
         </div>
       </div>

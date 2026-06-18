@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react';
-import { useTranslation } from 'react-i18next';
 import { Plus, FolderOpen, Pencil, Trash2 } from 'lucide-react';
 import { useProjectStore } from '@/stores/projectStore';
 import { getConfiguredApiKeyCount, useSettingsStore } from '@/stores/settingsStore';
@@ -13,7 +12,6 @@ type ProjectSortField = 'name' | 'createdAt' | 'updatedAt';
 type SortDirection = 'asc' | 'desc';
 
 export function ProjectManager() {
-  const { t } = useTranslation();
   const [showRenameDialog, setShowRenameDialog] = useState(false);
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [editingProjectName, setEditingProjectName] = useState('');
@@ -54,7 +52,7 @@ export function ProjectManager() {
   };
 
   const formatDate = (timestamp: number) => {
-    return new Date(timestamp).toLocaleDateString();
+    return new Date(timestamp).toLocaleDateString('zh-CN');
   };
 
   const sortedProjects = useMemo(() => {
@@ -79,32 +77,32 @@ export function ProjectManager() {
       <div className="max-w-5xl mx-auto">
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-text-dark">{t('project.title')}</h1>
+            <h1 className="text-2xl font-bold text-text-dark">项目管理</h1>
             <div className="flex items-center gap-2">
               <UiSelect
-                aria-label={t('project.sortBy')}
+                aria-label="排序字段"
                 value={sortField}
                 onChange={(event) => setSortField(event.target.value as ProjectSortField)}
                 className="h-9 w-[100px] rounded-lg text-sm"
               >
-                <option value="name">{t('project.sortByName')}</option>
-                <option value="createdAt">{t('project.sortByCreatedAt')}</option>
-                <option value="updatedAt">{t('project.sortByUpdatedAt')}</option>
+                <option value="name">按名称</option>
+                <option value="createdAt">按创建日期</option>
+                <option value="updatedAt">按修改日期</option>
               </UiSelect>
               <UiSelect
-                aria-label={t('project.sortDirection')}
+                aria-label="排序顺序"
                 value={sortDirection}
                 onChange={(event) => setSortDirection(event.target.value as SortDirection)}
                 className="h-9 w-[60px] rounded-lg text-sm"
               >
-                <option value="asc">{t('project.sortAsc')}</option>
-                <option value="desc">{t('project.sortDesc')}</option>
+                <option value="asc">升序</option>
+                <option value="desc">降序</option>
               </UiSelect>
             </div>
           </div>
           <UiButton type="button" variant="primary" onClick={handleCreateProject} className="gap-2">
             <Plus className="w-5 h-5" />
-            {t('project.newProject')}
+            新建项目
           </UiButton>
         </div>
 
@@ -113,8 +111,8 @@ export function ProjectManager() {
         {projects.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-text-muted">
             <FolderOpen className="w-16 h-16 mb-4 opacity-50" />
-            <p className="text-lg">{t('project.empty')}</p>
-            <p className="text-sm mt-2">{t('project.emptyHint')}</p>
+            <p className="text-lg">暂无项目</p>
+            <p className="text-sm mt-2">点击上方按钮创建新项目</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -133,7 +131,7 @@ export function ProjectManager() {
                       type="button"
                       onClick={(e) => handleRenameClick(project.id, project.name, e)}
                       className="p-1 hover:bg-bg-dark rounded"
-                      title={t('project.rename')}
+                      title="重命名"
                     >
                       <Pencil className="w-4 h-4 text-text-muted hover:text-text-dark" />
                     </button>
@@ -141,7 +139,7 @@ export function ProjectManager() {
                       type="button"
                       onClick={(e) => handleDeleteClick(project.id, e)}
                       className="p-1 hover:bg-bg-dark rounded"
-                      title={t('project.delete')}
+                      title="删除项目"
                     >
                       <Trash2 className="w-4 h-4 text-text-muted hover:text-red-500" />
                     </button>
@@ -149,10 +147,10 @@ export function ProjectManager() {
                 </div>
                 <div className="text-xs text-text-muted">
                   <p>
-                    {t('project.modified')}: {formatDate(project.updatedAt)}
+                    修改时间: {formatDate(project.updatedAt)}
                   </p>
                   <p>
-                    {t('project.created')}: {formatDate(project.createdAt)}
+                    创建时间: {formatDate(project.createdAt)}
                   </p>
                 </div>
               </div>
@@ -167,7 +165,7 @@ export function ProjectManager() {
 
       <RenameDialog
         isOpen={showRenameDialog}
-        title={editingProjectId ? t('project.renameTitle') : t('project.newProjectTitle')}
+        title={editingProjectId ? '重命名项目' : '新建项目'}
         defaultValue={editingProjectName}
         onClose={() => setShowRenameDialog(false)}
         onConfirm={handleConfirm}

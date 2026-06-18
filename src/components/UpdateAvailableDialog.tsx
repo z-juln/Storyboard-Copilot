@@ -1,5 +1,4 @@
 import { useCallback, useMemo, useState } from 'react';
-import { useTranslation } from 'react-i18next';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { UiButton, UiModal, UiSelect } from '@/components/ui';
 
@@ -22,16 +21,15 @@ export function UpdateAvailableDialog({
   currentVersion,
   onApplyIgnore,
 }: UpdateAvailableDialogProps) {
-  const { t } = useTranslation();
   const [ignoreMode, setIgnoreMode] = useState<UpdateIgnoreMode>('today-version');
 
   const ignoreOptions = useMemo(
     () => [
-      { value: 'today-version' as const, label: t('update.ignoreTodayVersion') },
-      { value: 'forever-version' as const, label: t('update.ignoreThisVersionForever') },
-      { value: 'forever-all' as const, label: t('update.ignoreAllForever') },
+      { value: 'today-version' as const, label: '今日不再提示该版本' },
+      { value: 'forever-version' as const, label: '不再提示该版本' },
+      { value: 'forever-all' as const, label: '永远不再提示更新' },
     ],
-    [t]
+    []
   );
 
   const handleOpenQuark = useCallback(() => {
@@ -51,36 +49,33 @@ export function UpdateAvailableDialog({
     <UiModal
       isOpen={isOpen}
       onClose={onClose}
-      title={t('update.dialogTitle')}
+      title="发现新版本"
       footer={(
         <>
           <UiButton variant="muted" onClick={onClose}>
-            {t('common.cancel')}
+            取消
           </UiButton>
           <UiButton variant="muted" onClick={handleOpenQuark}>
-            {t('update.goToQuarkDownload')}
+            前往网盘下载
           </UiButton>
           <UiButton variant="primary" onClick={handleOpenGithub}>
-            {t('update.goToGithubDownload')}
+            去 GitHub 下载
           </UiButton>
           <UiButton variant="ghost" onClick={handleApplyIgnore}>
-            {t('update.applyIgnore')}
+            应用忽略
           </UiButton>
         </>
       )}
     >
       <div className="text-sm text-text-muted leading-6">
-        <p>{t('update.dialogDescription')}</p>
+        <p>检测到软件有新版本，是否前往下载？</p>
         {(latestVersion || currentVersion) && (
           <p className="mt-2 text-xs">
-            {t('update.versionLine', {
-              currentVersion: currentVersion ?? '-',
-              latestVersion: latestVersion ?? '-',
-            })}
+            {`当前版本：${currentVersion ?? '-'}，最新版本：${latestVersion ?? '-'}`}
           </p>
         )}
         <div className="mt-3">
-          <p className="mb-1 text-xs text-text-muted">{t('update.ignoreRule')}</p>
+          <p className="mb-1 text-xs text-text-muted">忽略提醒规则</p>
           <UiSelect
             value={ignoreMode}
             onChange={(event) => setIgnoreMode(event.target.value as UpdateIgnoreMode)}

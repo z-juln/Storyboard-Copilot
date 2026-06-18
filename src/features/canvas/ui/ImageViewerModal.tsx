@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import { useTranslation } from 'react-i18next';
 import { ChevronLeft, ChevronRight, RotateCcw, X } from 'lucide-react';
 import { UI_CONTENT_OVERLAY_INSET_CLASS } from '@/components/ui/motion';
 import { useImageViewerTransform } from '../hooks/useImageViewerTransform';
@@ -21,7 +20,6 @@ export function ImageViewerModal({
   onClose,
   onNavigate,
 }: ImageViewerModalProps): JSX.Element | null {
-  const { t } = useTranslation();
   const viewerControlClass =
     'inline-flex h-10 items-center justify-center rounded-full border border-white/20 bg-black/60 px-4 text-sm text-white backdrop-blur-xl';
   const [isVisible, setIsVisible] = useState(false);
@@ -141,7 +139,7 @@ export function ImageViewerModal({
           <img
             ref={imageRef}
             src={displayImageUrl}
-            alt={t('viewer.imageAlt', '图片')}
+            alt="图片"
             className="select-none transition-opacity duration-300"
             style={{
               opacity: viewerOpacity * overlayOpacity,
@@ -171,7 +169,7 @@ export function ImageViewerModal({
                 onClick={() => onNavigate('prev')}
                 disabled={currentIndex <= 0}
                 className="rounded-full bg-zinc-800/80 p-2 text-white backdrop-blur-sm transition-all duration-200 hover:bg-zinc-700/80 disabled:cursor-not-allowed disabled:opacity-50"
-                title={t('viewer.prev', '上一张')}
+                title="上一张"
               >
                 <ChevronLeft className="h-5 w-5" />
               </button>
@@ -179,7 +177,7 @@ export function ImageViewerModal({
                 onClick={() => onNavigate('next')}
                 disabled={currentIndex >= imageList.length - 1}
                 className="rounded-full bg-zinc-800/80 p-2 text-white backdrop-blur-sm transition-all duration-200 hover:bg-zinc-700/80 disabled:cursor-not-allowed disabled:opacity-50"
-                title={t('viewer.next', '下一张')}
+                title="下一张"
               >
                 <ChevronRight className="h-5 w-5" />
               </button>
@@ -201,14 +199,14 @@ export function ImageViewerModal({
             <button
               onClick={resetView}
               className={`${viewerControlClass} transition-colors hover:bg-white/10`}
-              title={t('viewer.reset', '重置视图')}
+              title="重置视图"
             >
               <RotateCcw className="h-4 w-4" />
             </button>
             <button
               onClick={onClose}
               className={`${viewerControlClass} transition-colors hover:bg-white/10`}
-              title={t('common.close', '关闭')}
+              title="关闭"
             >
               <X className="h-4 w-4" />
             </button>

@@ -17,7 +17,6 @@ import {
   type NodeProps,
 } from '@xyflow/react';
 import { Upload } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
 
 import {
   CANVAS_NODE_TYPES,
@@ -71,7 +70,6 @@ function resolveDroppedImageFile(event: DragEvent<HTMLElement>): File | null {
 }
 
 export const UploadNode = memo(({ id, data, selected, width, height }: UploadNodeProps) => {
-  const { t } = useTranslation();
   const updateNodeInternals = useUpdateNodeInternals();
   const setSelectedNode = useCanvasStore((state) => state.setSelectedNode);
   const updateNodeData = useCanvasStore((state) => state.updateNodeData);
@@ -331,7 +329,7 @@ export const UploadNode = memo(({ id, data, selected, width, height }: UploadNod
           <CanvasNodeImage
             src={imageSource ?? ''}
             viewerSourceUrl={data.imageUrl ? resolveImageDisplayUrl(data.imageUrl) : null}
-            alt={t('node.upload.uploadedAlt')}
+            alt="已上传图片"
             className="h-full w-full object-contain"
             onLoad={handleImageLoad}
           />
@@ -342,7 +340,7 @@ export const UploadNode = memo(({ id, data, selected, width, height }: UploadNod
         >
           <div className="flex h-full w-full cursor-pointer flex-col items-center justify-center gap-2 text-text-muted/85">
             <Upload className="h-7 w-7 opacity-60" />
-            <span className="px-3 text-center text-[12px] leading-6">{t('node.upload.hint')}</span>
+            <span className="px-3 text-center text-[12px] leading-6">点击或拖拽上传图片</span>
           </div>
         </label>
       )}

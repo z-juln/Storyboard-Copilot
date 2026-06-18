@@ -2,7 +2,6 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { NodeToolbar as ReactFlowNodeToolbar } from '@xyflow/react';
 import { Copy, Crop, Download, FolderOpen, PenLine, RefreshCw, Scissors, Trash2, Unlink2 } from 'lucide-react';
 import { save } from '@tauri-apps/plugin-dialog';
-import { useTranslation } from 'react-i18next';
 
 import {
   NODE_TOOL_TYPES,
@@ -51,7 +50,6 @@ const TOOLBAR_NEUTRAL_BUTTON_CLASS =
   'border-[rgba(255,255,255,0.18)] bg-bg-dark/70 text-text-dark hover:border-[rgba(255,255,255,0.32)] hover:bg-bg-dark';
 
 export const NodeActionToolbar = memo(({ node }: NodeActionToolbarProps) => {
-  const { t, i18n } = useTranslation();
   const isImageEdit = isImageEditNode(node);
   const isStoryboardGen = isStoryboardGenNode(node);
   const isStoryboardSplit = isStoryboardSplitNode(node);
@@ -95,11 +93,11 @@ export const NodeActionToolbar = memo(({ node }: NodeActionToolbarProps) => {
   const generationErrorReport = useMemo(
     () =>
       buildGenerationErrorReport({
-        errorMessage: generationError || t('ai.error'),
+        errorMessage: generationError || '生成失败',
         errorDetails: generationErrorDetails || undefined,
         context: (node.data as { generationDebugContext?: unknown }).generationDebugContext,
       }),
-    [generationError, generationErrorDetails, node.data, t]
+    [generationError, generationErrorDetails, node.data]
   );
 
   const closeDownloadMenu = useCallback(() => {
@@ -115,16 +113,16 @@ export const NodeActionToolbar = memo(({ node }: NodeActionToolbarProps) => {
 
   const resolveToolLabel = useCallback((toolType: NodeToolType) => {
     if (toolType === NODE_TOOL_TYPES.crop) {
-      return t('tool.crop');
+      return '裁剪';
     }
     if (toolType === NODE_TOOL_TYPES.annotate) {
-      return t('tool.annotate');
+      return '标注';
     }
     if (toolType === NODE_TOOL_TYPES.splitStoryboard) {
-      return t('tool.split');
+      return '切割';
     }
     return '';
-  }, [t]);
+  }, []);
 
   useEffect(() => {
     if (!downloadMenu) {
@@ -202,26 +200,20 @@ export const NodeActionToolbar = memo(({ node }: NodeActionToolbarProps) => {
   const storyboardText = useMemo(() => {
     if (isStoryboardGen) {
       return node.data.frames
-        .map((frame, index) => t('nodeToolbar.storyboardLine', {
-          index: String(index + 1).padStart(2, '0'),
-          content: sanitizeStoryboardText(
+        .map((frame, index) => `分镜 ${String(index + 1).padStart(2, '0')}：${sanitizeStoryboardText(
             frame.description ?? '',
             ignoreAtTagWhenCopyingAndGenerating
-          ),
-        }))
+          )}`)
         .join('\n');
     }
     if (isStoryboardSplit) {
       const orderedFrames = [...node.data.frames].sort((a, b) => a.order - b.order);
       return orderedFrames
-        .map((frame, index) => t('nodeToolbar.storyboardLine', {
-          index: String(index + 1).padStart(2, '0'),
-          content: sanitizeStoryboardText(frame.note ?? '', ignoreAtTagWhenCopyingAndGenerating),
-        }))
+        .map((frame, index) => `分镜 ${String(index + 1).padStart(2, '0')}：${sanitizeStoryboardText(frame.note ?? '', ignoreAtTagWhenCopyingAndGenerating)}`)
         .join('\n');
     }
     return '';
-  }, [ignoreAtTagWhenCopyingAndGenerating, isStoryboardGen, isStoryboardSplit, node, t, i18n.language]);
+  }, [ignoreAtTagWhenCopyingAndGenerating, isStoryboardGen, isStoryboardSplit, node]);
 
   const handleCopyStoryboardText = useCallback(async () => {
     if (!storyboardText) {
@@ -339,7 +331,7 @@ export const NodeActionToolbar = memo(({ node }: NodeActionToolbarProps) => {
             }
           >
             <RefreshCw className="h-3.5 w-3.5" />
-            {t('nodeToolbar.reupload')}
+            重新上传
           </UiChipButton>
         )}
         {!isImageEdit && canHandleImage && (
@@ -355,7 +347,7 @@ export const NodeActionToolbar = memo(({ node }: NodeActionToolbarProps) => {
             }}
           >
             <Copy className="h-3.5 w-3.5" />
-            {t('nodeToolbar.copy')}
+            复制
           </UiChipButton>
         )}
         {!isImageEdit && canCopyStoryboardText && (
@@ -371,7 +363,7 @@ export const NodeActionToolbar = memo(({ node }: NodeActionToolbarProps) => {
             }}
           >
             <Copy className="h-3.5 w-3.5" />
-            {t('nodeToolbar.copyText')}
+            复制文本
           </UiChipButton>
         )}
         {!isImageEdit && canCopyGenerationError && (
@@ -387,7 +379,7 @@ export const NodeActionToolbar = memo(({ node }: NodeActionToolbarProps) => {
             }}
           >
             <Copy className="h-3.5 w-3.5" />
-            {isCopyErrorSuccess ? t('nodeToolbar.copied') : t('nodeToolbar.copyErrorReport')}
+            {isCopyErrorSuccess ? '已复制' : '复制报错'}
           </UiChipButton>
         )}
         {!isImageEdit && canHandleImage && (
@@ -408,7 +400,7 @@ export const NodeActionToolbar = memo(({ node }: NodeActionToolbarProps) => {
             }}
           >
             <Download className="h-3.5 w-3.5" />
-            {t('nodeToolbar.download')}
+            下载
           </UiChipButton>
         )}
         {!isImageEdit && isGroupNode(node) && (
@@ -422,7 +414,7 @@ export const NodeActionToolbar = memo(({ node }: NodeActionToolbarProps) => {
             }}
           >
             <Unlink2 className="h-3.5 w-3.5" />
-            {t('nodeToolbar.ungroup')}
+            解散
           </UiChipButton>
         )}
         <UiChipButton
@@ -435,7 +427,7 @@ export const NodeActionToolbar = memo(({ node }: NodeActionToolbarProps) => {
           }}
         >
           <Trash2 className="h-3.5 w-3.5" />
-          {t('common.delete')}
+          删除
         </UiChipButton>
       </UiPanel>
 
@@ -453,7 +445,7 @@ export const NodeActionToolbar = memo(({ node }: NodeActionToolbarProps) => {
             }}
           >
             <Download className="h-4 w-4" />
-            {t('nodeToolbar.saveAs')}
+            另存为...
           </button>
 
           {downloadPresetPaths.length > 0 ? (
@@ -475,7 +467,7 @@ export const NodeActionToolbar = memo(({ node }: NodeActionToolbarProps) => {
             </div>
           ) : (
             <div className="mt-1 border-t border-[rgba(255,255,255,0.1)] px-2.5 pt-2 text-xs text-text-muted">
-              {t('nodeToolbar.noDownloadPresetPathsHint')}
+              暂无预设路径，请在设置 - 通用中添加
             </div>
           )}
         </div>

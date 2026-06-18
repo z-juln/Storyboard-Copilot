@@ -11,7 +11,6 @@ import {
 } from 'react';
 import { Handle, Position, useUpdateNodeInternals, useViewport } from '@xyflow/react';
 import { Minus, Plus, Sparkles } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
 
 import {
   AUTO_REQUEST_ASPECT_RATIO,
@@ -539,7 +538,6 @@ function generateGridImageDataUrl(
 }
 
 export const StoryboardGenNode = memo(({ id, data, selected, width, height }: StoryboardGenNodeProps) => {
-  const { t, i18n } = useTranslation();
   const { zoom } = useViewport();
   const updateNodeInternals = useUpdateNodeInternals();
   const setSelectedNode = useCanvasStore((state) => state.setSelectedNode);
@@ -731,7 +729,6 @@ export const StoryboardGenNode = memo(({ id, data, selected, width, height }: St
         ? resolveModelPriceDisplay(selectedModel, {
           resolution: selectedResolution.value,
           extraParams: effectiveExtraParams,
-          language: i18n.language,
           settings: {
             displayCurrencyMode: priceDisplayCurrencyMode,
             usdToCnyRate,
@@ -742,7 +739,6 @@ export const StoryboardGenNode = memo(({ id, data, selected, width, height }: St
         : null,
     [
       grsaiCreditTierId,
-      i18n.language,
       preferDiscountedPrice,
       priceDisplayCurrencyMode,
       effectiveExtraParams,
@@ -759,26 +755,21 @@ export const StoryboardGenNode = memo(({ id, data, selected, width, height }: St
 
     const lines = [resolvedPriceDisplay.label];
     if (resolvedPriceDisplay.nativeLabel) {
-      lines.push(t('pricing.nativePrice', { value: resolvedPriceDisplay.nativeLabel }));
+      lines.push(`原币种：${resolvedPriceDisplay.nativeLabel}`);
     }
     if (resolvedPriceDisplay.originalLabel) {
-      lines.push(t('pricing.originalPrice', { value: resolvedPriceDisplay.originalLabel }));
+      lines.push(`原价：${resolvedPriceDisplay.originalLabel}`);
     }
     if (resolvedPriceDisplay.pointsCost) {
-      lines.push(t('pricing.pointsCost', { count: resolvedPriceDisplay.pointsCost }));
+      lines.push(`积分消耗：${resolvedPriceDisplay.pointsCost}`);
     }
     if (resolvedPriceDisplay.grsaiCreditTier) {
       lines.push(
-        t('pricing.grsaiTier', {
-          price: resolvedPriceDisplay.grsaiCreditTier.priceCny.toFixed(2),
-          credits: resolvedPriceDisplay.grsaiCreditTier.credits.toLocaleString(
-            i18n.language.startsWith('zh') ? 'zh-CN' : 'en-US'
-          ),
-        })
+        `积分档位：¥${resolvedPriceDisplay.grsaiCreditTier.priceCny.toFixed(2)} / ${resolvedPriceDisplay.grsaiCreditTier.credits.toLocaleString('zh-CN')} 积分`
       );
     }
     return lines.join('\n');
-  }, [i18n.language, resolvedPriceDisplay, t]);
+  }, [resolvedPriceDisplay]);
 
   const supportedAspectRatioValues = useMemo(
     () => selectedModel.aspectRatios.map((item) => item.value),
@@ -1034,7 +1025,7 @@ export const StoryboardGenNode = memo(({ id, data, selected, width, height }: St
         CANVAS_NODE_TYPES.exportImage,
         newNodePosition,
         {
-          displayName: t('node.storyboardGen.gridPreviewTitle'),
+          displayName: '网格预览',
           resultKind: 'storyboardGenOutput',
           imageUrl: gridImageDataUrl,
           previewImageUrl: gridImageDataUrl,
@@ -1214,7 +1205,6 @@ export const StoryboardGenNode = memo(({ id, data, selected, width, height }: St
     updateNodeData,
     mappedOverallRequestAspectRatio,
     resolveEffectiveRequestAspectRatio,
-    t,
     ignoreAtTagWhenCopyingAndGenerating,
   ]);
 
@@ -1448,13 +1438,13 @@ export const StoryboardGenNode = memo(({ id, data, selected, width, height }: St
       <div className="mb-2.5 flex shrink-0 items-center justify-between gap-2">
         <div className="flex items-center gap-1.5">
           <GridStepperControl
-            label={t('node.storyboardGen.rowsShort')}
+            label="行"
             value={nodeData.gridRows}
             onDecrease={() => handleRowChange(-1)}
             onIncrease={() => handleRowChange(1)}
           />
           <GridStepperControl
-            label={t('node.storyboardGen.colsShort')}
+            label="列"
             value={nodeData.gridCols}
             onDecrease={() => handleColChange(-1)}
             onIncrease={() => handleColChange(1)}
@@ -1463,9 +1453,9 @@ export const StoryboardGenNode = memo(({ id, data, selected, width, height }: St
 
         {showStoryboardGenAdvancedRatioControls && (
           <div className="min-w-0 flex-1 rounded-full border border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.04)] px-2 py-0.5 text-center text-[10px] text-text-muted">
-            <span>{t('node.storyboardGen.cellAspectRatio')}: {resolvedAspectRatios.cellAspectRatioLabel}</span>
+            <span>单格比例: {resolvedAspectRatios.cellAspectRatioLabel}</span>
             <span className="mx-1 text-[rgba(255,255,255,0.22)]">|</span>
-            <span>{t('node.storyboardGen.overallAspectRatio')}: {resolvedAspectRatios.overallAspectRatioLabel}</span>
+            <span>整体比例: {resolvedAspectRatios.overallAspectRatioLabel}</span>
           </div>
         )}
 
@@ -1483,7 +1473,7 @@ export const StoryboardGenNode = memo(({ id, data, selected, width, height }: St
                   updateNodeData(id, { ratioControlMode: 'overall' });
                 }}
               >
-                {t('node.storyboardGen.ratioModeOverall')}
+                整体比
               </button>
               <button
                 type="button"
@@ -1496,12 +1486,12 @@ export const StoryboardGenNode = memo(({ id, data, selected, width, height }: St
                   updateNodeData(id, { ratioControlMode: 'cell' });
                 }}
               >
-                {t('node.storyboardGen.ratioModeCell')}
+                单格比
               </button>
             </div>
           )}
           <div className={GRID_SUMMARY_CLASS}>
-            {t('node.storyboardGen.frameCount', { count: totalFrames })}
+            {`${totalFrames} 格`}
           </div>
         </div>
       </div>
@@ -1556,9 +1546,7 @@ export const StoryboardGenNode = memo(({ id, data, selected, width, height }: St
                     activeFrameTextareaRef.current = event.currentTarget;
                     syncFrameHighlightScroll(frame.id);
                   }}
-                  placeholder={t('node.storyboardGen.framePlaceholder', {
-                    index: String(index + 1).padStart(2, '0'),
-                  })}
+                  placeholder={`分镜 ${String(index + 1).padStart(2, '0')} 描述`}
                   wrap="soft"
                   className="ui-scrollbar nodrag nowheel relative z-10 h-full w-full resize-none overflow-y-auto overflow-x-hidden bg-transparent px-1.5 py-1 text-left text-[10px] leading-4 text-transparent caret-text-dark placeholder:text-text-muted/40 focus:border-accent/50 focus:outline-none whitespace-pre-wrap break-words"
                   style={{ scrollbarGutter: 'stable' }}
@@ -1670,7 +1658,7 @@ export const StoryboardGenNode = memo(({ id, data, selected, width, height }: St
           className={`!min-w-0 shrink-0 ${NODE_CONTROL_PRIMARY_BUTTON_CLASS}`}
         >
           <Sparkles className={NODE_CONTROL_ICON_CLASS} strokeWidth={2.8} />
-          {t('canvas.generate')}
+          生成
         </UiButton>
       </div>
 

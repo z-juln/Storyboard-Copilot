@@ -1,8 +1,6 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { SlidersHorizontal, Zap } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
-
 import { AUTO_REQUEST_ASPECT_RATIO } from '@/features/canvas/domain/canvasNodes';
 import {
   getModelProvider,
@@ -100,17 +98,22 @@ function getRatioPreviewStyle(ratio: string): { width: number; height: number } 
   };
 }
 
-function resolveTranslatedText(
-  t: (key: string) => string,
+const LABEL_KEY_TEXT: Record<string, string> = {
+  'modelParams.thinkingLevel': '思考等级',
+  'modelParams.thinkingLevelDesc': '仅对 fal 的 Nano Banana 2 生效；高思考会额外增加费用。',
+  'modelParams.thinkingDisabled': '关闭',
+  'modelParams.thinkingMinimal': '标准',
+  'modelParams.thinkingHigh': '高',
+};
+
+function resolveLabelText(
   key: string | undefined,
   fallback: string | undefined
 ): string {
-  if (!key) {
-    return fallback ?? '';
+  if (key && LABEL_KEY_TEXT[key]) {
+    return LABEL_KEY_TEXT[key];
   }
-
-  const translated = t(key);
-  return translated === key ? (fallback ?? key) : translated;
+  return fallback ?? key ?? '';
 }
 
 function resolveExtraParamValue(
@@ -164,7 +167,6 @@ export const ModelParamsControls = memo(({
   providerOptionClassName = DEFAULT_PROVIDER_OPTION_CLASS_NAME,
   modelOptionClassName = DEFAULT_MODEL_OPTION_CLASS_NAME,
 }: ModelParamsControlsProps) => {
-  const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement>(null);
   const modelTriggerRef = useRef<HTMLDivElement>(null);
   const paramsTriggerRef = useRef<HTMLDivElement>(null);
@@ -453,7 +455,7 @@ export const ModelParamsControls = memo(({
             }}
           >
             <SlidersHorizontal className={paramsIconClassName} />
-            <span className={paramsPrimaryTextClassName}>{t('modelParams.otherParams')}</span>
+            <span className={paramsPrimaryTextClassName}>其他参数</span>
           </UiChipButton>
         </div>
       )}
@@ -469,7 +471,7 @@ export const ModelParamsControls = memo(({
             <div className="ui-scrollbar max-h-[340px] space-y-4 overflow-y-auto p-1">
               <section>
                 <div className="mb-2 text-xs font-medium text-text-muted">
-                  {t('modelParams.provider')}
+                  供应商
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {providerOptions.map((provider) => {
@@ -507,7 +509,7 @@ export const ModelParamsControls = memo(({
 
               <section>
                 <div className="mb-2 text-xs font-medium text-text-muted">
-                  {t('modelParams.model')}
+                  模型
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {modelGroups.map((group) => {
@@ -548,7 +550,7 @@ export const ModelParamsControls = memo(({
         >
           <UiPanel className={paramsPanelClassName}>
             <div>
-              <div className="mb-2 text-xs text-text-muted">{t('modelParams.quality')}</div>
+              <div className="mb-2 text-xs text-text-muted">画质</div>
               <div className="grid grid-cols-4 gap-1 rounded-xl border border-[rgba(255,255,255,0.1)] bg-bg-dark/65 p-1">
                 {resolutionOptions.map((item) => {
                   const active = item.value === selectedResolution.value;
@@ -572,7 +574,7 @@ export const ModelParamsControls = memo(({
             </div>
 
             <div className="mt-3">
-              <div className="mb-2 text-xs text-text-muted">{t('modelParams.aspectRatio')}</div>
+              <div className="mb-2 text-xs text-text-muted">比例</div>
               <div className="grid grid-cols-5 gap-1 rounded-xl border border-[rgba(255,255,255,0.1)] bg-bg-dark/65 p-1">
                 {aspectRatioOptions.map((item) => {
                   const active = item.value === selectedAspectRatio.value;
@@ -611,17 +613,15 @@ export const ModelParamsControls = memo(({
 
             {panelExtraParamSchema.length > 0 && (
               <div className="mt-3">
-                <div className="mb-2 text-xs text-text-muted">{t('modelParams.extraOptions')}</div>
+                <div className="mb-2 text-xs text-text-muted">额外参数</div>
                 <div className="space-y-2 rounded-xl border border-[rgba(255,255,255,0.1)] bg-bg-dark/65 p-3">
                   {panelExtraParamSchema.map((definition) => {
-                    const translatedLabel = resolveTranslatedText(
-                      t,
+                    const translatedLabel = resolveLabelText(
                       definition.labelKey,
                       definition.label
                     );
                     const translatedDescription = definition.description || definition.descriptionKey
-                      ? resolveTranslatedText(
-                        t,
+                      ? resolveLabelText(
                         definition.descriptionKey,
                         definition.description
                       )
@@ -654,7 +654,7 @@ export const ModelParamsControls = memo(({
                           >
                             {definition.options.map((option) => (
                               <option key={option.value} value={option.value}>
-                                {resolveTranslatedText(t, option.labelKey, option.label)}
+                                {resolveLabelText( option.labelKey, option.label)}
                               </option>
                             ))}
                           </UiSelect>
@@ -724,17 +724,16 @@ export const ModelParamsControls = memo(({
                   />
                   <div className="min-w-0">
                     <div className="text-xs font-medium text-text-dark">
-                      {webSearchLabel ?? t('modelParams.enableWebSearch')}
+                      {webSearchLabel ?? '启用联网搜索'}
                     </div>
                   </div>
                 </label>
               )}
 
               {inlineExtraParamSchema.map((definition) => {
-                const translatedLabel = resolveTranslatedText(t, definition.labelKey, definition.label);
+                const translatedLabel = resolveLabelText( definition.labelKey, definition.label);
                 const translatedDescription = definition.description || definition.descriptionKey
-                  ? resolveTranslatedText(
-                    t,
+                  ? resolveLabelText(
                     definition.descriptionKey,
                     definition.description
                   )
@@ -766,7 +765,7 @@ export const ModelParamsControls = memo(({
                     >
                       {(definition.options ?? []).map((option) => (
                         <option key={option.value} value={option.value}>
-                          {resolveTranslatedText(t, option.labelKey, option.label)}
+                          {resolveLabelText( option.labelKey, option.label)}
                         </option>
                       ))}
                     </UiSelect>
@@ -782,7 +781,7 @@ export const ModelParamsControls = memo(({
       {typeof document !== 'undefined' && createPortal(
         <UiModal
           isOpen={Boolean(missingKeyProviderName)}
-          title={t('modelParams.providerKeyRequiredTitle')}
+          title="需要配置供应商密钥"
           onClose={() => setMissingKeyProviderName(null)}
           widthClassName="w-[420px]"
           containerClassName="z-[120]"
@@ -793,7 +792,7 @@ export const ModelParamsControls = memo(({
                 size="sm"
                 onClick={() => setMissingKeyProviderName(null)}
               >
-                {t('common.cancel')}
+                取消
               </UiButton>
               <UiButton
                 variant="primary"
@@ -804,13 +803,13 @@ export const ModelParamsControls = memo(({
                   openSettingsDialog({ category: 'providers' });
                 }}
               >
-                {t('modelParams.goConfigure')}
+                去配置
               </UiButton>
             </>
           )}
         >
           <p className="text-sm text-text-muted">
-            {t('modelParams.providerKeyRequiredDesc', { provider: missingKeyProviderName ?? '' })}
+            {`当前尚未配置 ${missingKeyProviderName ?? ''} 的 API Key，请先到设置中完成配置后再使用该供应商。`}
           </p>
         </UiModal>,
         document.body

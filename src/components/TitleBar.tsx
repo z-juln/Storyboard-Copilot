@@ -1,8 +1,7 @@
 import { useCallback } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { Minus, X, Maximize2, Settings, ArrowLeft } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
-import { Moon, Sun, Languages } from 'lucide-react';
+import { Moon, Sun } from 'lucide-react';
 import { useThemeStore } from '@/stores/themeStore';
 import { useProjectStore } from '@/stores/projectStore';
 import closeNormalIcon from '@/assets/macos-traffic-lights/1-close-1-normal.svg';
@@ -19,16 +18,14 @@ interface TitleBarProps {
 }
 
 export function TitleBar({ onSettingsClick, showBackButton, onBackClick }: TitleBarProps) {
-  const { t, i18n } = useTranslation();
   const { theme, toggleTheme } = useThemeStore();
   const currentProjectName = useProjectStore((state) => state.currentProject?.name);
 
   const appWindow = getCurrentWindow();
-  const isZh = i18n.language.startsWith('zh');
   const isMac =
     typeof navigator !== 'undefined'
     && /(Mac|iPhone|iPad|iPod)/i.test(`${navigator.platform} ${navigator.userAgent}`);
-  const appTitle = t('app.title');
+  const appTitle = '分镜助手';
   const titleText = currentProjectName ? `${currentProjectName} - ${appTitle}` : appTitle;
 
   const handleMinimize = useCallback(async () => {
@@ -57,11 +54,6 @@ export function TitleBar({ onSettingsClick, showBackButton, onBackClick }: Title
     await appWindow.startDragging();
   }, [appWindow]);
 
-  const handleLanguageClick = useCallback(() => {
-    const newLang = i18n.language.startsWith('zh') ? 'en' : 'zh';
-    i18n.changeLanguage(newLang);
-  }, [i18n]);
-
   const handleThemeClick = useCallback(() => {
     toggleTheme();
   }, [toggleTheme]);
@@ -75,8 +67,8 @@ export function TitleBar({ onSettingsClick, showBackButton, onBackClick }: Title
             onMouseDown={(event) => event.stopPropagation()}
             onClick={handleClose}
             className="relative flex h-3 w-3 items-center justify-center"
-            title={t('titleBar.close')}
-            aria-label={t('titleBar.close')}
+            title="关闭"
+            aria-label="关闭"
           >
             <img src={closeNormalIcon} alt="" className="h-3 w-3 pointer-events-none opacity-100 transition-opacity group-hover:opacity-0" />
             <img src={closeHoverIcon} alt="" className="absolute h-3 w-3 pointer-events-none opacity-0 transition-opacity group-hover:opacity-100" />
@@ -86,8 +78,8 @@ export function TitleBar({ onSettingsClick, showBackButton, onBackClick }: Title
             onMouseDown={(event) => event.stopPropagation()}
             onClick={handleMinimize}
             className="relative flex h-3 w-3 items-center justify-center"
-            title={t('titleBar.minimize')}
-            aria-label={t('titleBar.minimize')}
+            title="最小化"
+            aria-label="最小化"
           >
             <img src={minimizeNormalIcon} alt="" className="h-3 w-3 pointer-events-none opacity-100 transition-opacity group-hover:opacity-0" />
             <img src={minimizeHoverIcon} alt="" className="absolute h-3 w-3 pointer-events-none opacity-0 transition-opacity group-hover:opacity-100" />
@@ -97,8 +89,8 @@ export function TitleBar({ onSettingsClick, showBackButton, onBackClick }: Title
             onMouseDown={(event) => event.stopPropagation()}
             onClick={handleMaximize}
             className="relative flex h-3 w-3 items-center justify-center"
-            title={t('titleBar.maximize')}
-            aria-label={t('titleBar.maximize')}
+            title="最大化"
+            aria-label="最大化"
           >
             <img src={maximizeNormalIcon} alt="" className="h-3 w-3 pointer-events-none opacity-100 transition-opacity group-hover:opacity-0" />
             <img src={maximizeHoverIcon} alt="" className="absolute h-3 w-3 pointer-events-none opacity-0 transition-opacity group-hover:opacity-100" />
@@ -120,7 +112,7 @@ export function TitleBar({ onSettingsClick, showBackButton, onBackClick }: Title
               onBackClick();
             }}
             className="mr-3 p-1 hover:bg-bg-dark rounded transition-colors"
-            title={t('titleBar.back')}
+            title="返回"
           >
             <ArrowLeft className="w-4 h-4 text-text-muted hover:text-text-dark" />
           </button>
@@ -128,27 +120,15 @@ export function TitleBar({ onSettingsClick, showBackButton, onBackClick }: Title
         <span className="text-sm font-semibold text-text-dark">
           {titleText}
         </span>
-        {!isZh && !currentProjectName ? (
-          <span className="text-xs text-text-muted ml-2">{t('app.subtitle')}</span>
-        ) : null}
       </div>
 
       {/* 右侧按钮区域 */}
       <div className="flex items-center h-full">
         <button
           type="button"
-          onClick={handleLanguageClick}
-          className="h-full px-3 hover:bg-bg-dark transition-colors"
-          title={i18n.language.startsWith('zh') ? t('titleBar.switchToEnglish') : t('titleBar.switchToChinese')}
-        >
-          <Languages className="w-4 h-4 text-text-muted" />
-        </button>
-
-        <button
-          type="button"
           onClick={handleThemeClick}
           className="h-full px-3 hover:bg-bg-dark transition-colors"
-          title={theme === 'dark' ? t('theme.light') : t('theme.dark')}
+          title={theme === 'dark' ? '浅色' : '深色'}
         >
           {theme === 'dark' ? (
             <Sun className="w-4 h-4 text-text-muted" />
@@ -161,7 +141,7 @@ export function TitleBar({ onSettingsClick, showBackButton, onBackClick }: Title
           type="button"
           onClick={onSettingsClick}
           className="h-full px-3 hover:bg-bg-dark transition-colors"
-          title={t('settings.title')}
+          title="设置"
         >
           <Settings className="w-4 h-4 text-text-muted" />
         </button>
@@ -174,7 +154,7 @@ export function TitleBar({ onSettingsClick, showBackButton, onBackClick }: Title
               type="button"
               onClick={handleMinimize}
               className="h-full px-3 hover:bg-bg-dark transition-colors"
-              title={t('titleBar.minimize')}
+              title="最小化"
             >
               <Minus className="w-4 h-4 text-text-muted hover:text-text-dark" />
             </button>
@@ -183,7 +163,7 @@ export function TitleBar({ onSettingsClick, showBackButton, onBackClick }: Title
               type="button"
               onClick={handleMaximize}
               className="h-full px-3 hover:bg-bg-dark transition-colors"
-              title={t('titleBar.maximize')}
+              title="最大化"
             >
               <Maximize2 className="w-4 h-4 text-text-muted hover:text-text-dark" />
             </button>
@@ -192,7 +172,7 @@ export function TitleBar({ onSettingsClick, showBackButton, onBackClick }: Title
               type="button"
               onClick={handleClose}
               className="h-full px-3 hover:bg-red-500 transition-colors group"
-              title={t('titleBar.close')}
+              title="关闭"
             >
               <X className="w-4 h-4 text-text-muted group-hover:text-white" />
             </button>

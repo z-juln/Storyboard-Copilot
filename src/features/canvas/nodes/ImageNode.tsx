@@ -7,7 +7,6 @@ import {
   type NodeProps,
 } from '@xyflow/react';
 import { AlertTriangle, Image as ImageIcon, Sparkles } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
 
 import {
   CANVAS_NODE_TYPES,
@@ -46,7 +45,6 @@ function resolveNodeDimension(value: number | undefined, fallback: number): numb
 }
 
 export const ImageNode = memo(({ id, data, selected, type, width, height }: ImageNodeProps) => {
-  const { t } = useTranslation();
   const updateNodeInternals = useUpdateNodeInternals();
   const setSelectedNode = useCanvasStore((state) => state.setSelectedNode);
   const updateNodeData = useCanvasStore((state) => state.updateNodeData);
@@ -123,15 +121,15 @@ export const ImageNode = memo(({ id, data, selected, type, width, height }: Imag
 
   const waitingResultText = useMemo(() => {
     if (!isExportResultNode) {
-      return t('node.imageNode.selectToEdit');
+      return '选中后在下方输入提示词生成或编辑图片';
     }
 
     if (!isGenerating || waitedMinutes < 2) {
-      return t('node.imageNode.waitingResult');
+      return '等待输出结果图片';
     }
 
-    return t('node.imageNode.waitingResultDelayed', { minutes: waitedMinutes });
-  }, [isExportResultNode, isGenerating, t, waitedMinutes]);
+    return `已经等待 ${waitedMinutes} 分钟了，还没有结果。继续等待中...`;
+  }, [isExportResultNode, isGenerating, waitedMinutes]);
 
   const imageSource = useMemo(() => {
     const preferOriginal = shouldUseOriginalImageByZoom(zoom);
@@ -179,7 +177,7 @@ export const ImageNode = memo(({ id, data, selected, type, width, height }: Imag
         {data.imageUrl ? (
           <CanvasNodeImage
             src={imageSource ?? ''}
-            alt={isExportResultNode ? t('node.imageNode.resultAlt') : t('node.imageNode.generatedAlt')}
+            alt={isExportResultNode ? '结果图' : '生成图'}
             viewerSourceUrl={originalImageUrl}
             className="h-full w-full object-contain"
           />
@@ -187,7 +185,7 @@ export const ImageNode = memo(({ id, data, selected, type, width, height }: Imag
           <div className="flex h-full w-full flex-col items-center justify-center gap-2 px-4 text-red-300">
             <AlertTriangle className="h-7 w-7 opacity-90" />
             <span className="text-center text-[12px] font-medium leading-5 text-red-200">
-              {t('node.imageNode.generationFailed')}
+              生成失败
             </span>
             <span className="max-h-[88px] overflow-y-auto break-words text-center text-[11px] leading-5 text-red-200/90">
               {generationError}

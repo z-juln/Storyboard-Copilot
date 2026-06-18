@@ -1,6 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { X, Eye, EyeOff, FolderOpen, Plus, Trash2 } from 'lucide-react';
-import { Trans, useTranslation } from 'react-i18next';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
@@ -86,7 +85,6 @@ export function SettingsDialog({
   initialCategory = 'general',
   onCheckUpdate,
 }: SettingsDialogProps) {
-  const { t, i18n } = useTranslation();
   const {
     apiKeys,
     grsaiNanoBananaProModel,
@@ -398,7 +396,7 @@ export function SettingsDialog({
           <div className="w-[180px] bg-bg-dark border-r border-border-dark flex flex-col">
             <div className="px-4 py-4">
               <span className="text-xs font-medium text-text-muted uppercase tracking-wider">
-                {t('settings.title')}
+                {'设置'}
               </span>
             </div>
 
@@ -414,7 +412,7 @@ export function SettingsDialog({
                   }
               `}
               >
-                <span className="text-sm">{t('settings.general')}</span>
+                <span className="text-sm">{'通用'}</span>
               </button>
 
               <button
@@ -428,7 +426,7 @@ export function SettingsDialog({
                   }
               `}
               >
-                <span className="text-sm">{t('settings.providers')}</span>
+                <span className="text-sm">{'密钥'}</span>
               </button>
 
               <button
@@ -442,7 +440,7 @@ export function SettingsDialog({
                   }
               `}
               >
-                <span className="text-sm">{t('settings.appearance')}</span>
+                <span className="text-sm">{'外观'}</span>
               </button>
 
               <button
@@ -456,7 +454,7 @@ export function SettingsDialog({
                   }
               `}
               >
-                <span className="text-sm">{t('settings.pricing')}</span>
+                <span className="text-sm">{'价格'}</span>
               </button>
 
               <button
@@ -470,7 +468,7 @@ export function SettingsDialog({
                   }
               `}
               >
-                <span className="text-sm">{t('settings.experimental')}</span>
+                <span className="text-sm">{'实验'}</span>
               </button>
 
               <button
@@ -484,7 +482,7 @@ export function SettingsDialog({
                   }
               `}
               >
-                <span className="text-sm">{t('settings.about')}</span>
+                <span className="text-sm">{'关于'}</span>
               </button>
             </nav>
           </div>
@@ -495,16 +493,16 @@ export function SettingsDialog({
               <>
                 <div className="px-6 py-5 border-b border-border-dark">
                   <h2 className="text-lg font-semibold text-text-dark">
-                    {t('settings.providers')}
+                    {'密钥'}
                   </h2>
                   <p className="text-sm text-text-muted mt-1">
-                    {t('settings.providersDesc')}
+                    {'配置 AI 服务商的 API 密钥'}
                   </p>
                 </div>
 
                 <div className="ui-scrollbar flex-1 space-y-4 overflow-y-auto p-6">
                   {providers.map((provider) => {
-                    const displayName = i18n.language.startsWith('zh') ? provider.label : provider.name;
+                    const displayName = provider.label;
                     const isRevealed = Boolean(revealedApiKeys[provider.id]);
 
                     return (
@@ -513,23 +511,23 @@ export function SettingsDialog({
                           <h3 className="text-sm font-medium text-text-dark">{displayName}</h3>
                           {PROVIDER_REGISTER_URLS[provider.id] && PROVIDER_GET_KEY_URLS[provider.id] ? (
                             <p className="text-xs text-text-muted">
-                              {t('settings.providerApiKeyGuidePrefix')}{' '}
+                              {'首先'}{' '}
                               <a
                                 href={PROVIDER_REGISTER_URLS[provider.id]}
                                 target="_blank"
                                 rel="noreferrer"
                                 className="text-accent hover:underline"
                               >
-                                {t('settings.providerRegisterLink')}
+                                {'点击这里注册'}
                               </a>
-                              {t('settings.providerApiKeyGuideMiddle')}{' '}
+                              {'，然后'}{' '}
                               <a
                                 href={PROVIDER_GET_KEY_URLS[provider.id]}
                                 target="_blank"
                                 rel="noreferrer"
                                 className="text-accent hover:underline"
                               >
-                                {t('settings.getApiKeyLink')}
+                                {'点击这里获取密钥'}
                               </a>
                             </p>
                           ) : (
@@ -549,7 +547,7 @@ export function SettingsDialog({
                               }));
                               setProviderApiKey(provider.id, nextValue);
                             }}
-                            placeholder={t('settings.enterApiKey')}
+                            placeholder={'输入 API Key'}
                             className="w-full rounded border border-border-dark bg-surface-dark px-3 py-2 pr-10 text-sm text-text-dark placeholder:text-text-muted"
                           />
                           <button
@@ -573,22 +571,19 @@ export function SettingsDialog({
                         {provider.id === 'grsai' && (
                           <div className="mt-3">
                             <div className="mb-1 text-xs font-medium text-text-dark">
-                              {t('settings.nanoBananaProModel')}
+                              {'Nano Banana Pro 接入模型'}
                             </div>
                             <p className="mb-2 text-xs text-text-muted">
-                              <Trans
-                                i18nKey="settings.nanoBananaProModelDesc"
-                                components={{
-                                  modelListLink: (
-                                    <a
-                                      href="https://grsai.com/zh/dashboard/models"
-                                      target="_blank"
-                                      rel="noreferrer"
-                                      className="text-accent hover:underline"
-                                    />
-                                  ),
-                                }}
-                              />
+                              切换该供应商 Nano Banana Pro 的接入点，当一个接入点失效时可尝试切换，具体请查阅
+                                <a
+                                  href="https://grsai.com/zh/dashboard/models"
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-accent hover:underline"
+                                >
+                                  模型列表
+                                </a>
+                                。
                             </p>
                             <UiSelect
                               value={localGrsaiNanoBananaProModel}
@@ -616,7 +611,7 @@ export function SettingsDialog({
                     className="px-4 py-2 text-sm font-medium bg-accent text-white rounded
                              hover:bg-accent/80 transition-colors"
                   >
-                    {t('common.save')}
+                    {'保存'}
                   </button>
                 </div>
               </>
@@ -626,20 +621,20 @@ export function SettingsDialog({
               <>
                 <div className="px-6 py-5 border-b border-border-dark">
                   <h2 className="text-lg font-semibold text-text-dark">
-                    {t('settings.appearance')}
+                    {'外观'}
                   </h2>
                   <p className="text-sm text-text-muted mt-1">
-                    {t('settings.appearanceDesc')}
+                    {'自定义应用外观'}
                   </p>
                 </div>
 
                 <div className="ui-scrollbar flex-1 space-y-4 overflow-y-auto p-6">
                   <div className="rounded-lg border border-border-dark bg-bg-dark p-4">
                     <h3 className="text-sm font-medium text-text-dark">
-                      {t('settings.radiusPreset')}
+                      {'圆角大小'}
                     </h3>
                     <p className="mt-1 text-xs text-text-muted">
-                      {t('settings.radiusPresetDesc')}
+                      {'控制面板、输入框与节点的全局圆角风格。'}
                     </p>
                     <div className="mt-3">
                       <UiSelect
@@ -649,19 +644,19 @@ export function SettingsDialog({
                         }
                         className="h-9 text-sm"
                       >
-                        <option value="compact">{t('settings.radiusCompact')}</option>
-                        <option value="default">{t('settings.radiusDefault')}</option>
-                        <option value="large">{t('settings.radiusLarge')}</option>
+                        <option value="compact">{'紧凑'}</option>
+                        <option value="default">{'默认'}</option>
+                        <option value="large">{'圆润'}</option>
                       </UiSelect>
                     </div>
                   </div>
 
                   <div className="rounded-lg border border-border-dark bg-bg-dark p-4">
                     <h3 className="text-sm font-medium text-text-dark">
-                      {t('settings.themeTone')}
+                      {'明暗色调'}
                     </h3>
                     <p className="mt-1 text-xs text-text-muted">
-                      {t('settings.themeToneDesc')}
+                      {'为深浅主题选择中性、暖色或冷色倾向。'}
                     </p>
                     <div className="mt-3">
                       <UiSelect
@@ -671,19 +666,19 @@ export function SettingsDialog({
                         }
                         className="h-9 text-sm"
                       >
-                        <option value="neutral">{t('settings.toneNeutral')}</option>
-                        <option value="warm">{t('settings.toneWarm')}</option>
-                        <option value="cool">{t('settings.toneCool')}</option>
+                        <option value="neutral">{'中性'}</option>
+                        <option value="warm">{'暖色'}</option>
+                        <option value="cool">{'冷色'}</option>
                       </UiSelect>
                     </div>
                   </div>
 
                   <div className="rounded-lg border border-border-dark bg-bg-dark p-4">
                     <h3 className="text-sm font-medium text-text-dark">
-                      {t('settings.edgeRoutingMode')}
+                      {'连线样式'}
                     </h3>
                     <p className="mt-1 text-xs text-text-muted">
-                      {t('settings.edgeRoutingModeDesc')}
+                      {'切换节点间连线路径风格，可选择自动避让节点的直角走线。'}
                     </p>
                     <div className="mt-3">
                       <UiSelect
@@ -695,19 +690,19 @@ export function SettingsDialog({
                         }
                         className="h-9 text-sm"
                       >
-                        <option value="spline">{t('settings.edgeRoutingSpline')}</option>
-                        <option value="orthogonal">{t('settings.edgeRoutingOrthogonal')}</option>
-                        <option value="smartOrthogonal">{t('settings.edgeRoutingSmartOrthogonal')}</option>
+                        <option value="spline">{'曲线'}</option>
+                        <option value="orthogonal">{'直角'}</option>
+                        <option value="smartOrthogonal">{'智能避让（直角）'}</option>
                       </UiSelect>
                     </div>
                   </div>
 
                   <div className="rounded-lg border border-border-dark bg-bg-dark p-4">
                     <h3 className="text-sm font-medium text-text-dark">
-                      {t('settings.accentColor')}
+                      {'强调色'}
                     </h3>
                     <p className="mt-1 text-xs text-text-muted">
-                      {t('settings.accentColorDesc')}
+                      {'用于按钮、选中边框和交互高亮。'}
                     </p>
                     <div className="mt-3 flex items-center gap-2">
                       <input
@@ -727,7 +722,7 @@ export function SettingsDialog({
                         className="inline-flex h-9 items-center justify-center rounded border border-border-dark bg-surface-dark px-3 text-xs text-text-dark transition-colors hover:bg-bg-dark"
                         onClick={() => setLocalAccentColor('#3B82F6')}
                       >
-                        {t('settings.resetAccentColor')}
+                        {'恢复默认'}
                       </button>
                     </div>
                   </div>
@@ -738,7 +733,7 @@ export function SettingsDialog({
                     onClick={handleSave}
                     className="rounded bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent/80"
                   >
-                    {t('common.save')}
+                    {'保存'}
                   </button>
                 </div>
               </>
@@ -748,10 +743,10 @@ export function SettingsDialog({
               <>
                 <div className="px-6 py-5 border-b border-border-dark">
                   <h2 className="text-lg font-semibold text-text-dark">
-                    {t('settings.pricing')}
+                    {'价格'}
                   </h2>
                   <p className="text-sm text-text-muted mt-1">
-                    {t('settings.pricingDesc')}
+                    {'管理节点价格展示、汇率换算和积分套餐估算。'}
                   </p>
                 </div>
 
@@ -759,16 +754,16 @@ export function SettingsDialog({
                   <SettingsCheckboxCard
                     checked={localShowNodePrice}
                     onCheckedChange={setLocalShowNodePrice}
-                    title={t('settings.showNodePrice')}
-                    description={t('settings.showNodePriceDesc')}
+                    title={'在节点右上角显示价格'}
+                    description={'实时根据当前模型、分辨率和附加参数显示本次运行的预计消费。'}
                   />
 
                   <div className="rounded-lg border border-border-dark bg-bg-dark p-4">
                     <h3 className="text-sm font-medium text-text-dark">
-                      {t('settings.priceDisplayCurrencyMode')}
+                      {'价格显示币种'}
                     </h3>
                     <p className="mt-1 text-xs text-text-muted">
-                      {t('settings.priceDisplayCurrencyModeDesc')}
+                      {'自动模式下默认显示人民币，也可手动选择美元。'}
                     </p>
                     <div className="mt-3">
                       <UiSelect
@@ -780,19 +775,19 @@ export function SettingsDialog({
                         }
                         className="h-9 text-sm"
                       >
-                        <option value="auto">{t('settings.priceCurrencyAuto')}</option>
-                        <option value="cny">{t('settings.priceCurrencyCny')}</option>
-                        <option value="usd">{t('settings.priceCurrencyUsd')}</option>
+                        <option value="auto">{'自动（人民币）'}</option>
+                        <option value="cny">{'人民币'}</option>
+                        <option value="usd">{'美元'}</option>
                       </UiSelect>
                     </div>
                   </div>
 
                   <div className="rounded-lg border border-border-dark bg-bg-dark p-4">
                     <h3 className="text-sm font-medium text-text-dark">
-                      {t('settings.usdToCnyRate')}
+                      {'美元兑人民币汇率'}
                     </h3>
                     <p className="mt-1 text-xs text-text-muted">
-                      {t('settings.usdToCnyRateDesc')}
+                      {'用于在美元和人民币之间换算显示价格，不影响实际平台扣费。'}
                     </p>
                     <div className="mt-3">
                       <input
@@ -809,16 +804,16 @@ export function SettingsDialog({
                   <SettingsCheckboxCard
                     checked={localPreferDiscountedPrice}
                     onCheckedChange={setLocalPreferDiscountedPrice}
-                    title={t('settings.preferDiscountedPrice')}
-                    description={t('settings.preferDiscountedPriceDesc')}
+                    title={'优先显示折扣价'}
+                    description={'目前仅 KIE 提供原价与折扣价两套价格参考。国内优惠价通常需要向 KIE 单独申请；启用后会优先按折扣价估算。'}
                   />
 
                   <div className="rounded-lg border border-border-dark bg-bg-dark p-4">
                     <h3 className="text-sm font-medium text-text-dark">
-                      {t('settings.grsaiCreditTier')}
+                      {'GRSAI 积分套餐档位'}
                     </h3>
                     <p className="mt-1 text-xs text-text-muted">
-                      {t('settings.grsaiCreditTierDesc')}
+                      {'GRSAI 采用积分扣费，不同充值档位对应的单次成本不同。'}
                     </p>
                     <div className="mt-3">
                       <UiSelect
@@ -830,10 +825,7 @@ export function SettingsDialog({
                       >
                         {GRSAI_CREDIT_TIERS.map((tier) => (
                           <option key={tier.id} value={tier.id}>
-                            {t('settings.grsaiCreditTierOption', {
-                              price: tier.priceCny.toFixed(2),
-                              credits: tier.credits.toLocaleString(i18n.language.startsWith('zh') ? 'zh-CN' : 'en-US'),
-                            })}
+                            {`¥${tier.priceCny.toFixed(2)} / ${tier.credits.toLocaleString('zh-CN')} 积分`}
                           </option>
                         ))}
                       </UiSelect>
@@ -846,7 +838,7 @@ export function SettingsDialog({
                     onClick={handleSave}
                     className="rounded bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent/80"
                   >
-                    {t('common.save')}
+                    {'保存'}
                   </button>
                 </div>
               </>
@@ -856,10 +848,10 @@ export function SettingsDialog({
               <>
                 <div className="px-6 py-5 border-b border-border-dark">
                   <h2 className="text-lg font-semibold text-text-dark">
-                    {t('settings.general')}
+                    {'通用'}
                   </h2>
                   <p className="text-sm text-text-muted mt-1">
-                    {t('settings.generalDesc')}
+                    {'通用设置'}
                   </p>
                 </div>
 
@@ -867,38 +859,38 @@ export function SettingsDialog({
                   <SettingsCheckboxCard
                     checked={localStoryboardGenKeepStyleConsistent}
                     onCheckedChange={setLocalStoryboardGenKeepStyleConsistent}
-                    title={t('settings.storyboardGenKeepStyleConsistent')}
-                    description={t('settings.storyboardGenKeepStyleConsistentDesc')}
+                    title={'分镜图风格与参考图保持一致'}
+                    description={'启用后，分镜生成提示词会追加“图片风格与参考图保持一致”。'}
                   />
 
                   <SettingsCheckboxCard
                     checked={localIgnoreAtTagWhenCopyingAndGenerating}
                     onCheckedChange={setLocalIgnoreAtTagWhenCopyingAndGenerating}
-                    title={t('settings.ignoreAtTagWhenCopyingAndGenerating')}
-                    description={t('settings.ignoreAtTagWhenCopyingAndGeneratingDesc')}
+                    title={'复制/保存文本时忽略 @ 标签'}
+                    description={'启用后，复制文本和写入图片分镜元数据时会忽略类似“@图1”的标签；发送生成请求时仅移除“@”并保留“图1”。'}
                   />
 
                   <SettingsCheckboxCard
                     checked={localStoryboardGenDisableTextInImage}
                     onCheckedChange={setLocalStoryboardGenDisableTextInImage}
-                    title={t('settings.storyboardGenDisableTextInImage')}
-                    description={t('settings.storyboardGenDisableTextInImageDesc')}
+                    title={'分镜图禁止生成描述文本'}
+                    description={'启用后，分镜生成提示词会追加“禁止添加描述文本”。'}
                   />
 
                   <SettingsCheckboxCard
                     checked={localUseUploadFilenameAsNodeTitle}
                     onCheckedChange={setLocalUseUploadFilenameAsNodeTitle}
-                    title={t('settings.useUploadFilenameAsNodeTitle')}
-                    description={t('settings.useUploadFilenameAsNodeTitleDesc')}
+                    title={'上传节点自动使用文件名作为标题'}
+                    description={'启用后，新上传图片会默认使用文件名作为节点标题（仍可双击手动重命名）。'}
                   />
 
                   <div className="rounded-lg border border-border-dark bg-bg-dark p-4">
                     <div className="mb-3">
                       <h3 className="text-sm font-medium text-text-dark">
-                        {t('settings.downloadPresetPaths')}
+                        {'下载预设路径'}
                       </h3>
                       <p className="mt-1 text-xs text-text-muted">
-                        {t('settings.downloadPresetPathsDesc')}
+                        {'用于节点工具条下载菜单中的快速保存目录（最多 8 个）'}
                       </p>
                     </div>
 
@@ -906,7 +898,7 @@ export function SettingsDialog({
                       <input
                         value={localDownloadPathInput}
                         onChange={(event) => setLocalDownloadPathInput(event.target.value)}
-                        placeholder={t('settings.downloadPathPlaceholder')}
+                        placeholder={'输入目录路径，例如 /Users/name/Pictures/Storyboard 或 D:\\Images\\Storyboard'}
                         className="h-9 flex-1 rounded border border-border-dark bg-surface-dark px-3 text-sm text-text-dark outline-none placeholder:text-text-muted"
                       />
                       <button
@@ -915,7 +907,7 @@ export function SettingsDialog({
                         onClick={handleAddDownloadPathFromInput}
                       >
                         <Plus className="mr-1 h-3.5 w-3.5" />
-                        {t('settings.addPath')}
+                        {'添加路径'}
                       </button>
                       <button
                         type="button"
@@ -925,7 +917,7 @@ export function SettingsDialog({
                         }}
                       >
                         <FolderOpen className="mr-1 h-3.5 w-3.5" />
-                        {t('settings.chooseFolder')}
+                        {'选择文件夹'}
                       </button>
                     </div>
 
@@ -941,14 +933,14 @@ export function SettingsDialog({
                               type="button"
                               className="ml-auto inline-flex h-6 w-6 items-center justify-center rounded text-text-muted transition-colors hover:bg-bg-dark hover:text-text-dark"
                               onClick={() => handleRemoveDownloadPath(path)}
-                              title={t('common.delete')}
+                              title={'删除'}
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                             </button>
                           </div>
                         ))
                       ) : (
-                        <div className="text-xs text-text-muted">{t('settings.noDownloadPresetPaths')}</div>
+                        <div className="text-xs text-text-muted">{'暂无预设路径'}</div>
                       )}
                     </div>
                   </div>
@@ -959,7 +951,7 @@ export function SettingsDialog({
                     onClick={handleSave}
                     className="rounded bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent/80"
                   >
-                    {t('common.save')}
+                    {'保存'}
                   </button>
                 </div>
               </>
@@ -969,10 +961,10 @@ export function SettingsDialog({
               <>
                 <div className="px-6 py-5 border-b border-border-dark">
                   <h2 className="text-lg font-semibold text-text-dark">
-                    {t('settings.experimental')}
+                    {'实验'}
                   </h2>
                   <p className="text-sm text-text-muted mt-1">
-                    {t('settings.experimentalDesc')}
+                    {'用于放置实验性质或低频使用的功能开关。'}
                   </p>
                 </div>
 
@@ -980,22 +972,22 @@ export function SettingsDialog({
                   <SettingsCheckboxCard
                     checked={localEnableStoryboardGenGridPreviewShortcut}
                     onCheckedChange={setLocalEnableStoryboardGenGridPreviewShortcut}
-                    title={t('settings.enableStoryboardGenGridPreviewShortcut')}
-                    description={t('settings.enableStoryboardGenGridPreviewShortcutDesc')}
+                    title={'启用分镜网格预览快捷键'}
+                    description={'启用后，在分镜生成节点按住 Ctrl + Alt + Shift 点击“生成”会直接输出网格预览图，不发送 AI 请求。'}
                   />
 
                   <SettingsCheckboxCard
                     checked={localShowStoryboardGenAdvancedRatioControls}
                     onCheckedChange={setLocalShowStoryboardGenAdvancedRatioControls}
-                    title={t('settings.showStoryboardGenAdvancedRatioControls')}
-                    description={t('settings.showStoryboardGenAdvancedRatioControlsDesc')}
+                    title={'显示分镜比例高级控制'}
+                    description={'启用后显示单格/整体比例信息和“整体比/单格比”切换；关闭时默认按单格比逻辑运行。'}
                   />
 
                   <SettingsCheckboxCard
                     checked={localStoryboardGenAutoInferEmptyFrame}
                     onCheckedChange={setLocalStoryboardGenAutoInferEmptyFrame}
-                    title={t('settings.storyboardGenAutoInferEmptyFrame')}
-                    description={t('settings.storyboardGenAutoInferEmptyFrameDesc')}
+                    title={'空分镜自动推测'}
+                    description={'启用后，分镜生成时如果某个格子没有填写内容，会自动追加“依据之前的内容进行推测”。'}
                   />
                 </div>
 
@@ -1004,7 +996,7 @@ export function SettingsDialog({
                     onClick={handleSave}
                     className="rounded bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent/80"
                   >
-                    {t('common.save')}
+                    {'保存'}
                   </button>
                 </div>
               </>
@@ -1014,10 +1006,10 @@ export function SettingsDialog({
               <>
                 <div className="px-6 py-5 border-b border-border-dark">
                   <h2 className="text-lg font-semibold text-text-dark">
-                    {t('settings.about')}
+                    {'关于'}
                   </h2>
                   <p className="text-sm text-text-muted mt-1">
-                    {t('settings.aboutDesc')}
+                    {'应用信息'}
                   </p>
                 </div>
 
@@ -1026,7 +1018,7 @@ export function SettingsDialog({
                     <div className="flex items-start gap-4">
                       <img
                         src="/app-icon.png"
-                        alt={t('settings.aboutAppName')}
+                        alt={'分镜助手'}
                         className="h-14 w-14 rounded-lg border border-border-dark object-cover"
                       />
                       <div className="min-w-0 flex-1">
@@ -1036,10 +1028,10 @@ export function SettingsDialog({
                           rel="noreferrer"
                           className="text-base font-semibold text-accent hover:underline"
                         >
-                          {t('settings.aboutAppName')}
+                          {'分镜助手'}
                         </a>
                         <p className="mt-1 text-sm text-text-muted">
-                          {t('settings.aboutIntro')}
+                          {'基于节点画布的 AI 分镜工作台，一站式完成图片生成、编辑与分镜流程。'}
                         </p>
                       </div>
                     </div>
@@ -1047,21 +1039,21 @@ export function SettingsDialog({
 
                   <div className="rounded-lg border border-border-dark bg-bg-dark p-4 space-y-2 text-sm">
                     <p className="text-text-dark">
-                      {t('settings.aboutVersionLabel')}: <span className="text-text-muted">{appVersion || t('settings.aboutVersionUnknown')}</span>
+                      {'版本'}: <span className="text-text-muted">{appVersion || '未知'}</span>
                     </p>
                     <p className="text-text-dark">
-                      {t('settings.aboutAuthorLabel')}:{' '}
+                      {'作者'}:{' '}
                       <a
                         href="https://space.bilibili.com/39337803"
                         target="_blank"
                         rel="noreferrer"
                         className="text-accent hover:underline"
                       >
-                        {t('settings.aboutAuthor')}
+                        {'痕继痕迹'}
                       </a>
                     </p>
                     <p className="text-text-dark">
-                      {t('settings.aboutRepositoryLabel')}:{' '}
+                      {'项目仓库'}:{' '}
                       <a
                         href="https://github.com/henjicc/Storyboard-Copilot"
                         target="_blank"
@@ -1077,14 +1069,14 @@ export function SettingsDialog({
                     <SettingsCheckboxCard
                       checked={localAutoCheckAppUpdateOnLaunch}
                       onCheckedChange={setLocalAutoCheckAppUpdateOnLaunch}
-                      title={t('settings.autoCheckUpdateOnLaunch')}
-                      description={t('settings.autoCheckUpdateOnLaunchDesc')}
+                      title={'启动时自动检查更新'}
+                      description={'每次打开软件自动检查一次新版本。'}
                     />
                     <SettingsCheckboxCard
                       checked={localEnableUpdateDialog}
                       onCheckedChange={setLocalEnableUpdateDialog}
-                      title={t('settings.enableUpdateDialog')}
-                      description={t('settings.enableUpdateDialogDesc')}
+                      title={'启用更新提示弹窗'}
+                      description={'检测到新版本时显示更新提示弹窗。'}
                     />
                     <div className="pt-1">
                       <button
@@ -1096,15 +1088,15 @@ export function SettingsDialog({
                         disabled={checkUpdateStatus === 'checking'}
                       >
                         {checkUpdateStatus === 'checking'
-                          ? t('settings.checkingUpdate')
-                          : t('settings.checkUpdateNow')}
+                          ? '正在检查更新...'
+                          : '立即检查更新'}
                       </button>
                       {checkUpdateStatus !== '' && (
                         <p className="mt-2 text-xs text-text-muted">
-                          {checkUpdateStatus === 'has-update' && t('settings.checkUpdateHasUpdate')}
-                          {checkUpdateStatus === 'up-to-date' && t('settings.checkUpdateUpToDate')}
-                          {checkUpdateStatus === 'failed' && t('settings.checkUpdateFailed')}
-                          {checkUpdateStatus === 'checking' && t('settings.checkingUpdate')}
+                          {checkUpdateStatus === 'has-update' && '检测到新版本。'}
+                          {checkUpdateStatus === 'up-to-date' && '当前已是最新版本。'}
+                          {checkUpdateStatus === 'failed' && '检查更新失败，请稍后重试。'}
+                          {checkUpdateStatus === 'checking' && '正在检查更新...'}
                         </p>
                       )}
                     </div>
@@ -1117,13 +1109,13 @@ export function SettingsDialog({
                       onClick={onClose}
                       className="rounded border border-border-dark px-4 py-2 text-sm font-medium text-text-dark transition-colors hover:bg-bg-dark"
                     >
-                      {t('common.close')}
+                      {'关闭'}
                     </button>
                     <button
                       onClick={handleSave}
                       className="rounded bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent/80"
                     >
-                      {t('common.save')}
+                      {'保存'}
                     </button>
                   </div>
                 </div>

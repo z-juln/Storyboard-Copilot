@@ -1,5 +1,4 @@
 import { useMemo, useCallback, useEffect, useRef, useState } from 'react';
-import { useTranslation } from 'react-i18next';
 import { Image, Upload, Sparkles, LayoutGrid, Type } from 'lucide-react';
 import { UI_POPOVER_TRANSITION_MS } from '@/components/ui/motion';
 
@@ -21,13 +20,20 @@ const iconMap: Record<MenuIconKey, typeof Upload> = {
   text: Type,
 };
 
+const MENU_LABELS: Record<string, string> = {
+  'node.menu.uploadImage': '上传图片',
+  'node.menu.aiImageGeneration': 'AI 图片',
+  'node.menu.storyboard': '分镜节点',
+  'node.menu.storyboardGen': '分镜生成',
+  'node.menu.textAnnotation': '文本注释',
+};
+
 export function NodeSelectionMenu({
   position,
   allowedTypes,
   onSelect,
   onClose,
 }: NodeSelectionMenuProps) {
-  const { t } = useTranslation();
   const menuRef = useRef<HTMLDivElement>(null);
   const [isVisible, setIsVisible] = useState(false);
 
@@ -109,7 +115,7 @@ export function NodeSelectionMenu({
             <div className="flex h-8 w-8 items-center justify-center rounded-md bg-bg-dark">
               <Icon className="h-4 w-4 text-accent" />
             </div>
-            <span className="text-sm text-text-dark">{t(item.menuLabelKey)}</span>
+            <span className="text-sm text-text-dark">{MENU_LABELS[item.menuLabelKey] ?? item.menuLabelKey}</span>
           </button>
         );
       })}
