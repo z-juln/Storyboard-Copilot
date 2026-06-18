@@ -37,7 +37,7 @@ curl --request POST \
 
 ## 查询任务状态
 
-提交任务后，可通过统一的查询端点查看任务进度并获取生成结果。建议参考 [获取任务详情](/cn/market/common/get-task-detail)。
+提交任务后，可通过统一的查询端点查看任务进度并获取生成结果。详见 [task-query.md](./task-query.md)。
 
 生产环境中，建议使用 `callBackUrl` 参数接收生成完成的自动通知，而非轮询状态端点。
 

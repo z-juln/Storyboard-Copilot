@@ -4,7 +4,7 @@
 
 Seedream 4.0 是一款先进的图像生成模型，提供灵活的图像创建功能，包括支持4K分辨率，可以从文本和其他图像生成图像。
 
-本接口支持个人认证及企业认证用户调用。请参见 [实名认证](/docs/support/identity-verification)，完成个人用户认证或企业用户认证，以确保可以正常使用本功能。
+本接口支持个人认证及企业认证用户调用。请参见 [实名认证](https://ppio.com/docs/support/identity-verification)，完成个人用户认证或企业用户认证，以确保可以正常使用本功能。
 
 ## 请求示例
 
@@ -68,4 +68,4 @@ curl --request POST \
 | :--- | :--- | :--- |
 | `images` | string[] | 包含生成图像下载链接的数组。 |
 
-[Seedream 文生图](/docs/models/reference-seedream-text-to-image) [即梦文生图 3.0](/docs/models/reference-seedream3.0-text-to-image)
+[Seedream 文生图](https://ppio.com/docs/models/reference-seedream-text-to-image) · [即梦文生图 3.0](https://ppio.com/docs/models/reference-seedream3.0-text-to-image)

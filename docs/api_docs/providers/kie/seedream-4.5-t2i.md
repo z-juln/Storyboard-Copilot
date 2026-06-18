@@ -40,14 +40,14 @@ curl --request POST \
 
 ## 查询任务状态
 
-提交任务后，可通过统一查询端点查看进度并获取结果。详情请参考 [获取任务详情](/cn/market/common/get-task-detail)。
+提交任务后，可通过统一查询端点查看进度并获取结果。详见 [task-query.md](./task-query.md)。
 
 生产环境中，建议使用 `callBackUrl` 参数在生成完成时接收自动通知，而非轮询状态端点。
 
 ## 相关资源
 
-* [市场概览](/cn/market/quickstart)
-* [通用 API](/cn/common-api/get-account-credits)
+* [市场概览](https://docs.kie.ai/cn/market/quickstart)
+* [通用 API](https://docs.kie.ai/cn/common-api/get-account-credits)
 
 ## 请求参数
 

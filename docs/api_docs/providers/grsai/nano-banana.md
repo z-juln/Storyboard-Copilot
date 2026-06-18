@@ -1,4 +1,6 @@
-# API文档
+# Grsai — Nano Banana 绘画接口
+
+> 模型级接入指南见 [nano-banana-pro.md](../../models/nano-banana-pro.md) 与 [nano-banana-2.md](../../models/nano-banana-2.md)。
 
 ## 节点信息
 

@@ -46,8 +46,9 @@ curl --request POST \
 
 ## 相关资源
 
-* [市场概览 - 浏览所有可用模型](/cn/market/quickstart)
-* [通用 API - 查看账户积分与使用情况](/cn/common-api/get-account-credits)
+* [市场概览 - 浏览所有可用模型](https://docs.kie.ai/cn/market/quickstart)
+* [通用 API - 查看账户积分与使用情况](https://docs.kie.ai/cn/common-api/get-account-credits)
+* [任务查询](./task-query.md)
 
 ## Authorizations
 

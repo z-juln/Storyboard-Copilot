@@ -1,4 +1,6 @@
-# 获取任务详情 - KIE API
+# KIE 任务查询
+
+> KIE 平台概览与参考图上传说明见 [README.md](./README.md)、[file-upload.md](./file-upload.md)。
 
 ## 概述
 使用此端点查询通过Market模型API创建的任何任务的状态和结果。这是一个统一的查询接口，适用于Market类别下的所有模型。
