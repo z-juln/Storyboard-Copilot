@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
-import { invoke, isTauri } from '@tauri-apps/api/core';
+import { invoke } from '@tauri-apps/api/core';
 import { Canvas } from './features/canvas/Canvas';
 import { TitleBar } from './components/TitleBar';
 import { SettingsDialog } from './components/SettingsDialog';
@@ -209,16 +209,14 @@ function App() {
   return (
     <ReactFlowProvider>
       <div className="w-full h-full flex flex-col bg-bg-dark">
-        {isTauri() && (
-          <TitleBar
-            onSettingsClick={() => {
-              setSettingsInitialCategory('general');
-              setShowSettings(true);
-            }}
-            showBackButton={!!currentProjectId}
-            onBackClick={closeProject}
-          />
-        )}
+        <TitleBar
+          onSettingsClick={() => {
+            setSettingsInitialCategory('general');
+            setShowSettings(true);
+          }}
+          showBackButton={!!currentProjectId}
+          onBackClick={closeProject}
+        />
 
         <main className="flex-1 relative">
           {currentProjectId ? <Canvas /> : <ProjectManager />}
