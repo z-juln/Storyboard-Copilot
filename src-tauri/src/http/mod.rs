@@ -6,7 +6,7 @@ use axum::{
     extract::{Path, State},
     http::{Method, StatusCode},
     response::{IntoResponse, Response},
-    routing::{get, post, put},
+    routing::{delete, get, post, put},
     Json, Router,
 };
 use serde_json::json;
@@ -20,10 +20,13 @@ use crate::ai::dto::{
     PollModelAdapterRequestDto, SetProviderSecretRequestDto,
 };
 use crate::ai::service::AiService;
+use crate::project::dto::{ProjectRecord, RenameProjectRequestDto, UpdateProjectViewportRequestDto};
+use crate::project::ProjectService;
 
 #[derive(Clone)]
 pub struct HttpState {
-    pub service: Arc<AiService>,
+    pub ai: Arc<AiService>,
+    pub project: Arc<ProjectService>,
 }
 
 pub fn resolve_api_db_path(app: &AppHandle) -> Result<PathBuf, String> {
@@ -55,7 +58,8 @@ pub async fn start_http_server_with_db(db_path: PathBuf) -> Result<(), String> {
         .unwrap_or(1421);
 
     let state = HttpState {
-        service: Arc::new(AiService::new(db_path)),
+        ai: Arc::new(AiService::new(db_path.clone())),
+        project: Arc::new(ProjectService::new(db_path)),
     };
 
     let cors = CorsLayer::new()
@@ -63,7 +67,13 @@ pub async fn start_http_server_with_db(db_path: PathBuf) -> Result<(), String> {
             "http://localhost:1420".parse().unwrap(),
             "http://127.0.0.1:1420".parse().unwrap(),
         ])
-        .allow_methods([Method::GET, Method::POST, Method::PUT, Method::OPTIONS])
+        .allow_methods([
+            Method::GET,
+            Method::POST,
+            Method::PUT,
+            Method::DELETE,
+            Method::OPTIONS,
+        ])
         .allow_headers(Any);
 
     let router = Router::new()
@@ -73,6 +83,15 @@ pub async fn start_http_server_with_db(db_path: PathBuf) -> Result<(), String> {
         .route("/api/v1/adapters/poll", post(poll_adapter))
         .route("/api/v1/secrets/:provider_id", get(get_secret_status))
         .route("/api/v1/secrets/:provider_id", put(set_secret))
+        .route("/api/v1/projects", get(list_projects))
+        .route("/api/v1/projects/:project_id", get(get_project))
+        .route("/api/v1/projects/:project_id", put(upsert_project))
+        .route("/api/v1/projects/:project_id", delete(delete_project))
+        .route(
+            "/api/v1/projects/:project_id/viewport",
+            put(update_project_viewport),
+        )
+        .route("/api/v1/projects/:project_id/rename", put(rename_project))
         .layer(cors)
         .with_state(state);
 
@@ -102,14 +121,14 @@ async fn health() -> Json<HealthResponseDto> {
 }
 
 async fn list_adapters(State(state): State<HttpState>) -> Json<serde_json::Value> {
-    Json(json!({ "adapters": state.service.list_adapters() }))
+    Json(json!({ "adapters": state.ai.list_adapters() }))
 }
 
 async fn invoke_adapter(
     State(state): State<HttpState>,
     Json(request): Json<InvokeModelAdapterRequestDto>,
 ) -> Response {
-    match state.service.invoke_adapter(request).await {
+    match state.ai.invoke_adapter(request).await {
         Ok(result) => Json(result).into_response(),
         Err(err) => api_error(StatusCode::BAD_REQUEST, err.to_string()),
     }
@@ -119,7 +138,7 @@ async fn poll_adapter(
     State(state): State<HttpState>,
     Json(request): Json<PollModelAdapterRequestDto>,
 ) -> Response {
-    match state.service.poll_adapter(request).await {
+    match state.ai.poll_adapter(request).await {
         Ok(result) => Json(result).into_response(),
         Err(err) => api_error(StatusCode::BAD_REQUEST, err.to_string()),
     }
@@ -129,7 +148,7 @@ async fn get_secret_status(
     State(state): State<HttpState>,
     Path(provider_id): Path<String>,
 ) -> Response {
-    match state.service.secret_status(&provider_id) {
+    match state.ai.secret_status(&provider_id) {
         Ok(result) => Json(result).into_response(),
         Err(err) => api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
     }
@@ -140,13 +159,85 @@ async fn set_secret(
     Path(provider_id): Path<String>,
     Json(request): Json<SetProviderSecretRequestDto>,
 ) -> Response {
-    match state.service.set_provider_secret(&provider_id, &request.api_key) {
-        Ok(()) => {
-            match state.service.secret_status(&provider_id) {
-                Ok(result) => Json(result).into_response(),
-                Err(err) => api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
-            }
-        }
+    match state.ai.set_provider_secret(&provider_id, &request.api_key) {
+        Ok(()) => match state.ai.secret_status(&provider_id) {
+            Ok(result) => Json(result).into_response(),
+            Err(err) => api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
+        },
+        Err(err) => api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
+    }
+}
+
+async fn list_projects(State(state): State<HttpState>) -> Response {
+    match state.project.list_summaries() {
+        Ok(projects) => Json(json!({ "projects": projects })).into_response(),
+        Err(err) => api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
+    }
+}
+
+async fn get_project(
+    State(state): State<HttpState>,
+    Path(project_id): Path<String>,
+) -> Response {
+    match state.project.get_record(&project_id) {
+        Ok(Some(record)) => Json(record).into_response(),
+        Ok(None) => api_error(StatusCode::NOT_FOUND, format!("项目不存在: {project_id}")),
+        Err(err) => api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
+    }
+}
+
+async fn upsert_project(
+    State(state): State<HttpState>,
+    Path(project_id): Path<String>,
+    Json(record): Json<ProjectRecord>,
+) -> Response {
+    if record.id != project_id {
+        return api_error(
+            StatusCode::BAD_REQUEST,
+            "路径 projectId 与请求体 id 不一致".to_string(),
+        );
+    }
+
+    match state.project.upsert_record(record) {
+        Ok(()) => StatusCode::NO_CONTENT.into_response(),
+        Err(err) => api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
+    }
+}
+
+async fn update_project_viewport(
+    State(state): State<HttpState>,
+    Path(project_id): Path<String>,
+    Json(request): Json<UpdateProjectViewportRequestDto>,
+) -> Response {
+    match state
+        .project
+        .update_viewport(&project_id, &request.viewport_json)
+    {
+        Ok(()) => StatusCode::NO_CONTENT.into_response(),
+        Err(err) => api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
+    }
+}
+
+async fn rename_project(
+    State(state): State<HttpState>,
+    Path(project_id): Path<String>,
+    Json(request): Json<RenameProjectRequestDto>,
+) -> Response {
+    match state
+        .project
+        .rename(&project_id, &request.name, request.updated_at)
+    {
+        Ok(()) => StatusCode::NO_CONTENT.into_response(),
+        Err(err) => api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
+    }
+}
+
+async fn delete_project(
+    State(state): State<HttpState>,
+    Path(project_id): Path<String>,
+) -> Response {
+    match state.project.delete(&project_id) {
+        Ok(()) => StatusCode::NO_CONTENT.into_response(),
         Err(err) => api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
     }
 }

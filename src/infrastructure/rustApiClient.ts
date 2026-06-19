@@ -4,6 +4,10 @@ import type {
   ModelInvokeInput,
   ProviderSecretStatus,
 } from '@/features/aiModels/types';
+import type {
+  ProjectRecord,
+  ProjectSummaryRecord,
+} from '@/commands/projectState';
 
 const DEFAULT_BASE_URL = 'http://127.0.0.1:1421';
 
@@ -20,6 +24,15 @@ async function readJson<T>(response: Response): Promise<T> {
   return payload;
 }
 
+async function readEmpty(response: Response): Promise<void> {
+  if (response.ok) {
+    return;
+  }
+
+  const payload = (await response.json().catch(() => ({}))) as { error?: string };
+  throw new Error(payload.error || `HTTP ${response.status}`);
+}
+
 export interface RustApiClient {
   health: () => Promise<{ status: string; version: string }>;
   listAdapters: () => Promise<BuiltinAdapterSummary[]>;
@@ -34,6 +47,12 @@ export interface RustApiClient {
   }) => Promise<ModelCallResult>;
   getSecretStatus: (providerId: string) => Promise<ProviderSecretStatus>;
   setProviderSecret: (providerId: string, apiKey: string) => Promise<ProviderSecretStatus>;
+  listProjectSummaries: () => Promise<ProjectSummaryRecord[]>;
+  getProjectRecord: (projectId: string) => Promise<ProjectRecord | null>;
+  upsertProjectRecord: (record: ProjectRecord) => Promise<void>;
+  updateProjectViewportRecord: (projectId: string, viewportJson: string) => Promise<void>;
+  renameProjectRecord: (projectId: string, name: string, updatedAt: number) => Promise<void>;
+  deleteProjectRecord: (projectId: string) => Promise<void>;
 }
 
 export function createRustApiClient(baseUrl = resolveBaseUrl()): RustApiClient {
@@ -76,6 +95,48 @@ export function createRustApiClient(baseUrl = resolveBaseUrl()): RustApiClient {
         body: JSON.stringify({ apiKey }),
       });
       return readJson<ProviderSecretStatus>(response);
+    },
+    listProjectSummaries: async () => {
+      const response = await fetch(`${normalizedBaseUrl}/api/v1/projects`);
+      const payload = await readJson<{ projects: ProjectSummaryRecord[] }>(response);
+      return payload.projects;
+    },
+    getProjectRecord: async (projectId) => {
+      const response = await fetch(`${normalizedBaseUrl}/api/v1/projects/${projectId}`);
+      if (response.status === 404) {
+        return null;
+      }
+      return readJson<ProjectRecord>(response);
+    },
+    upsertProjectRecord: async (record) => {
+      const response = await fetch(`${normalizedBaseUrl}/api/v1/projects/${record.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(record),
+      });
+      await readEmpty(response);
+    },
+    updateProjectViewportRecord: async (projectId, viewportJson) => {
+      const response = await fetch(`${normalizedBaseUrl}/api/v1/projects/${projectId}/viewport`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ viewportJson }),
+      });
+      await readEmpty(response);
+    },
+    renameProjectRecord: async (projectId, name, updatedAt) => {
+      const response = await fetch(`${normalizedBaseUrl}/api/v1/projects/${projectId}/rename`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, updatedAt }),
+      });
+      await readEmpty(response);
+    },
+    deleteProjectRecord: async (projectId) => {
+      const response = await fetch(`${normalizedBaseUrl}/api/v1/projects/${projectId}`, {
+        method: 'DELETE',
+      });
+      await readEmpty(response);
     },
   };
 }
