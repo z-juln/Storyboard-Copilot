@@ -15,6 +15,7 @@ import { GRSAI_NANO_BANANA_PRO_MODEL_OPTIONS } from '@/features/canvas/models/pr
 import { GRSAI_CREDIT_TIERS } from '@/features/canvas/pricing/types';
 import providerGuideMarkdown from '../../docs/settings/provider-guide.md?raw';
 import type { SettingsCategory } from '@/features/settings/settingsEvents';
+import { BuiltinModelsPanel } from '@/components/settings/BuiltinModelsPanel';
 
 interface SettingsDialogProps {
   isOpen: boolean;
@@ -430,6 +431,20 @@ export function SettingsDialog({
               </button>
 
               <button
+                onClick={() => setActiveCategory('aiModels')}
+                className={`
+                w-full flex items-center gap-3 px-4 py-2.5 text-left
+                transition-colors
+                ${activeCategory === 'aiModels'
+                    ? 'bg-accent/10 text-text-dark border-l-2 border-accent'
+                    : 'text-text-muted hover:bg-bg-dark hover:text-text-dark'
+                  }
+              `}
+              >
+                <span className="text-sm">{'模型'}</span>
+              </button>
+
+              <button
                 onClick={() => setActiveCategory('appearance')}
                 className={`
                 w-full flex items-center gap-3 px-4 py-2.5 text-left
@@ -615,6 +630,12 @@ export function SettingsDialog({
                   </button>
                 </div>
               </>
+            )}
+
+            {activeCategory === 'aiModels' && (
+              <div className="ui-scrollbar flex-1 overflow-y-auto p-6">
+                <BuiltinModelsPanel />
+              </div>
             )}
 
             {activeCategory === 'appearance' && (

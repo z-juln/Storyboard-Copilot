@@ -1,5 +1,6 @@
 pub mod ai;
 pub mod commands;
+pub mod http;
 
 use std::path::PathBuf;
 use std::time::Duration;
@@ -135,6 +136,13 @@ pub fn run() {
                     warn!("failed to apply macOS window effects: {err}");
                 }
             }
+
+            let app_handle_for_api = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                if let Err(err) = http::start_http_server(app_handle_for_api).await {
+                    warn!("failed to start local AI HTTP API: {err}");
+                }
+            });
 
             let app_handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {

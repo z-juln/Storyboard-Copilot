@@ -1,5 +1,9 @@
+pub mod adapters;
+pub mod dto;
 pub mod error;
 pub mod providers;
+pub mod secrets;
+pub mod service;
 
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;

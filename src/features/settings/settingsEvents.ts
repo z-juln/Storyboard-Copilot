@@ -1,5 +1,6 @@
 export type SettingsCategory =
   | 'providers'
+  | 'aiModels'
   | 'pricing'
   | 'appearance'
   | 'general'
