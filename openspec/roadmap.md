@@ -14,44 +14,97 @@
 ## 现状基线（2026-06）
 
 - 已有：节点画布、上传/AI 出图/裁剪标注/分镜切割与生成、多供应商 API Key 配置（kie / ppio / fal / grsai）、模型参数控件。
-- 缺口：统一模型配置中心、全局 prompt 预设、目录可视化、VR/3D 组件、通用对话、配置导入导出、工作流模板与 Agent。
+- **运行形态**：前端为同一套 React 应用；AI 等能力目前经 Tauri WebView bridge（`invoke`）调 Rust，**浏览器单独打开时无法完整使用**。
+- **目标形态**：Web 端 + 本地 Rust HTTP 服务 = **完整应用**；浏览器与 Tauri 窗口共用同一前端，**一律走本地网络请求**（`fetch → 127.0.0.1:1421`），**不用 WebView bridge 传 AI/业务 API**。
+- 缺口：本地 HTTP 服务层、内置 AI 模型库（对话/生图/视频）、全局 prompt 预设、目录可视化、VR/3D 组件、配置导入导出、工作流模板与 Agent。
 
 ---
 
 ## 一、AI 基础设施
 
-### [P0] 通用 AI 模型配置中心
+### [P0] Web + 本地 Rust：双端一体
 
-**目标**：一套可视化配置体系，覆盖主流供应商与模型，并支持用户自定义增删改；交互参考 [CC Switch](https://github.com/farion1231/cc-switch) 的 Provider 管理范式。
+**目标**：**Web 端也是完整 App**——不是「阉割版网页」，而是「同一套前端 + 本机 Rust 后端」。Tauri 桌面壳只负责窗口与系统能力；**与 AI、模型、密钥相关的业务通讯全部经本地 HTTP API**，禁止依赖 WebView bridge（`@tauri-apps/api` invoke）。
 
-**参考 CC Switch 的用法要点**：
+```text
+浏览器 localhost:1420  ──┐
+                         ├── fetch → Rust HTTP API :1421 → AiService → 内置 Adapter
+Tauri WebView :1420   ──┘         （同一路径、同一协议）
 
-- 内置 50+ 供应商/模型预设，一键导入（填 API Key 即可启用）
-- 可视化列表：启用/禁用、拖拽排序、分组管理
-- 单条配置包含：名称、Base URL、模型 ID、鉴权方式、能力标签（生图/视频/LLM）
-- 配置导入/导出（JSON），便于备份与跨设备迁移
-- 可选：本地代理 / 故障转移（后续 P1）
+Tauri 壳：窗口 / 文件 / 部分持久化（非 AI 主通道，逐步也迁 HTTP）
+```
 
-**与现状差异**：
+**启动方式**：
 
-- 当前模型定义分散在代码注册表 + 设置页 API Key；用户无法自行新增 OpenAI 兼容网关或改模型参数模板
-- 需抽象「模型配置 schema」，与运行时 `resolveRequest` / Rust provider 解耦
+| 场景 | 前端 | Rust API | 说明 |
+|------|------|----------|------|
+| 全链路开发 | `npm run tauri dev` → `:1420` | Tauri 进程内启动 `:1421` | 桌面窗口 + 浏览器均可访问同一前端 |
+| Web 调试 | `npm run dev` → `:1420` | 单独启动 Rust API（如 `storyboard-api`） | 浏览器即完整 AI 调试环境 |
+
+**硬约束**：
+
+- 前端 AI 调用：**仅** `rustApiClient` / `httpAiGateway` → `http://127.0.0.1:1421/api/v1/...`
+- **禁止**：AI 模型调用走 `invoke('generate_image')`、`invoke('invoke_model_adapter')` 等 bridge
+- Rust API 只绑定 `127.0.0.1`；CORS 放行本地 Vite origin
+- 后端未启动时，前端明确提示「请先启动本地 Rust 服务」
 
 **验收**：
 
-- [ ] 设置页独立「模型与供应商」分类，列表展示全部已配置项
-- [ ] 可从预设库一键添加；可手动新建/编辑/删除自定义配置
-- [ ] 节点选模型时下拉仅展示「已启用且 Key 有效」的项；缺 Key 时有明确引导
-- [ ] 内置主流模型（生图/视频/LLM）的默认参数模板（比例、分辨率、模式说明）
-- [ ] 配置持久化到本地 SQLite，与项目数据分离
+- [ ] `npm run tauri dev` 后 `:1421` health 可用；浏览器打开 `:1420` 可调用 AI
+- [ ] Tauri 窗口与浏览器 Network 面板可见对 `:1421` 的 fetch，**无** AI 相关 invoke
+- [ ] 纯 Web 模式（`npm run dev` + 独立 Rust API）可完成至少一项 AI 能力验证
 
-**主要改动路由**：`settingsStore`、设置 UI、`models/` 注册机制、`src-tauri/src/ai/` provider 解析
+**主要改动路由**：`src/infrastructure/rustApiClient.ts`、`src-tauri/src/http/`、`src-tauri/src/ai/service/`
+
+---
+
+### [P0] 内置 AI 模型库
+
+**依赖**：Web + 本地 Rust 双端一体（上节 HTTP 通道必须先就绪）
+
+**目标**：用户**不用配置调用方式**（不写 JS Adapter、不填 Submit/Poll URL、不拼请求体）。应用内置 [`docs/api_docs/models/`](../docs/api_docs/models/) 中的模型能力，用户侧只做：**选模型、填 Key（可选）、启用/禁用**。所有模型调用经 **本地 HTTP API** 进入 Rust 内置 Adapter。
+
+详细协议见：[custom-ai-model-config.md](./custom-ai-model-config.md)（运行时仍按 Provider → Model → Adapter 分层，但 Adapter 由应用内置，不对用户开放编辑）。
+
+**用户侧体验（参考「对话自配 / 视频自配」的简化版）**：
+
+- **默认内置**：部分模型（如 DeepSeek 对话）开箱可用，内置 Key 由应用提供；用户可切换「使用内置 / 使用自己的 Key」
+- **模型选择**：设置页或节点内，从内置模型列表中选（标签/下拉），不按 capability 手写配置
+- **供应商 Key**：仅需在「密钥」页为对应供应商填 API Key；缺 Key 时有明确引导
+- **不提供**：自定义通道、Submit/Poll 模板、Headers/Body JSON、用户粘贴 JS 调用声明
+
+**模型范围（以文档目录为准，逐步接入）**：
+
+| 类型 | 文档入口 | 示例 |
+|------|----------|------|
+| 对话 | `docs/api_docs/models/` | DeepSeek V4 Pro、GPT-5.5、Kimi 2.6 |
+| 生图 | 同上 | Nano Banana、Gemini 3、GPT Image 2.0、Seedream… |
+| 生视频 | 同上 | Seedance 2.0、Kling 3.0 |
+
+新模型接入流程：**维护 `docs/api_docs/models/*.md` → 在 Rust 内置 Adapter → 出现在设置/节点列表**（`custom-ai-model-adapter-author` skill 供开发写内置实现，不对终端用户暴露）。
+
+**与现状差异**：
+
+- 当前生图模型分散在代码注册表 + 设置页 Key；对话/视频尚无统一内置库
+- 目标：调用实现全部在 Rust 内置，与 `docs/api_docs/models` 一一对应；用户配置与项目 JSON 分离
+
+**验收**：
+
+- [ ] 设置页「模型」展示内置模型列表（来源 `docs/api_docs/models`，已接入项可启用/禁用）
+- [ ] 对话类：至少 DeepSeek 内置可用（默认 Key + 用户 Key 覆盖 + 清空回退默认）
+- [ ] 生图/视频：节点下拉仅展示已内置且 Key 有效的模型
+- [ ] **浏览器与 Tauri 窗口均可通过 `:1421` 调用上述模型，行为一致**
+- [ ] 用户无法新增/编辑/删除调用逻辑；不可查看内置 Adapter 实现细节
+- [ ] 缺 Key 或 Rust API 未启动时有明确引导
+- [ ] 用户 Key 与启用状态持久化到本地 SQLite，不进项目 JSON
+
+**主要改动路由**：`docs/api_docs/models/`、`src-tauri/src/ai/adapters/`、`features/aiModels/`、设置 UI、`rustApiClient`、`src-tauri/src/http/`
 
 ---
 
 ### [P0] Grok 免费生图 / 视频接入
 
-**目标**：接入 xAI Grok 免费或低成本生图、生视频能力，作为预设供应商之一纳入上述配置中心。
+**目标**：接入 xAI Grok 免费或低成本生图、生视频能力，作为内置模型之一纳入模型库（文档进 `docs/api_docs/models/`）。
 
 **验收**：
 
@@ -59,7 +112,7 @@
 - [ ] 支持至少一种生图与一种视频模型（按官方 API 能力裁剪）
 - [ ] 图像/视频节点可选 Grok 模型并完成生成
 
-**依赖**：通用 AI 模型配置中心（或最小可用的预设 + Key 配置）
+**依赖**：内置 AI 模型库（或最小可用的内置对话 + 生图）
 
 ---
 
@@ -78,7 +131,7 @@
 - [ ] 匹配规则可配置（内置 JSON + 后续用户可调优先级）
 - [ ] 缺 Key / 缺模型时错误信息 actionable
 
-**依赖**：通用 AI 模型配置中心  
+**依赖**：内置 AI 模型库  
 **优先级**：P1
 
 ---
@@ -94,7 +147,7 @@
 - [ ] 对话历史会话级持久化（可选）
 - [ ] 支持复制回复、插入到文字节点
 
-**依赖**：通用 AI 模型配置中心（LLM 部分）
+**依赖**：内置 AI 模型库（LLM 部分）
 
 ---
 
@@ -271,7 +324,7 @@
 - [ ] 导入前校验，失败项逐项报告
 
 **依赖**：各配置模块 schema 稳定  
-**优先级**：P1（与 P0 配置中心同步设计 schema）
+**优先级**：P1（与 P0 内置模型库同步设计 schema）
 
 ---
 
@@ -297,7 +350,8 @@
 
 ```text
 Phase 1（P0 底座）
-├── 通用 AI 模型配置中心
+├── Web + 本地 Rust 双端一体（HTTP :1421，禁止 AI bridge）
+├── 内置 AI 模型库
 ├── 预设 Base-Prompt
 ├── 通用 AI 对话框
 ├── Grok 接入
