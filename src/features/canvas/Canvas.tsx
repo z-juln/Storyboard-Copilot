@@ -986,14 +986,9 @@ export function Canvas() {
     setShowNodeMenu(true);
   }, [reactFlowInstance]);
 
-  const handlePaneClick = useCallback((event: ReactMouseEvent) => {
+  const handlePaneClick = useCallback((_event: ReactMouseEvent) => {
     if (suppressNextPaneClickRef.current) {
       suppressNextPaneClickRef.current = false;
-      return;
-    }
-
-    if (event.detail >= 2) {
-      openNodeMenuAtClientPosition(event.clientX, event.clientY);
       return;
     }
 
@@ -1002,7 +997,17 @@ export function Canvas() {
     setMenuAllowedTypes(undefined);
     setPendingConnectStart(null);
     setPreviewConnectionVisual(null);
-  }, [openNodeMenuAtClientPosition, setSelectedNode]);
+  }, [setSelectedNode]);
+
+  const handlePaneContextMenu = useCallback((event: MouseEvent | ReactMouseEvent) => {
+    const target = event.target as HTMLElement | null;
+    if (!target?.classList.contains('react-flow__pane')) {
+      return;
+    }
+
+    event.preventDefault();
+    openNodeMenuAtClientPosition(event.clientX, event.clientY);
+  }, [openNodeMenuAtClientPosition]);
 
   const handleNodeSelect = useCallback(
     (type: CanvasNodeType) => {
@@ -1571,7 +1576,7 @@ export function Canvas() {
         <div className="flex max-w-3xl flex-col items-center gap-5 px-6 text-center">
           {configuredApiKeyCount === 0 && <MissingApiKeyHint />}
           <div>
-            <div className="text-2xl text-text-muted">双击鼠标添加节点</div>
+            <div className="text-2xl text-text-muted">右键画布添加节点</div>
           </div>
         </div>
       </div>
@@ -1595,6 +1600,7 @@ export function Canvas() {
         onNodeDrag={handleNodeDrag}
         onNodeDragStop={handleNodeDragStop}
         onPaneClick={handlePaneClick}
+        onPaneContextMenu={handlePaneContextMenu}
         onMove={handleMove}
         onMoveStart={handleMoveStart}
         onMoveEnd={handleMoveEnd}
