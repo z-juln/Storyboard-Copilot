@@ -10,6 +10,7 @@ import type {
 } from '@/commands/projectState';
 
 const DEFAULT_BASE_URL = 'http://127.0.0.1:1421';
+const DEFAULT_UPLOAD_CHUNK_SIZE = 4 * 1024 * 1024;
 
 export function resolveRustApiBaseUrl(): string {
   const configured = import.meta.env.VITE_RUST_API_BASE_URL?.trim();
@@ -22,6 +23,17 @@ function resolveBaseUrl(): string {
 
 export function buildLocalImageUrl(filePath: string): string {
   return `${resolveRustApiBaseUrl()}/image?path=${encodeURIComponent(filePath)}`;
+}
+
+export interface PrepareNodeImageResult {
+  imagePath: string;
+  previewImagePath: string;
+  aspectRatio: string;
+}
+
+interface CreateImageUploadSessionResult {
+  uploadId: string;
+  chunkSize: number;
 }
 
 async function readJson<T>(response: Response): Promise<T> {
@@ -39,6 +51,59 @@ async function readEmpty(response: Response): Promise<void> {
 
   const payload = (await response.json().catch(() => ({}))) as { error?: string };
   throw new Error(payload.error || `HTTP ${response.status}`);
+}
+
+async function abortImageUploadSession(baseUrl: string, uploadId: string): Promise<void> {
+  await fetch(`${baseUrl}/api/v1/images/upload-sessions/${uploadId}`, {
+    method: 'DELETE',
+  }).catch(() => undefined);
+}
+
+async function uploadBinaryInChunks(
+  baseUrl: string,
+  data: Blob,
+  extension: string,
+  maxPreviewDimension?: number
+): Promise<PrepareNodeImageResult> {
+  const sessionResponse = await fetch(`${baseUrl}/api/v1/images/upload-sessions`, {
+    method: 'POST',
+  });
+  const session = await readJson<CreateImageUploadSessionResult>(sessionResponse);
+  const chunkSize = session.chunkSize > 0 ? session.chunkSize : DEFAULT_UPLOAD_CHUNK_SIZE;
+  const totalChunks = Math.max(1, Math.ceil(data.size / chunkSize));
+
+  try {
+    for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex += 1) {
+      const start = chunkIndex * chunkSize;
+      const chunk = data.slice(start, start + chunkSize);
+      const chunkResponse = await fetch(
+        `${baseUrl}/api/v1/images/upload-sessions/${session.uploadId}/chunks/${chunkIndex}`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/octet-stream' },
+          body: chunk,
+        }
+      );
+      await readEmpty(chunkResponse);
+    }
+
+    const completeResponse = await fetch(
+      `${baseUrl}/api/v1/images/upload-sessions/${session.uploadId}/complete`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          extension,
+          totalChunks,
+          maxPreviewDimension,
+        }),
+      }
+    );
+    return readJson<PrepareNodeImageResult>(completeResponse);
+  } catch (error) {
+    await abortImageUploadSession(baseUrl, session.uploadId);
+    throw error;
+  }
 }
 
 export interface RustApiClient {
@@ -61,6 +126,15 @@ export interface RustApiClient {
   updateProjectViewportRecord: (projectId: string, viewportJson: string) => Promise<void>;
   renameProjectRecord: (projectId: string, name: string, updatedAt: number) => Promise<void>;
   deleteProjectRecord: (projectId: string) => Promise<void>;
+  prepareNodeImageFromBlob: (
+    data: Blob,
+    extension: string,
+    maxPreviewDimension?: number
+  ) => Promise<PrepareNodeImageResult>;
+  prepareNodeImageFromSource: (
+    source: string,
+    maxPreviewDimension?: number
+  ) => Promise<PrepareNodeImageResult>;
 }
 
 export function createRustApiClient(baseUrl = resolveBaseUrl()): RustApiClient {
@@ -145,6 +219,19 @@ export function createRustApiClient(baseUrl = resolveBaseUrl()): RustApiClient {
         method: 'DELETE',
       });
       await readEmpty(response);
+    },
+    prepareNodeImageFromBlob: async (data, extension, maxPreviewDimension) =>
+      uploadBinaryInChunks(normalizedBaseUrl, data, extension, maxPreviewDimension),
+    prepareNodeImageFromSource: async (source, maxPreviewDimension) => {
+      const response = await fetch(`${normalizedBaseUrl}/api/v1/images/prepare-from-source`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          source,
+          maxPreviewDimension,
+        }),
+      });
+      return readJson<PrepareNodeImageResult>(response);
     },
   };
 }

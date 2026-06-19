@@ -53,12 +53,6 @@ export interface StoryboardImageMetadata {
   frameNotes: string[];
 }
 
-export interface PrepareNodeImageSourceResult {
-  imagePath: string;
-  previewImagePath: string;
-  aspectRatio: string;
-}
-
 export interface CropImageSourcePayload {
   source: string;
   aspectRatio?: string;
@@ -100,42 +94,10 @@ export async function embedStoryboardImageMetadata(
   return await invoke('embed_storyboard_image_metadata', { source, metadata });
 }
 
-export async function prepareNodeImageSource(
-  source: string,
-  maxPreviewDimension = 512
-): Promise<PrepareNodeImageSourceResult> {
-  return await invoke('prepare_node_image_source', {
-    source,
-    maxPreviewDimension,
-  });
-}
-
-export async function prepareNodeImageBinary(
-  bytes: Uint8Array,
-  extension?: string,
-  maxPreviewDimension = 512
-): Promise<PrepareNodeImageSourceResult> {
-  return await invoke('prepare_node_image_binary', {
-    bytes: Array.from(bytes),
-    extension,
-    maxPreviewDimension,
-  });
-}
-
 export async function cropImageSource(
   payload: CropImageSourcePayload
 ): Promise<string> {
   return await invoke('crop_image_source', { payload });
-}
-
-export async function loadImage(filePath: string): Promise<string> {
-  return await invoke('load_image', {
-    filePath,
-  });
-}
-
-export async function persistImageSource(source: string): Promise<string> {
-  return await invoke('persist_image_source', { source });
 }
 
 export async function persistImageBinary(

@@ -3,7 +3,8 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use axum::{
-    extract::{Path, Query, State},
+    body::Bytes,
+    extract::{DefaultBodyLimit, Path, Query, State},
     http::{header, Method, StatusCode},
     response::{IntoResponse, Response},
     routing::{delete, get, post, put},
@@ -21,7 +22,15 @@ use crate::ai::dto::{
     PollModelAdapterRequestDto, SetProviderSecretRequestDto,
 };
 use crate::ai::service::AiService;
+use crate::media::dto::{
+    CompleteImageUploadRequestDto, PrepareFromSourceRequestDto,
+};
 use crate::media::read_local_image;
+use crate::media::store::prepare_from_source;
+use crate::media::upload::{
+    cleanup_stale_upload_sessions, complete_upload_session, create_upload_session,
+    remove_upload_session, write_upload_chunk, UPLOAD_CHUNK_SIZE,
+};
 use crate::project::dto::{ProjectRecord, RenameProjectRequestDto, UpdateProjectViewportRequestDto};
 use crate::project::ProjectService;
 
@@ -70,6 +79,8 @@ pub async fn start_http_server_with_db(db_path: PathBuf) -> Result<(), String> {
         .map(PathBuf::from)
         .unwrap_or_else(|| db_path.clone());
 
+    let _ = cleanup_stale_upload_sessions(&app_data_dir);
+
     let state = HttpState {
         ai: Arc::new(AiService::new(db_path.clone())),
         project: Arc::new(ProjectService::new(db_path)),
@@ -90,6 +101,13 @@ pub async fn start_http_server_with_db(db_path: PathBuf) -> Result<(), String> {
         ])
         .allow_headers(Any);
 
+    let upload_routes = Router::new()
+        .route(
+            "/api/v1/images/upload-sessions/:upload_id/chunks/:chunk_index",
+            put(upload_image_chunk),
+        )
+        .layer(DefaultBodyLimit::max(UPLOAD_CHUNK_SIZE + 4096));
+
     let router = Router::new()
         .route("/api/v1/health", get(health))
         .route("/api/v1/adapters", get(list_adapters))
@@ -107,7 +125,21 @@ pub async fn start_http_server_with_db(db_path: PathBuf) -> Result<(), String> {
         )
         .route("/api/v1/projects/:project_id/rename", put(rename_project))
         .route("/api/v1/image", get(serve_image))
+        .route("/api/v1/images/upload-sessions", post(create_image_upload_session))
+        .route(
+            "/api/v1/images/upload-sessions/:upload_id/complete",
+            post(complete_image_upload),
+        )
+        .route(
+            "/api/v1/images/upload-sessions/:upload_id",
+            delete(abort_image_upload),
+        )
+        .route(
+            "/api/v1/images/prepare-from-source",
+            post(prepare_image_from_source),
+        )
         .route("/image", get(serve_image))
+        .merge(upload_routes)
         .layer(cors)
         .with_state(state);
 
@@ -255,6 +287,63 @@ async fn delete_project(
     match state.project.delete(&project_id) {
         Ok(()) => StatusCode::NO_CONTENT.into_response(),
         Err(err) => api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
+    }
+}
+
+async fn create_image_upload_session(State(state): State<HttpState>) -> Response {
+    match create_upload_session(&state.app_data_dir) {
+        Ok(result) => Json(result).into_response(),
+        Err(err) => api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
+    }
+}
+
+async fn upload_image_chunk(
+    State(state): State<HttpState>,
+    Path((upload_id, chunk_index)): Path<(String, u32)>,
+    body: Bytes,
+) -> Response {
+    match write_upload_chunk(&state.app_data_dir, &upload_id, chunk_index, &body) {
+        Ok(()) => StatusCode::NO_CONTENT.into_response(),
+        Err(err) => api_error(StatusCode::BAD_REQUEST, err),
+    }
+}
+
+async fn complete_image_upload(
+    State(state): State<HttpState>,
+    Path(upload_id): Path<String>,
+    Json(request): Json<CompleteImageUploadRequestDto>,
+) -> Response {
+    match complete_upload_session(&state.app_data_dir, &upload_id, request) {
+        Ok(result) => Json(result).into_response(),
+        Err(err) => api_error(StatusCode::BAD_REQUEST, err),
+    }
+}
+
+async fn abort_image_upload(
+    State(state): State<HttpState>,
+    Path(upload_id): Path<String>,
+) -> Response {
+    match remove_upload_session(&state.app_data_dir, &upload_id) {
+        Ok(()) => StatusCode::NO_CONTENT.into_response(),
+        Err(err) => api_error(StatusCode::BAD_REQUEST, err),
+    }
+}
+
+async fn prepare_image_from_source(
+    State(state): State<HttpState>,
+    Json(request): Json<PrepareFromSourceRequestDto>,
+) -> Response {
+    if request.source.trim().starts_with("data:") {
+        return api_error(
+            StatusCode::BAD_REQUEST,
+            "Data URL is too large for JSON upload; use chunked upload API".to_string(),
+        );
+    }
+
+    let max_preview = request.max_preview_dimension.unwrap_or(512);
+    match prepare_from_source(&state.app_data_dir, &request.source, max_preview).await {
+        Ok(result) => Json(result).into_response(),
+        Err(err) => api_error(StatusCode::BAD_REQUEST, err),
     }
 }
 

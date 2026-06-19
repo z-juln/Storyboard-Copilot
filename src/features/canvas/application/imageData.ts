@@ -1,12 +1,8 @@
-import { isTauri } from '@tauri-apps/api/core';
-
 import {
-  loadImage,
-  prepareNodeImageBinary,
-  persistImageSource,
-  prepareNodeImageSource,
-} from '@/commands/image';
-import { buildLocalImageUrl } from '@/infrastructure/rustApiClient';
+  buildLocalImageUrl,
+  rustApiClient,
+  type PrepareNodeImageResult,
+} from '@/infrastructure/rustApiClient';
 
 export function parseAspectRatio(value: string): number {
   const [width, height] = value.split(':').map((item) => Number(item));
@@ -146,16 +142,70 @@ export function resolveImageDisplayUrl(imageUrl: string): string {
   return imageUrl;
 }
 
+function mapPreparedResult(prepared: PrepareNodeImageResult): PreparedNodeImage {
+  return {
+    imageUrl: prepared.imagePath,
+    previewImageUrl: prepared.previewImagePath,
+    aspectRatio: prepared.aspectRatio,
+  };
+}
+
+function isInlineImageSource(source: string): boolean {
+  const lower = source.trim().toLowerCase();
+  return lower.startsWith('data:') || lower.startsWith('blob:');
+}
+
+function resolveBlobExtension(blob: Blob, fallbackSource?: string): string {
+  const mime = blob.type.toLowerCase();
+  if (mime === 'image/png') return 'png';
+  if (mime === 'image/jpeg' || mime === 'image/jpg') return 'jpg';
+  if (mime === 'image/webp') return 'webp';
+  if (mime === 'image/gif') return 'gif';
+  if (mime === 'image/bmp') return 'bmp';
+  if (mime === 'image/tiff') return 'tiff';
+  if (mime === 'image/avif') return 'avif';
+
+  if (fallbackSource?.startsWith('data:image/')) {
+    const mimePart = fallbackSource.slice('data:'.length).split(';')[0] ?? '';
+    return resolveBlobExtension(new Blob([], { type: mimePart }));
+  }
+
+  return 'png';
+}
+
+async function prepareInlineImageSource(
+  source: string,
+  maxPreviewDimension: number
+): Promise<PreparedNodeImage> {
+  const response = await fetch(source);
+  if (!response.ok) {
+    throw createImagePipelineError(
+      '无法读取内存图片数据',
+      `source=${source}\nstatus=${response.status}`
+    );
+  }
+  const blob = await response.blob();
+  const prepared = await rustApiClient.prepareNodeImageFromBlob(
+    blob,
+    resolveBlobExtension(blob, source),
+    maxPreviewDimension
+  );
+  return mapPreparedResult(prepared);
+}
+
 export async function persistImageLocally(source: string): Promise<string> {
-  if (isLikelyLocalImagePath(source)) {
-    return source;
+  const trimmed = source.trim();
+  if (!trimmed || isLikelyLocalImagePath(trimmed)) {
+    return trimmed;
   }
 
-  if (!isTauri()) {
-    return source;
+  if (isInlineImageSource(trimmed)) {
+    const prepared = await prepareInlineImageSource(trimmed, DEFAULT_PREVIEW_MAX_DIMENSION);
+    return prepared.imageUrl;
   }
 
-  return await persistImageSource(source);
+  const prepared = await rustApiClient.prepareNodeImageFromSource(trimmed);
+  return prepared.imagePath;
 }
 
 export async function loadImageElement(source: string): Promise<HTMLImageElement> {
@@ -185,13 +235,6 @@ export async function imageUrlToDataUrl(imageUrl: string): Promise<string> {
   }
 
   if (isLikelyLocalImagePath(imageUrl)) {
-    if (isTauri()) {
-      try {
-        return await loadImage(imageUrl);
-      } catch (error) {
-        throw createImagePipelineError('无法读取本地图片数据', `source=${imageUrl}`, error);
-      }
-    }
     const localResponse = await fetch(resolveImageDisplayUrl(imageUrl));
     if (!localResponse.ok) {
       throw createImagePipelineError(
@@ -273,31 +316,15 @@ export async function prepareNodeImageFromFile(
     return prepared;
   }
 
-  if (isTauri()) {
-    const safeMaxDimension = Math.max(64, Math.floor(maxPreviewDimension));
-    const readStarted = performance.now();
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    const readElapsed = Math.round(performance.now() - readStarted);
-    const extension = resolveFileExtension(file);
-    const tauriStarted = performance.now();
-    const prepared = await prepareNodeImageBinary(bytes, extension, safeMaxDimension);
-    const tauriElapsed = Math.round(performance.now() - tauriStarted);
-    console.info(
-      `[upload-perf][imageData] prepareNodeImageFromFile binary-mode name="${file.name}" size=${file.size}B readArrayBuffer=${readElapsed}ms tauriPrepare=${tauriElapsed}ms total=${Math.round(performance.now() - started)}ms`
-    );
-    return {
-      imageUrl: prepared.imagePath,
-      previewImageUrl: prepared.previewImagePath,
-      aspectRatio: prepared.aspectRatio,
-    };
-  }
-
-  const dataUrlStarted = performance.now();
-  const source = await readFileAsDataUrl(file);
-  const dataUrlElapsed = Math.round(performance.now() - dataUrlStarted);
-  const prepared = await prepareNodeImage(source, maxPreviewDimension);
+  const safeMaxDimension = Math.max(64, Math.floor(maxPreviewDimension));
+  const extension = resolveFileExtension(file);
+  const prepareStarted = performance.now();
+  const prepared = mapPreparedResult(
+    await rustApiClient.prepareNodeImageFromBlob(file, extension, safeMaxDimension)
+  );
+  const prepareElapsed = Math.round(performance.now() - prepareStarted);
   console.info(
-    `[upload-perf][imageData] prepareNodeImageFromFile dataurl-fallback name="${file.name}" size=${file.size}B readDataUrl=${dataUrlElapsed}ms total=${Math.round(performance.now() - started)}ms`
+    `[upload-perf][imageData] prepareNodeImageFromFile binary-mode name="${file.name}" size=${file.size}B httpPrepare=${prepareElapsed}ms total=${Math.round(performance.now() - started)}ms`
   );
   return prepared;
 }
@@ -374,47 +401,19 @@ export async function prepareNodeImage(
   }
 
   const started = performance.now();
-  if (isTauri()) {
-    const safeMaxDimension = Math.max(64, Math.floor(maxPreviewDimension));
-    try {
-      const tauriStarted = performance.now();
-      const prepared = await prepareNodeImageSource(trimmedImageUrl, safeMaxDimension);
-      console.info(
-        `[upload-perf][imageData] prepareNodeImage tauri-source elapsed=${Math.round(performance.now() - tauriStarted)}ms total=${Math.round(performance.now() - started)}ms`
-      );
-      return {
-        imageUrl: prepared.imagePath,
-        previewImageUrl: prepared.previewImagePath,
-        aspectRatio: prepared.aspectRatio,
-      };
-    } catch (error) {
-      console.warn('[imageData] prepareNodeImage tauri-source failed, fallback to browser path', {
-        source: trimmedImageUrl,
-        error,
-      });
-      // fallback to browser path for compatibility
-    }
-  }
+  const safeMaxDimension = Math.max(64, Math.floor(maxPreviewDimension));
 
   try {
-    const persistedImagePath = await persistImageLocally(trimmedImageUrl);
-    const normalizedDataUrl = await imageUrlToDataUrl(persistedImagePath);
-    const image = await loadImageElement(normalizedDataUrl);
-    const safeMaxDimension = Math.max(64, Math.floor(maxPreviewDimension));
-    const previewDataUrl = renderPreviewDataUrl(image, normalizedDataUrl, safeMaxDimension);
-    const previewImagePath =
-      previewDataUrl === normalizedDataUrl
-        ? persistedImagePath
-        : await persistImageLocally(previewDataUrl);
-
+    const prepareStarted = performance.now();
+    const prepared = isInlineImageSource(trimmedImageUrl)
+      ? await prepareInlineImageSource(trimmedImageUrl, safeMaxDimension)
+      : mapPreparedResult(
+          await rustApiClient.prepareNodeImageFromSource(trimmedImageUrl, safeMaxDimension)
+        );
     console.info(
-      `[upload-perf][imageData] prepareNodeImage browser-fallback total=${Math.round(performance.now() - started)}ms`
+      `[upload-perf][imageData] prepareNodeImage http elapsed=${Math.round(performance.now() - prepareStarted)}ms total=${Math.round(performance.now() - started)}ms`
     );
-    return {
-      imageUrl: persistedImagePath,
-      previewImageUrl: previewImagePath,
-      aspectRatio: reduceAspectRatio(image.naturalWidth, image.naturalHeight),
-    };
+    return prepared;
   } catch (error) {
     throw createImagePipelineError(
       '生成结果无法解析为图片',

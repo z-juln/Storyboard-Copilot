@@ -24,7 +24,7 @@ Source Node -> Process Node / Tool / AI -> Derived Output Node
 | Node Domain | 节点类型、默认数据、菜单、连线能力 | `src/features/canvas/domain/` |
 | Tools | 裁剪、标注、分镜切割等工具 | `src/features/canvas/tools/`, `toolProcessor.ts` |
 | AI Models | 模型定义、供应商、请求映射 | `src/features/canvas/models/`, `src-tauri/src/ai/` |
-| Persistence | SQLite 项目快照、视口、图片池 | `src/commands/projectState.ts`, `src-tauri/src/commands/project_state.rs` |
+| Persistence | SQLite 项目快照、视口、图片池；本地图片读写走 `:1421` HTTP | `src/commands/projectState.ts`, `src/infrastructure/rustApiClient.ts`, `src-tauri/src/project/`, `src-tauri/src/media/` |
 | i18n | 中英文文案 | `src/i18n/` |
 
 ## Change Routing
@@ -41,7 +41,9 @@ Source Node -> Process Node / Tool / AI -> Derived Output Node
 ## Invariants
 
 - 节点注册以 `domain/nodeRegistry.ts` 和 `domain/canvasNodes.ts` 为单一真相源。
-- UI 不直接调用外部 AI/API；通过应用层、命令层或本地服务中转。
+- UI 不直接调用外部 AI/API；通过应用层、命令层或本地 `:1421` HTTP 服务中转。
+- Web 与 Tauri WebView 共用同一套 `rustApiClient`；图片落盘与读取不走 WebView `invoke`。
+- 本地文件上传走分片二进制 PUT（默认 4MB/片），禁止 JSON base64 整包上传；data URL 同样先转 Blob 再分片。
 - 工具产物走“生成新节点”链路。
 - 拖拽中不做重持久化；结束后防抖保存。
 - 视口保存走独立轻量通道。
