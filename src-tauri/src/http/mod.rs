@@ -3,12 +3,13 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use axum::{
-    extract::{Path, State},
-    http::{Method, StatusCode},
+    extract::{Path, Query, State},
+    http::{header, Method, StatusCode},
     response::{IntoResponse, Response},
     routing::{delete, get, post, put},
     Json, Router,
 };
+use serde::Deserialize;
 use serde_json::json;
 use tauri::AppHandle;
 use tauri::Manager;
@@ -20,6 +21,7 @@ use crate::ai::dto::{
     PollModelAdapterRequestDto, SetProviderSecretRequestDto,
 };
 use crate::ai::service::AiService;
+use crate::media::read_local_image;
 use crate::project::dto::{ProjectRecord, RenameProjectRequestDto, UpdateProjectViewportRequestDto};
 use crate::project::ProjectService;
 
@@ -27,6 +29,12 @@ use crate::project::ProjectService;
 pub struct HttpState {
     pub ai: Arc<AiService>,
     pub project: Arc<ProjectService>,
+    pub app_data_dir: PathBuf,
+}
+
+#[derive(Debug, Deserialize)]
+struct ImagePathQuery {
+    path: String,
 }
 
 pub fn resolve_api_db_path(app: &AppHandle) -> Result<PathBuf, String> {
@@ -57,9 +65,15 @@ pub async fn start_http_server_with_db(db_path: PathBuf) -> Result<(), String> {
         .and_then(|value| value.parse::<u16>().ok())
         .unwrap_or(1421);
 
+    let app_data_dir = db_path
+        .parent()
+        .map(PathBuf::from)
+        .unwrap_or_else(|| db_path.clone());
+
     let state = HttpState {
         ai: Arc::new(AiService::new(db_path.clone())),
         project: Arc::new(ProjectService::new(db_path)),
+        app_data_dir,
     };
 
     let cors = CorsLayer::new()
@@ -92,6 +106,8 @@ pub async fn start_http_server_with_db(db_path: PathBuf) -> Result<(), String> {
             put(update_project_viewport),
         )
         .route("/api/v1/projects/:project_id/rename", put(rename_project))
+        .route("/api/v1/image", get(serve_image))
+        .route("/image", get(serve_image))
         .layer(cors)
         .with_state(state);
 
@@ -239,6 +255,21 @@ async fn delete_project(
     match state.project.delete(&project_id) {
         Ok(()) => StatusCode::NO_CONTENT.into_response(),
         Err(err) => api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
+    }
+}
+
+async fn serve_image(
+    State(state): State<HttpState>,
+    Query(query): Query<ImagePathQuery>,
+) -> Response {
+    match read_local_image(&state.app_data_dir, &query.path) {
+        Ok((bytes, mime)) => (
+            StatusCode::OK,
+            [(header::CONTENT_TYPE, mime)],
+            bytes,
+        )
+            .into_response(),
+        Err(err) => api_error(StatusCode::NOT_FOUND, err),
     }
 }
 

@@ -1,4 +1,4 @@
-import { convertFileSrc, isTauri } from '@tauri-apps/api/core';
+import { isTauri } from '@tauri-apps/api/core';
 
 import {
   loadImage,
@@ -6,6 +6,7 @@ import {
   persistImageSource,
   prepareNodeImageSource,
 } from '@/commands/image';
+import { buildLocalImageUrl } from '@/infrastructure/rustApiClient';
 
 export function parseAspectRatio(value: string): number {
   const [width, height] = value.split(':').map((item) => Number(item));
@@ -107,35 +108,42 @@ export function isLikelyLocalImagePath(imageUrl: string): boolean {
   return LOCAL_PATH_PREFIX_PATTERN.test(imageUrl);
 }
 
-export function resolveImageDisplayUrl(imageUrl: string): string {
-  const lower = imageUrl.toLowerCase();
-  if (lower.startsWith('file://')) {
-    if (!isTauri()) {
-      return imageUrl;
-    }
+function normalizeLocalFilesystemPath(imageUrl: string): string | null {
+  const trimmed = imageUrl.trim();
+  if (!trimmed) {
+    return null;
+  }
 
+  if (trimmed.includes('/image?path=')) {
+    return null;
+  }
+
+  const lower = trimmed.toLowerCase();
+  if (lower.startsWith('file://')) {
     try {
-      const parsed = new URL(imageUrl);
+      const parsed = new URL(trimmed);
       const decodedPathname = decodeURIComponent(parsed.pathname);
       const normalizedPath = decodedPathname.replace(/^\/([A-Za-z]:[\\/])/, '$1');
-      if (!normalizedPath) {
-        return imageUrl;
-      }
-      return convertFileSrc(normalizedPath);
+      return normalizedPath || null;
     } catch {
-      return imageUrl;
+      return null;
     }
   }
 
-  if (!isLikelyLocalImagePath(imageUrl)) {
-    return imageUrl;
+  if (isLikelyLocalImagePath(trimmed)) {
+    return trimmed;
   }
 
-  if (!isTauri()) {
-    return imageUrl;
+  return null;
+}
+
+export function resolveImageDisplayUrl(imageUrl: string): string {
+  const localPath = normalizeLocalFilesystemPath(imageUrl);
+  if (localPath) {
+    return buildLocalImageUrl(localPath);
   }
 
-  return convertFileSrc(imageUrl);
+  return imageUrl;
 }
 
 export async function persistImageLocally(source: string): Promise<string> {

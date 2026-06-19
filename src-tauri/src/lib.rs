@@ -1,6 +1,7 @@
 pub mod ai;
 pub mod commands;
 pub mod http;
+pub mod media;
 pub mod project;
 
 use std::path::PathBuf;

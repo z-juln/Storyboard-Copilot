@@ -11,9 +11,17 @@ import type {
 
 const DEFAULT_BASE_URL = 'http://127.0.0.1:1421';
 
-function resolveBaseUrl(): string {
+export function resolveRustApiBaseUrl(): string {
   const configured = import.meta.env.VITE_RUST_API_BASE_URL?.trim();
-  return configured || DEFAULT_BASE_URL;
+  return (configured || DEFAULT_BASE_URL).replace(/\/$/, '');
+}
+
+function resolveBaseUrl(): string {
+  return resolveRustApiBaseUrl();
+}
+
+export function buildLocalImageUrl(filePath: string): string {
+  return `${resolveRustApiBaseUrl()}/image?path=${encodeURIComponent(filePath)}`;
 }
 
 async function readJson<T>(response: Response): Promise<T> {
