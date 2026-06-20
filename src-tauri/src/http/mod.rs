@@ -22,6 +22,10 @@ use crate::ai::dto::{
     PollModelAdapterRequestDto, SetProviderSecretRequestDto,
 };
 use crate::ai::service::AiService;
+use crate::clipboard::{
+    clear_project_assets_clipboard_cut_marker, read_project_assets_from_clipboard,
+    write_project_assets_to_clipboard, WriteProjectAssetsClipboardRequestDto,
+};
 use crate::media::dto::{
     CompleteImageUploadRequestDto, EmbedStoryboardMetadataRequestDto,
     MergeStoryboardImagesPayload, PrepareFromSourceRequestDto,
@@ -34,8 +38,8 @@ use crate::media::upload::{
     remove_upload_session, write_upload_chunk, UPLOAD_CHUNK_SIZE,
 };
 use crate::project::dto::{
-    CreateAssetDirectoryRequestDto, MoveProjectAssetRequestDto, ProjectSnapshot,
-    RenameProjectRequestDto, UpdateProjectViewportRequestDto,
+    CreateAssetDirectoryRequestDto, ImportProjectAssetsRequestDto, MoveProjectAssetRequestDto,
+    ProjectSnapshot, RenameProjectRequestDto, UpdateProjectViewportRequestDto,
 };
 use crate::project::ProjectService;
 
@@ -153,6 +157,22 @@ pub async fn start_http_server_with_app_data(app_data_dir: PathBuf) -> Result<()
         .route(
             "/api/v1/projects/:project_id/assets/:file_name",
             put(put_project_asset),
+        )
+        .route(
+            "/api/v1/projects/:project_id/assets/copy",
+            post(copy_project_asset),
+        )
+        .route(
+            "/api/v1/projects/:project_id/assets/import",
+            post(import_project_assets),
+        )
+        .route(
+            "/api/v1/clipboard/assets/clear-cut",
+            post(clear_project_assets_clipboard_cut),
+        )
+        .route(
+            "/api/v1/projects/:project_id/clipboard/assets",
+            get(read_project_assets_clipboard).post(write_project_assets_clipboard),
         )
         .route(
             "/api/v1/projects/:project_id/assets",
@@ -383,6 +403,67 @@ async fn move_project_asset(
         .move_asset(&project_id, &request.from, &request.to)
     {
         Ok((from, to)) => Json(json!({ "from": from, "to": to })).into_response(),
+        Err(err) => api_error(StatusCode::BAD_REQUEST, err),
+    }
+}
+
+async fn copy_project_asset(
+    State(state): State<HttpState>,
+    Path(project_id): Path<String>,
+    Json(request): Json<MoveProjectAssetRequestDto>,
+) -> Response {
+    match state
+        .project
+        .copy_asset(&project_id, &request.from, &request.to)
+    {
+        Ok((from, to)) => Json(json!({ "from": from, "to": to })).into_response(),
+        Err(err) => api_error(StatusCode::BAD_REQUEST, err),
+    }
+}
+
+async fn import_project_assets(
+    State(state): State<HttpState>,
+    Path(project_id): Path<String>,
+    Json(request): Json<ImportProjectAssetsRequestDto>,
+) -> Response {
+    match state
+        .project
+        .import_assets(&project_id, &request.target_dir, &request.sources)
+    {
+        Ok(result) => Json(result).into_response(),
+        Err(err) => api_error(StatusCode::BAD_REQUEST, err),
+    }
+}
+
+async fn read_project_assets_clipboard(
+    State(state): State<HttpState>,
+    Path(project_id): Path<String>,
+) -> Response {
+    match read_project_assets_from_clipboard(&state.app_data_dir, &project_id) {
+        Ok(payload) => Json(payload).into_response(),
+        Err(err) => api_error(StatusCode::BAD_REQUEST, err),
+    }
+}
+
+async fn write_project_assets_clipboard(
+    State(state): State<HttpState>,
+    Path(project_id): Path<String>,
+    Json(request): Json<WriteProjectAssetsClipboardRequestDto>,
+) -> Response {
+    match write_project_assets_to_clipboard(
+        &state.app_data_dir,
+        &project_id,
+        &request.relative_paths,
+        request.cut,
+    ) {
+        Ok(()) => StatusCode::NO_CONTENT.into_response(),
+        Err(err) => api_error(StatusCode::BAD_REQUEST, err),
+    }
+}
+
+async fn clear_project_assets_clipboard_cut() -> Response {
+    match clear_project_assets_clipboard_cut_marker() {
+        Ok(()) => StatusCode::NO_CONTENT.into_response(),
         Err(err) => api_error(StatusCode::BAD_REQUEST, err),
     }
 }

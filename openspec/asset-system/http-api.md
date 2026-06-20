@@ -8,6 +8,11 @@
 | `POST` | `/projects/:id/assets/directories` | 创建目录 |
 | `PUT` | `/projects/:id/assets?path=` | 嵌套路径写文件（query 传 path） |
 | `PATCH` | `/projects/:id/assets` | `{ from, to }` move/rename |
+| `POST` | `/projects/:id/assets/copy` | `{ from, to }` 磁盘复制（粘贴 copy 用） |
+| `POST` | `/projects/:id/assets/import` | `{ targetDir, sources[] }` 从绝对路径磁盘导入（外部粘贴） |
+| `GET` | `/projects/:id/clipboard/assets` | 读取系统剪贴板并解析为资产粘贴项 |
+| `POST` | `/projects/:id/clipboard/assets` | `{ relativePaths, cut }` 写入系统剪贴板（Finder 同格式） |
+| `POST` | `/clipboard/assets/clear-cut` | 清除 Explorer 剪切标记 |
 | `DELETE` | `/projects/:id/assets?path=` | 删除文件或空目录 |
 | `GET` | `/projects/:id/assets?path=&v=` | 读原图（`v` 为 cache bust） |
 | `GET` | `/projects/:id/assets/preview?path=&max=` | 读缩略图（按内容 hash 缓存于 `.cache/previews/`） |

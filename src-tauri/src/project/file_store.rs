@@ -349,6 +349,79 @@ pub fn move_project_asset(
     Ok((from_normalized, to_normalized))
 }
 
+fn copy_path_recursive(from: &Path, to: &Path) -> Result<(), String> {
+    if from.is_file() {
+        if let Some(parent) = to.parent() {
+            fs::create_dir_all(parent)
+                .map_err(|err| format!("Failed to create destination parent dir: {err}"))?;
+        }
+        fs::copy(from, to).map_err(|err| format!("Failed to copy asset file: {err}"))?;
+        return Ok(());
+    }
+
+    if from.is_dir() {
+        fs::create_dir_all(to)
+            .map_err(|err| format!("Failed to create destination directory: {err}"))?;
+        for entry in fs::read_dir(from).map_err(|err| format!("Failed to read source directory: {err}"))? {
+            let entry = entry.map_err(|err| format!("Failed to read directory entry: {err}"))?;
+            let file_name = entry.file_name();
+            copy_path_recursive(&entry.path(), &to.join(file_name))?;
+        }
+        return Ok(());
+    }
+
+    Err(format!("Unsupported asset source type: {}", from.display()))
+}
+
+pub fn copy_project_asset(
+    app_data_dir: &Path,
+    project_id: &str,
+    from_path: &str,
+    to_path: &str,
+) -> Result<(String, String), String> {
+    let from_normalized = normalize_asset_relative_path(from_path)?;
+    let to_normalized = normalize_asset_relative_path(to_path)?;
+    if from_normalized == to_normalized {
+        return Ok((from_normalized, to_normalized));
+    }
+
+    let project_dir = resolve_project_dir(app_data_dir, project_id);
+    if !project_dir.is_dir() {
+        return Err(format!("Project not found: {project_id}"));
+    }
+
+    let from_target = resolve_existing_project_relative_path(&project_dir, &from_normalized)?;
+    if !from_target.exists() {
+        return Err(format!("Asset not found: {from_normalized}"));
+    }
+
+    let to_target = project_dir.join(&to_normalized);
+    if to_target.exists() {
+        return Err(format!("Destination already exists: {to_normalized}"));
+    }
+
+    let canonical_project = fs::canonicalize(&project_dir)
+        .map_err(|err| format!("Project dir unavailable: {err}"))?;
+    let canonical_from = fs::canonicalize(&from_target)
+        .map_err(|err| format!("Source asset unavailable: {err}"))?;
+    if !canonical_from.starts_with(&canonical_project) {
+        return Err("Asset path escapes project dir".to_string());
+    }
+
+    if let Some(parent) = to_target.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|err| format!("Failed to create destination parent dir: {err}"))?;
+        let canonical_to_parent = fs::canonicalize(parent)
+            .map_err(|err| format!("Destination parent unavailable: {err}"))?;
+        if !canonical_to_parent.starts_with(&canonical_project) {
+            return Err("Asset path escapes project dir".to_string());
+        }
+    }
+
+    copy_path_recursive(&from_target, &to_target)?;
+    Ok((from_normalized, to_normalized))
+}
+
 pub fn delete_project_asset(
     app_data_dir: &Path,
     project_id: &str,
@@ -486,4 +559,187 @@ fn build_directory_entry(project_dir: &Path, relative_path: &str) -> Result<Proj
             Some(children)
         },
     })
+}
+
+pub fn resolve_project_asset_absolute_path(
+    app_data_dir: &Path,
+    project_id: &str,
+    relative_path: &str,
+) -> Result<PathBuf, String> {
+    let project_dir = resolve_project_dir(app_data_dir, project_id);
+    if !project_dir.is_dir() {
+        return Err(format!("Project not found: {project_id}"));
+    }
+    resolve_existing_project_relative_path(&project_dir, relative_path)
+}
+
+pub fn try_project_relative_asset_path(
+    app_data_dir: &Path,
+    project_id: &str,
+    absolute_path: &Path,
+) -> Option<String> {
+    let project_dir = resolve_project_dir(app_data_dir, project_id);
+    if !project_dir.is_dir() {
+        return None;
+    }
+
+    let assets_dir = project_dir.join(ASSETS_DIR);
+    let canonical_project = fs::canonicalize(&project_dir).ok()?;
+    let canonical_assets = fs::canonicalize(&assets_dir).ok()?;
+    let canonical_abs = fs::canonicalize(absolute_path).ok()?;
+    if !canonical_abs.starts_with(&canonical_assets) {
+        return None;
+    }
+
+    let relative = canonical_abs
+        .strip_prefix(&canonical_project)
+        .ok()?
+        .to_string_lossy()
+        .replace('\\', "/");
+    normalize_asset_relative_path(&relative).ok()
+}
+
+#[derive(Debug, Clone)]
+pub struct ImportedAssetItem {
+    pub dest_relative: String,
+    pub kind: String,
+    pub file_paths: Vec<String>,
+}
+
+fn resolve_unique_asset_dest_path(
+    project_dir: &Path,
+    target_dir: &str,
+    base_name: &str,
+) -> Result<String, String> {
+    let target_normalized = normalize_asset_relative_path(target_dir)?;
+    let desired = if target_normalized == ASSETS_DIR {
+        format!("{ASSETS_DIR}/{base_name}")
+    } else {
+        format!("{target_normalized}/{base_name}")
+    };
+
+    if !project_dir.join(&desired).exists() {
+        return Ok(desired);
+    }
+
+    let dot = base_name.rfind('.');
+    let (stem, ext) = if let Some(index) = dot {
+        (&base_name[..index], &base_name[index..])
+    } else {
+        (base_name, "")
+    };
+
+    for index in 1..1000 {
+        let candidate_name = format!("{stem} ({index}){ext}");
+        let candidate = if target_normalized == ASSETS_DIR {
+            format!("{ASSETS_DIR}/{candidate_name}")
+        } else {
+            format!("{target_normalized}/{candidate_name}")
+        };
+        if !project_dir.join(&candidate).exists() {
+            return Ok(candidate);
+        }
+    }
+
+    Err(format!("无法生成唯一路径: {desired}"))
+}
+
+fn collect_asset_file_paths(project_dir: &Path, relative_path: &str) -> Result<Vec<String>, String> {
+    let normalized = normalize_asset_relative_path(relative_path)?;
+    let target = project_dir.join(&normalized);
+    if target.is_file() {
+        return Ok(vec![normalized]);
+    }
+    if !target.is_dir() {
+        return Ok(Vec::new());
+    }
+
+    let mut files = Vec::new();
+    collect_asset_files_recursive(project_dir, &target, &mut files)?;
+    Ok(files)
+}
+
+fn collect_asset_files_recursive(
+    project_dir: &Path,
+    dir: &Path,
+    files: &mut Vec<String>,
+) -> Result<(), String> {
+    for entry in fs::read_dir(dir).map_err(|err| format!("Failed to read asset directory: {err}"))? {
+        let entry = entry.map_err(|err| format!("Failed to read directory entry: {err}"))?;
+        let path = entry.path();
+        if path.is_dir() {
+            collect_asset_files_recursive(project_dir, &path, files)?;
+            continue;
+        }
+        if !path.is_file() {
+            continue;
+        }
+        let relative = path
+            .strip_prefix(project_dir)
+            .map_err(|_| "Asset path escapes project dir".to_string())?
+            .to_string_lossy()
+            .replace('\\', "/");
+        files.push(normalize_asset_relative_path(&relative)?);
+    }
+    Ok(())
+}
+
+pub fn import_external_paths_into_assets(
+    app_data_dir: &Path,
+    project_id: &str,
+    source_paths: &[PathBuf],
+    target_dir_path: &str,
+) -> Result<Vec<ImportedAssetItem>, String> {
+    let target_dir = normalize_asset_relative_path(target_dir_path)?;
+    let project_dir = resolve_project_dir(app_data_dir, project_id);
+    if !project_dir.is_dir() {
+        return Err(format!("Project not found: {project_id}"));
+    }
+
+    let canonical_project = fs::canonicalize(&project_dir)
+        .map_err(|err| format!("Project dir unavailable: {err}"))?;
+
+    let mut results = Vec::new();
+    for source_path in source_paths {
+        if !source_path.exists() {
+            continue;
+        }
+
+        let source = fs::canonicalize(source_path)
+            .map_err(|err| format!("Source path unavailable: {err}"))?;
+        let base_name = source
+            .file_name()
+            .ok_or_else(|| format!("Invalid source path: {}", source.display()))?
+            .to_string_lossy()
+            .to_string();
+        let dest_relative = resolve_unique_asset_dest_path(&project_dir, &target_dir, &base_name)?;
+        let dest_absolute = project_dir.join(&dest_relative);
+
+        if let Some(parent) = dest_absolute.parent() {
+            fs::create_dir_all(parent)
+                .map_err(|err| format!("Failed to create destination parent dir: {err}"))?;
+            let canonical_parent = fs::canonicalize(parent)
+                .map_err(|err| format!("Destination parent unavailable: {err}"))?;
+            if !canonical_parent.starts_with(&canonical_project) {
+                return Err("Asset path escapes project dir".to_string());
+            }
+        }
+
+        copy_path_recursive(&source, &dest_absolute)?;
+
+        let kind = if source.is_dir() {
+            "directory".to_string()
+        } else {
+            "file".to_string()
+        };
+        let file_paths = collect_asset_file_paths(&project_dir, &dest_relative)?;
+
+        results.push(ImportedAssetItem {
+            dest_relative,
+            kind,
+            file_paths,
+        });
+    }
+
+    Ok(results)
 }

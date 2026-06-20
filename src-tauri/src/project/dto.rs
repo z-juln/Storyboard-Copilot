@@ -77,3 +77,24 @@ pub struct MoveProjectAssetResponseDto {
     pub from: String,
     pub to: String,
 }
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportProjectAssetsRequestDto {
+    pub target_dir: String,
+    pub sources: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportedAssetItemDto {
+    pub dest_relative: String,
+    pub kind: String,
+    pub file_paths: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportProjectAssetsResponseDto {
+    pub imports: Vec<ImportedAssetItemDto>,
+}

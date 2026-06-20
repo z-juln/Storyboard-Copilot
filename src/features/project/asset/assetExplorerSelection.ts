@@ -1,8 +1,12 @@
 import type { ProjectDirectoryEntry } from '@/features/project/types';
 
-import type { AssetClipboardItem } from './assetExplorerClipboard';
 import { findEntryInTree, isDescendantAssetPath } from './assetExplorerPathUtils';
 import { normalizeAssetPath } from './assetManifest';
+
+export interface AssetSelectionItem {
+  path: string;
+  kind: 'file' | 'directory';
+}
 
 export function filterTopLevelSelectedPaths(paths: Iterable<string>): string[] {
   const normalizedPaths = Array.from(
@@ -30,7 +34,7 @@ export function resolveEntriesForPaths(
   return entries;
 }
 
-export function entriesToClipboardItems(entries: ProjectDirectoryEntry[]): AssetClipboardItem[] {
+export function entriesToSelectionItems(entries: ProjectDirectoryEntry[]): AssetSelectionItem[] {
   return entries.map((entry) => ({
     path: entry.path,
     kind: entry.kind === 'directory' ? 'directory' : 'file',

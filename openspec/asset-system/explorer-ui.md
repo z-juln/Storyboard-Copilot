@@ -20,6 +20,7 @@
 - **根目录空白右键**：`assets/` 根（无重命名/删除）。
 - **树内 DnD**：拖到目录 = move；多选时拖任一选中项移动全部；`effectAllowed = copyMove`。
 - **快捷键**（非 input/textarea）：`⌘/Ctrl+A/C/X/V`、`Delete`、`⌘+Backspace`；**Enter** 单选时重命名。
+- **剪贴板**：复制/剪切/粘贴统一走**系统剪贴板**（macOS 文件 URL）；Explorer 内 ⌘X 剪切通过自定义 cut 标记区分 move；Finder 等外部文件 ⌘V 粘贴经服务端磁盘 import，不经 HTTP body 传文件。
 - **删除**：`UiModal` 确认；单项或批量展示引用节点数量。
 
 ## 预览

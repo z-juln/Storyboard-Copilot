@@ -1,14 +1,14 @@
 import type { CanvasNode } from '@/stores/canvasStore';
 import type { ProjectDirectoryEntry } from '@/features/project/types';
-import { buildProjectAssetUrl } from '@/features/project/projectPaths';
 import { rustApiClient } from '@/infrastructure/rustApiClient';
 
-import type { AssetExplorerClipboardState } from './assetExplorerClipboard';
+import type { AssetClipboardPasteItem, AssetClipboardMode } from './assetExplorerClipboard';
 import {
+  collectFilePathsFromEntry,
+  findEntryInTree,
   getAssetBaseName,
   isDescendantAssetPath,
   joinAssetPath,
-  collectFilePathsFromEntry,
 } from './assetExplorerPathUtils';
 import {
   createEmptyAssetManifest,
@@ -21,14 +21,6 @@ import {
 } from './assetManifest';
 import type { AssetManifest } from './types';
 import { countRefsForFileAssetId } from './assetRefIndex';
-
-async function fetchAssetBlob(projectId: string, path: string): Promise<Blob> {
-  const response = await fetch(buildProjectAssetUrl(projectId, path));
-  if (!response.ok) {
-    throw new Error(`读取资产失败: ${path}`);
-  }
-  return await response.blob();
-}
 
 async function deleteEntryRecursive(projectId: string, entry: ProjectDirectoryEntry): Promise<void> {
   if (entry.kind === 'file') {
@@ -66,6 +58,23 @@ function resolveUniquePath(existingPaths: Set<string>, desiredPath: string): str
 
 function listExistingManifestPaths(manifest: AssetManifest): Set<string> {
   return new Set(Object.values(manifest).map((record) => normalizeAssetPath(record.path)));
+}
+
+function registerCopiedSubtreeInManifest(
+  manifest: AssetManifest,
+  entry: ProjectDirectoryEntry,
+  destPath: string
+): AssetManifest {
+  if (entry.kind === 'file') {
+    return registerFileAssetPath(manifest, destPath).manifest;
+  }
+
+  let nextManifest = manifest;
+  for (const child of entry.children ?? []) {
+    const childDest = joinAssetPath(destPath, getAssetBaseName(child.path));
+    nextManifest = registerCopiedSubtreeInManifest(nextManifest, child, childDest);
+  }
+  return nextManifest;
 }
 
 export function countAssetPathRefs(
@@ -163,105 +172,50 @@ export async function copyProjectAssetEntry(input: {
 }): Promise<AssetManifest> {
   const targetDir = normalizeAssetPath(input.targetDirPath).replace(/\/+$/, '') || 'assets';
   const existingPaths = listExistingManifestPaths(input.manifest);
-  let manifest = input.manifest;
+  const baseName = getAssetBaseName(input.entry.path);
+  const desiredPath = targetDir === 'assets' ? `assets/${baseName}` : `${targetDir}/${baseName}`;
+  const nextPath = resolveUniquePath(existingPaths, desiredPath);
 
-  const copyFile = async (sourcePath: string) => {
-    const baseName = getAssetBaseName(sourcePath);
-    const desiredPath = targetDir === 'assets' ? `assets/${baseName}` : `${targetDir}/${baseName}`;
-    const nextPath = resolveUniquePath(existingPaths, desiredPath);
-    existingPaths.add(nextPath);
-
-    const blob = await fetchAssetBlob(input.projectId, sourcePath);
-    await rustApiClient.putProjectAssetAtPath(input.projectId, nextPath, blob);
-    const registered = registerFileAssetPath(manifest, nextPath);
-    manifest = registered.manifest;
-  };
-
-  const copyEntry = async (entry: ProjectDirectoryEntry, parentDir: string) => {
-    if (entry.kind === 'file') {
-      const baseName = getAssetBaseName(entry.path);
-      const desiredPath = parentDir === 'assets' ? `assets/${baseName}` : `${parentDir}/${baseName}`;
-      const nextPath = resolveUniquePath(existingPaths, desiredPath);
-      existingPaths.add(nextPath);
-      const blob = await fetchAssetBlob(input.projectId, entry.path);
-      await rustApiClient.putProjectAssetAtPath(input.projectId, nextPath, blob);
-      const registered = registerFileAssetPath(manifest, nextPath);
-      manifest = registered.manifest;
-      return;
-    }
-
-    const dirName = getAssetBaseName(entry.path);
-    const desiredDir = parentDir === 'assets' ? `assets/${dirName}` : `${parentDir}/${dirName}`;
-    const nextDir = resolveUniquePath(existingPaths, desiredDir);
-    existingPaths.add(nextDir);
-    await rustApiClient.createProjectAssetDirectory(input.projectId, nextDir);
-
-    for (const child of entry.children ?? []) {
-      await copyEntry(child, nextDir);
-    }
-  };
+  await rustApiClient.copyProjectAsset(input.projectId, input.entry.path, nextPath);
 
   if (input.entry.kind === 'file') {
-    await copyFile(input.entry.path);
-    return manifest;
+    return registerFileAssetPath(input.manifest, nextPath).manifest;
   }
 
-  await copyEntry(input.entry, targetDir);
-  return manifest;
+  return registerCopiedSubtreeInManifest(input.manifest, input.entry, nextPath);
 }
 
-export async function pasteAssetExplorerClipboard(input: {
+export async function pasteSystemClipboardToDirectory(input: {
   projectId: string;
   targetDirPath: string;
-  clipboard: AssetExplorerClipboardState;
+  mode: AssetClipboardMode;
+  items: AssetClipboardPasteItem[];
   tree: ProjectDirectoryEntry;
   manifest: AssetManifest;
 }): Promise<AssetManifest> {
   const targetDir = normalizeAssetPath(input.targetDirPath).replace(/\/+$/, '') || 'assets';
   let manifest = input.manifest;
 
-  const findEntry = (path: string): ProjectDirectoryEntry | null => {
-    const normalized = normalizeAssetPath(path);
-    const walk = (entry: ProjectDirectoryEntry): ProjectDirectoryEntry | null => {
-      if (normalizeAssetPath(entry.path) === normalized) {
-        return entry;
-      }
-      for (const child of entry.children ?? []) {
-        const found = walk(child);
-        if (found) {
-          return found;
-        }
-      }
-      return null;
-    };
-    if (normalizeAssetPath(input.tree.path) === normalized) {
-      return input.tree;
-    }
-    for (const child of input.tree.children ?? []) {
-      const found = walk(child);
-      if (found) {
-        return found;
-      }
-    }
-    return null;
-  };
+  const projectItems = input.items.filter((item) => item.projectRelativePath);
+  const externalItems = input.items.filter((item) => !item.projectRelativePath);
 
-  for (const item of input.clipboard.items) {
-    if (isDescendantAssetPath(item.path, targetDir) && item.kind === 'directory') {
+  for (const item of projectItems) {
+    const sourcePath = item.projectRelativePath!;
+    if (isDescendantAssetPath(sourcePath, targetDir) && item.kind === 'directory') {
       continue;
     }
 
-    const entry = findEntry(item.path);
+    const entry = findEntryInTree(input.tree, sourcePath);
     if (!entry) {
       continue;
     }
 
-    if (input.clipboard.mode === 'cut') {
-      const baseName = getAssetBaseName(item.path);
+    if (input.mode === 'cut') {
+      const baseName = getAssetBaseName(sourcePath);
       const nextPath = joinAssetPath(targetDir, baseName);
       manifest = await moveProjectAssetEntry({
         projectId: input.projectId,
-        fromPath: item.path,
+        fromPath: sourcePath,
         toPath: nextPath,
         manifest,
       });
@@ -274,6 +228,20 @@ export async function pasteAssetExplorerClipboard(input: {
       targetDirPath: targetDir,
       manifest,
     });
+  }
+
+  if (externalItems.length > 0) {
+    const result = await rustApiClient.importProjectAssets(
+      input.projectId,
+      targetDir,
+      externalItems.map((item) => item.absolutePath)
+    );
+
+    for (const imported of result.imports) {
+      for (const filePath of imported.filePaths) {
+        manifest = registerFileAssetPath(manifest, filePath).manifest;
+      }
+    }
   }
 
   return manifest;

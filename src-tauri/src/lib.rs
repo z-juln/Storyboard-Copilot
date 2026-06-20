@@ -1,4 +1,5 @@
 pub mod ai;
+pub mod clipboard;
 pub mod commands;
 pub mod http;
 pub mod media;

@@ -1,37 +1,64 @@
+import { rustApiClient } from '@/infrastructure/rustApiClient';
+
 export type AssetClipboardMode = 'copy' | 'cut';
 
-export interface AssetClipboardItem {
-  path: string;
+export interface AssetClipboardPasteItem {
+  absolutePath: string;
+  projectRelativePath: string | null;
   kind: 'file' | 'directory';
 }
 
-export interface AssetExplorerClipboardState {
+export interface AssetClipboardPastePayload {
   mode: AssetClipboardMode;
-  items: AssetClipboardItem[];
+  items: AssetClipboardPasteItem[];
 }
 
-let clipboardState: AssetExplorerClipboardState | null = null;
-
-export function getAssetExplorerClipboard(): AssetExplorerClipboardState | null {
-  return clipboardState;
+function normalizeClipboardPayload(payload: {
+  mode: string;
+  items: Array<{
+    absolutePath: string;
+    projectRelativePath: string | null;
+    kind: string;
+  }>;
+}): AssetClipboardPastePayload {
+  return {
+    mode: payload.mode === 'cut' ? 'cut' : 'copy',
+    items: payload.items.map((item) => ({
+      absolutePath: item.absolutePath,
+      projectRelativePath: item.projectRelativePath,
+      kind: item.kind === 'directory' ? 'directory' : 'file',
+    })),
+  };
 }
 
-export function setAssetExplorerClipboard(state: AssetExplorerClipboardState | null): void {
-  clipboardState = state;
-}
-
-export function hasAssetExplorerClipboard(): boolean {
-  return Boolean(clipboardState?.items.length);
-}
-
-export async function writeAssetPathsToSystemClipboard(paths: string[]): Promise<void> {
-  if (paths.length === 0) {
+export async function writeProjectAssetsToSystemClipboard(
+  projectId: string,
+  relativePaths: string[],
+  cut: boolean
+): Promise<void> {
+  if (relativePaths.length === 0) {
     return;
   }
 
+  await rustApiClient.writeProjectAssetsClipboard(projectId, relativePaths, cut);
+}
+
+export async function readProjectAssetsFromSystemClipboard(
+  projectId: string
+): Promise<AssetClipboardPastePayload> {
+  const payload = await rustApiClient.readProjectAssetsClipboard(projectId);
+  return normalizeClipboardPayload(payload);
+}
+
+export async function clearSystemClipboardCutMarker(): Promise<void> {
+  await rustApiClient.clearProjectAssetsClipboardCut();
+}
+
+export async function hasSystemClipboardAssetItems(projectId: string): Promise<boolean> {
   try {
-    await navigator.clipboard.writeText(paths.join('\n'));
-  } catch (error) {
-    console.warn('[asset] failed to write system clipboard', error);
+    const payload = await readProjectAssetsFromSystemClipboard(projectId);
+    return payload.items.length > 0;
+  } catch {
+    return false;
   }
 }

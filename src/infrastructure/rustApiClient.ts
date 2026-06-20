@@ -31,6 +31,12 @@ export interface PrepareNodeImageResult {
   contentHash: string;
 }
 
+export interface ImportedAssetItem {
+  destRelative: string;
+  kind: 'file' | 'directory';
+  filePaths: string[];
+}
+
 export interface MergeStoryboardImagesPayload {
   frameSources: string[];
   rows: number;
@@ -185,6 +191,30 @@ export interface RustApiClient {
     from: string,
     to: string
   ) => Promise<{ from: string; to: string }>;
+  copyProjectAsset: (
+    projectId: string,
+    from: string,
+    to: string
+  ) => Promise<{ from: string; to: string }>;
+  importProjectAssets: (
+    projectId: string,
+    targetDir: string,
+    sources: string[]
+  ) => Promise<{ imports: ImportedAssetItem[] }>;
+  readProjectAssetsClipboard: (projectId: string) => Promise<{
+    mode: string;
+    items: Array<{
+      absolutePath: string;
+      projectRelativePath: string | null;
+      kind: string;
+    }>;
+  }>;
+  writeProjectAssetsClipboard: (
+    projectId: string,
+    relativePaths: string[],
+    cut: boolean
+  ) => Promise<void>;
+  clearProjectAssetsClipboardCut: () => Promise<void>;
   deleteProjectAsset: (projectId: string, path: string) => Promise<void>;
   prepareNodeImageFromBlob: (
     projectId: string,
@@ -353,6 +383,58 @@ export function createRustApiClient(baseUrl = resolveBaseUrl()): RustApiClient {
         }
       );
       return readJson<{ from: string; to: string }>(response);
+    },
+    copyProjectAsset: async (projectId, from, to) => {
+      const response = await fetch(
+        `${normalizedBaseUrl}/api/v1/projects/${encodeURIComponent(projectId)}/assets/copy`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ from, to }),
+        }
+      );
+      return readJson<{ from: string; to: string }>(response);
+    },
+    importProjectAssets: async (projectId, targetDir, sources) => {
+      const response = await fetch(
+        `${normalizedBaseUrl}/api/v1/projects/${encodeURIComponent(projectId)}/assets/import`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ targetDir, sources }),
+        }
+      );
+      return readJson<{ imports: ImportedAssetItem[] }>(response);
+    },
+    readProjectAssetsClipboard: async (projectId) => {
+      const response = await fetch(
+        `${normalizedBaseUrl}/api/v1/projects/${encodeURIComponent(projectId)}/clipboard/assets`
+      );
+      return readJson<{
+        mode: string;
+        items: Array<{
+          absolutePath: string;
+          projectRelativePath: string | null;
+          kind: string;
+        }>;
+      }>(response);
+    },
+    writeProjectAssetsClipboard: async (projectId, relativePaths, cut) => {
+      const response = await fetch(
+        `${normalizedBaseUrl}/api/v1/projects/${encodeURIComponent(projectId)}/clipboard/assets`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ relativePaths, cut }),
+        }
+      );
+      await readEmpty(response);
+    },
+    clearProjectAssetsClipboardCut: async () => {
+      const response = await fetch(`${normalizedBaseUrl}/api/v1/clipboard/assets/clear-cut`, {
+        method: 'POST',
+      });
+      await readEmpty(response);
     },
     deleteProjectAsset: async (projectId, path) => {
       const response = await fetch(

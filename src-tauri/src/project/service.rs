@@ -1,7 +1,10 @@
 use std::path::{Path, PathBuf};
 
-use super::dto::{ProjectDirectoryEntry, ProjectSnapshot, ProjectSummaryRecord};
-use super::file_store;
+use super::dto::{
+    ImportedAssetItemDto, ImportProjectAssetsResponseDto, ProjectDirectoryEntry, ProjectSnapshot,
+    ProjectSummaryRecord,
+};
+use super::file_store::{self, ImportedAssetItem};
 
 pub struct ProjectService {
     app_data_dir: PathBuf,
@@ -74,7 +77,42 @@ impl ProjectService {
         file_store::move_project_asset(&self.app_data_dir, project_id, from_path, to_path)
     }
 
+    pub fn copy_asset(
+        &self,
+        project_id: &str,
+        from_path: &str,
+        to_path: &str,
+    ) -> Result<(String, String), String> {
+        file_store::copy_project_asset(&self.app_data_dir, project_id, from_path, to_path)
+    }
+
     pub fn delete_asset(&self, project_id: &str, path: &str) -> Result<(), String> {
         file_store::delete_project_asset(&self.app_data_dir, project_id, path)
+    }
+
+    pub fn import_assets(
+        &self,
+        project_id: &str,
+        target_dir: &str,
+        sources: &[String],
+    ) -> Result<ImportProjectAssetsResponseDto, String> {
+        let source_paths = sources.iter().map(PathBuf::from).collect::<Vec<_>>();
+        let imports = file_store::import_external_paths_into_assets(
+            &self.app_data_dir,
+            project_id,
+            &source_paths,
+            target_dir,
+        )?;
+        Ok(ImportProjectAssetsResponseDto {
+            imports: imports.into_iter().map(map_imported_asset_item).collect(),
+        })
+    }
+}
+
+fn map_imported_asset_item(item: ImportedAssetItem) -> ImportedAssetItemDto {
+    ImportedAssetItemDto {
+        dest_relative: item.dest_relative,
+        kind: item.kind,
+        file_paths: item.file_paths,
     }
 }

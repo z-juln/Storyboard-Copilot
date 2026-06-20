@@ -41,19 +41,21 @@ export {
   isDescendantAssetPath,
   joinAssetPath,
 } from './assetExplorerPathUtils';
+export type { AssetSelectionItem } from './assetExplorerSelection';
 export {
-  entriesToClipboardItems,
+  entriesToSelectionItems,
   filterTopLevelSelectedPaths,
   resolveEntriesForPaths,
   resolveTopLevelSelectedEntries,
 } from './assetExplorerSelection';
 export {
-  getAssetExplorerClipboard,
-  setAssetExplorerClipboard,
-  hasAssetExplorerClipboard,
-  type AssetClipboardItem,
+  clearSystemClipboardCutMarker,
+  hasSystemClipboardAssetItems,
+  readProjectAssetsFromSystemClipboard,
+  writeProjectAssetsToSystemClipboard,
   type AssetClipboardMode,
-  type AssetExplorerClipboardState,
+  type AssetClipboardPasteItem,
+  type AssetClipboardPastePayload,
 } from './assetExplorerClipboard';
 export {
   countAssetPathRefs,
@@ -64,7 +66,7 @@ export {
   deleteProjectAssetEntries,
   moveProjectAssetEntry,
   moveProjectAssetEntries,
-  pasteAssetExplorerClipboard,
+  pasteSystemClipboardToDirectory,
   renameProjectAssetEntry,
   resolveNewSiblingName,
 } from './projectAssetService';

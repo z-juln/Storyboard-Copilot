@@ -11,8 +11,8 @@
 | `resolveAssetDisplayUrl.ts` | fileAssetId → 原图或 preview HTTP URL |
 | `projectPaths.ts` | `buildProjectAssetUrl` / `buildProjectAssetPreviewUrl` |
 | `assetExplorerPathUtils.ts` | 路径 join / `findEntryInTree` / `getSiblingEntries` |
-| `assetExplorerSelection.ts` | 选区纯函数：顶层去重、路径解析、clipboard items |
-| `assetExplorerClipboard.ts` | 复制 / 剪切 / 粘贴 |
+| `assetExplorerSelection.ts` | 选区纯函数：顶层去重、路径解析、selection items |
+| `assetExplorerClipboard.ts` | 系统剪贴板读写（HTTP API → Rust NSPasteboard）；cut 标记 |
 | `assetPreviewUtils.ts` | 预览类型、`fetchAssetTextContent` |
 | `createUploadNodeFromProjectAsset.ts` | drag payload + upload 节点 data |
 | `dropProjectAssetOnCanvas.ts` | 画布 drop 编排 |

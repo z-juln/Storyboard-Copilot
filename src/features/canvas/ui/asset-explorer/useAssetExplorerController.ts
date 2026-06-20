@@ -11,9 +11,10 @@ import {
 
 import type { ProjectDirectoryEntry } from '@/features/project/types';
 import {
-  getAssetExplorerClipboard,
-  setAssetExplorerClipboard,
-  writeAssetPathsToSystemClipboard,
+  clearSystemClipboardCutMarker,
+  hasSystemClipboardAssetItems,
+  readProjectAssetsFromSystemClipboard,
+  writeProjectAssetsToSystemClipboard,
 } from '@/features/project/asset/assetExplorerClipboard';
 import {
   collectFilePathsFromEntry,
@@ -25,7 +26,7 @@ import {
   joinAssetPath,
 } from '@/features/project/asset/assetExplorerPathUtils';
 import {
-  entriesToClipboardItems,
+  entriesToSelectionItems,
   resolveTopLevelSelectedEntries,
 } from '@/features/project/asset/assetExplorerSelection';
 import { normalizeAssetPath } from '@/features/project/asset/assetManifest';
@@ -35,7 +36,7 @@ import {
   createProjectAssetFolder,
   deleteProjectAssetEntries,
   moveProjectAssetEntries,
-  pasteAssetExplorerClipboard,
+  pasteSystemClipboardToDirectory,
   renameProjectAssetEntry,
   resolveNewSiblingName,
 } from '@/features/project/asset/projectAssetService';
@@ -132,7 +133,29 @@ export function useAssetExplorerController({
     return findEntryInTree(tree, anchorPath);
   }, [anchorPath, tree]);
 
-  const canPaste = Boolean(getAssetExplorerClipboard()?.items.length);
+  const [canPaste, setCanPaste] = useState(false);
+
+  const refreshCanPaste = useCallback(async () => {
+    if (readOnly) {
+      setCanPaste(false);
+      return;
+    }
+    setCanPaste(await hasSystemClipboardAssetItems(projectId));
+  }, [projectId, readOnly]);
+
+  useEffect(() => {
+    void refreshCanPaste();
+  }, [refreshCanPaste]);
+
+  useEffect(() => {
+    const handleWindowFocus = () => {
+      void refreshCanPaste();
+    };
+    window.addEventListener('focus', handleWindowFocus);
+    return () => {
+      window.removeEventListener('focus', handleWindowFocus);
+    };
+  }, [refreshCanPaste]);
 
   const applyManifest = useCallback(
     (nextManifest: AssetManifest) => {
@@ -151,14 +174,18 @@ export function useAssetExplorerController({
       if (readOnly || entries.length === 0) {
         return;
       }
-      const items = entriesToClipboardItems(entries);
-      setAssetExplorerClipboard({
-        mode,
-        items,
-      });
-      void writeAssetPathsToSystemClipboard(items.map((item) => item.path));
+      const items = entriesToSelectionItems(entries);
+      void writeProjectAssetsToSystemClipboard(
+        projectId,
+        items.map((item) => item.path),
+        mode === 'cut'
+      )
+        .then(() => refreshCanPaste())
+        .catch((copyError) => {
+          setError(copyError instanceof Error ? copyError.message : '复制到剪贴板失败');
+        });
     },
-    [readOnly]
+    [projectId, readOnly, refreshCanPaste]
   );
 
   const copySelectionToClipboard = useCallback(
@@ -177,29 +204,32 @@ export function useAssetExplorerController({
       if (readOnly || !tree) {
         return;
       }
-      const clipboard = getAssetExplorerClipboard();
-      if (!clipboard?.items.length) {
+      const clipboard = await readProjectAssetsFromSystemClipboard(projectId);
+      if (!clipboard.items.length) {
+        setError('剪贴板中没有可粘贴的文件');
         return;
       }
 
       try {
-        const nextManifest = await pasteAssetExplorerClipboard({
+        const nextManifest = await pasteSystemClipboardToDirectory({
           projectId,
           targetDirPath,
-          clipboard,
+          mode: clipboard.mode,
+          items: clipboard.items,
           tree,
           manifest,
         });
         applyManifest(nextManifest);
         if (clipboard.mode === 'cut') {
-          setAssetExplorerClipboard(null);
+          await clearSystemClipboardCutMarker();
         }
         await loadTree();
+        await refreshCanPaste();
       } catch (pasteError) {
         setError(pasteError instanceof Error ? pasteError.message : '粘贴失败');
       }
     },
-    [applyManifest, loadTree, manifest, projectId, readOnly, tree]
+    [applyManifest, loadTree, manifest, projectId, readOnly, refreshCanPaste, tree]
   );
 
   const openPreview = useCallback((entry: ProjectDirectoryEntry) => {
@@ -579,6 +609,7 @@ export function useAssetExplorerController({
       }
       event.preventDefault();
       selectSingle(tree.path);
+      void refreshCanPaste();
       setContextMenu({
         x: event.clientX,
         y: event.clientY,
@@ -586,7 +617,7 @@ export function useAssetExplorerController({
         isAssetsRoot: true,
       });
     },
-    [selectSingle, tree]
+    [refreshCanPaste, selectSingle, tree]
   );
 
   const handleAssetsRootDragOver = useCallback(
@@ -617,9 +648,10 @@ export function useAssetExplorerController({
       if (!selectedPaths.has(normalized)) {
         selectSingle(normalized);
       }
+      void refreshCanPaste();
       setContextMenu({ x: event.clientX, y: event.clientY, entry: item });
     },
-    [selectSingle, selectedPaths]
+    [refreshCanPaste, selectSingle, selectedPaths]
   );
 
   const copyContextMenuSelection = useCallback(
