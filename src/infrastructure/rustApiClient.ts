@@ -31,6 +31,44 @@ export interface PrepareNodeImageResult {
   aspectRatio: string;
 }
 
+export interface MergeStoryboardImagesPayload {
+  frameSources: string[];
+  rows: number;
+  cols: number;
+  cellGap: number;
+  outerPadding: number;
+  noteHeight: number;
+  fontSize: number;
+  backgroundColor: string;
+  maxDimension: number;
+  showFrameIndex?: boolean;
+  showFrameNote?: boolean;
+  notePlacement?: 'overlay' | 'bottom';
+  imageFit?: 'cover' | 'contain';
+  frameIndexPrefix?: string;
+  textColor?: string;
+  frameNotes?: string[];
+}
+
+export interface MergeStoryboardImagesResult {
+  imagePath: string;
+  canvasWidth: number;
+  canvasHeight: number;
+  cellWidth: number;
+  cellHeight: number;
+  gap: number;
+  padding: number;
+  noteHeight: number;
+  fontSize: number;
+  textOverlayApplied: boolean;
+}
+
+export interface StoryboardImageMetadata {
+  gridRows: number;
+  gridCols: number;
+  frameNotes: string[];
+}
+
 interface CreateImageUploadSessionResult {
   uploadId: string;
   chunkSize: number;
@@ -149,6 +187,15 @@ export interface RustApiClient {
     source: string,
     maxPreviewDimension?: number
   ) => Promise<PrepareNodeImageResult>;
+  mergeStoryboardImages: (
+    projectId: string,
+    payload: MergeStoryboardImagesPayload
+  ) => Promise<MergeStoryboardImagesResult>;
+  embedStoryboardImageMetadata: (
+    projectId: string,
+    source: string,
+    metadata: StoryboardImageMetadata
+  ) => Promise<string>;
 }
 
 export function createRustApiClient(baseUrl = resolveBaseUrl()): RustApiClient {
@@ -261,6 +308,29 @@ export function createRustApiClient(baseUrl = resolveBaseUrl()): RustApiClient {
         }
       );
       return readJson<PrepareNodeImageResult>(response);
+    },
+    mergeStoryboardImages: async (projectId, payload) => {
+      const response = await fetch(
+        `${normalizedBaseUrl}/api/v1/projects/${encodeURIComponent(projectId)}/storyboard/merge`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        }
+      );
+      return readJson<MergeStoryboardImagesResult>(response);
+    },
+    embedStoryboardImageMetadata: async (projectId, source, metadata) => {
+      const response = await fetch(
+        `${normalizedBaseUrl}/api/v1/projects/${encodeURIComponent(projectId)}/storyboard/embed-metadata`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ source, metadata }),
+        }
+      );
+      const result = await readJson<{ path: string }>(response);
+      return result.path;
     },
   };
 }

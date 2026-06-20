@@ -23,7 +23,8 @@ use crate::ai::dto::{
 };
 use crate::ai::service::AiService;
 use crate::media::dto::{
-    CompleteImageUploadRequestDto, PrepareFromSourceRequestDto,
+    CompleteImageUploadRequestDto, EmbedStoryboardMetadataRequestDto,
+    MergeStoryboardImagesPayload, PrepareFromSourceRequestDto,
 };
 use crate::media::read_local_image;
 use crate::media::store::prepare_from_source;
@@ -149,6 +150,14 @@ pub async fn start_http_server_with_app_data(app_data_dir: PathBuf) -> Result<()
         .route(
             "/api/v1/projects/:project_id/images/prepare-from-source",
             post(prepare_image_from_source),
+        )
+        .route(
+            "/api/v1/projects/:project_id/storyboard/merge",
+            post(merge_storyboard_images),
+        )
+        .route(
+            "/api/v1/projects/:project_id/storyboard/embed-metadata",
+            post(embed_storyboard_metadata),
         )
         .route("/api/v1/image", get(serve_image))
         .route("/image", get(serve_image))
@@ -377,6 +386,41 @@ async fn prepare_image_from_source(
     .await
     {
         Ok(result) => Json(result).into_response(),
+        Err(err) => api_error(StatusCode::BAD_REQUEST, err),
+    }
+}
+
+async fn merge_storyboard_images(
+    State(state): State<HttpState>,
+    Path(project_id): Path<String>,
+    Json(payload): Json<MergeStoryboardImagesPayload>,
+) -> Response {
+    match crate::commands::image::merge_storyboard_images_for_project(
+        &state.app_data_dir,
+        &project_id,
+        payload,
+    )
+    .await
+    {
+        Ok(result) => Json(result).into_response(),
+        Err(err) => api_error(StatusCode::BAD_REQUEST, err),
+    }
+}
+
+async fn embed_storyboard_metadata(
+    State(state): State<HttpState>,
+    Path(project_id): Path<String>,
+    Json(request): Json<EmbedStoryboardMetadataRequestDto>,
+) -> Response {
+    match crate::commands::image::embed_storyboard_image_metadata_for_project(
+        &state.app_data_dir,
+        &project_id,
+        &request.source,
+        &request.metadata,
+    )
+    .await
+    {
+        Ok(path) => Json(json!({ "path": path })).into_response(),
         Err(err) => api_error(StatusCode::BAD_REQUEST, err),
     }
 }

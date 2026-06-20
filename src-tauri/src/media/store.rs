@@ -186,6 +186,32 @@ pub fn persist_image_bytes_legacy(
     Ok(output_path.to_string_lossy().to_string())
 }
 
+pub async fn resolve_project_source_bytes(
+    app_data_dir: &Path,
+    project_id: &str,
+    source: &str,
+) -> Result<(Vec<u8>, String), String> {
+    let trimmed = source.trim();
+    if trimmed.is_empty() {
+        return Err("Image source is empty".to_string());
+    }
+
+    if trimmed.starts_with("assets/") {
+        let asset_path =
+            crate::project::file_store::read_project_asset(app_data_dir, project_id, trimmed)?;
+        let ext = asset_path
+            .extension()
+            .and_then(|item| item.to_str())
+            .map(normalize_extension)
+            .unwrap_or_else(|| "png".to_string());
+        let bytes = std::fs::read(&asset_path)
+            .map_err(|err| format!("Failed to read project asset: {err}"))?;
+        return Ok((bytes, ext));
+    }
+
+    resolve_source_bytes(trimmed).await
+}
+
 pub async fn resolve_source_bytes(source: &str) -> Result<(Vec<u8>, String), String> {
     if source.starts_with("data:") {
         return parse_data_url(source);

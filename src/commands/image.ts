@@ -1,5 +1,36 @@
 import { invoke } from '@tauri-apps/api/core';
 
+import {
+  rustApiClient,
+  type MergeStoryboardImagesPayload,
+  type MergeStoryboardImagesResult,
+  type StoryboardImageMetadata,
+} from '@/infrastructure/rustApiClient';
+import { useProjectStore } from '@/stores/projectStore';
+
+export type {
+  MergeStoryboardImagesPayload,
+  MergeStoryboardImagesResult,
+  StoryboardImageMetadata,
+};
+
+export interface CropImageSourcePayload {
+  source: string;
+  aspectRatio?: string;
+  cropX?: number;
+  cropY?: number;
+  cropWidth?: number;
+  cropHeight?: number;
+}
+
+function requireCurrentProjectId(): string {
+  const projectId = useProjectStore.getState().currentProjectId;
+  if (!projectId) {
+    throw new Error('未打开项目，无法处理图片');
+  }
+  return projectId;
+}
+
 export async function splitImage(
   imageBase64: string,
   rows: number,
@@ -28,57 +59,10 @@ export async function splitImageSource(
   });
 }
 
-export interface MergeStoryboardImagesPayload {
-  frameSources: string[];
-  rows: number;
-  cols: number;
-  cellGap: number;
-  outerPadding: number;
-  noteHeight: number;
-  fontSize: number;
-  backgroundColor: string;
-  maxDimension: number;
-  showFrameIndex?: boolean;
-  showFrameNote?: boolean;
-  notePlacement?: 'overlay' | 'bottom';
-  imageFit?: 'cover' | 'contain';
-  frameIndexPrefix?: string;
-  textColor?: string;
-  frameNotes?: string[];
-}
-
-export interface StoryboardImageMetadata {
-  gridRows: number;
-  gridCols: number;
-  frameNotes: string[];
-}
-
-export interface CropImageSourcePayload {
-  source: string;
-  aspectRatio?: string;
-  cropX?: number;
-  cropY?: number;
-  cropWidth?: number;
-  cropHeight?: number;
-}
-
-export interface MergeStoryboardImagesResult {
-  imagePath: string;
-  canvasWidth: number;
-  canvasHeight: number;
-  cellWidth: number;
-  cellHeight: number;
-  gap: number;
-  padding: number;
-  noteHeight: number;
-  fontSize: number;
-  textOverlayApplied: boolean;
-}
-
 export async function mergeStoryboardImages(
   payload: MergeStoryboardImagesPayload
 ): Promise<MergeStoryboardImagesResult> {
-  return await invoke('merge_storyboard_images', { payload });
+  return rustApiClient.mergeStoryboardImages(requireCurrentProjectId(), payload);
 }
 
 export async function readStoryboardImageMetadata(
@@ -91,7 +75,7 @@ export async function embedStoryboardImageMetadata(
   source: string,
   metadata: StoryboardImageMetadata
 ): Promise<string> {
-  return await invoke('embed_storyboard_image_metadata', { source, metadata });
+  return rustApiClient.embedStoryboardImageMetadata(requireCurrentProjectId(), source, metadata);
 }
 
 export async function cropImageSource(

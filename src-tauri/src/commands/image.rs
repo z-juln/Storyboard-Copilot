@@ -16,17 +16,13 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Manager};
 use tracing::info;
 
-use crate::media::store::{self, normalize_extension, resolve_source_bytes};
+use crate::media::store::{self, normalize_extension, resolve_project_source_bytes, resolve_source_bytes};
 
 const STORYBOARD_METADATA_PNG_TEXT_KEY: &str = "StoryboardCopilotMetadata";
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct StoryboardImageMetadata {
-    pub grid_rows: u32,
-    pub grid_cols: u32,
-    pub frame_notes: Vec<String>,
-}
+pub use crate::media::dto::{
+    MergeStoryboardImagesPayload, MergeStoryboardImagesResult, StoryboardImageMetadata,
+};
 
 #[tauri::command]
 pub async fn split_image(
@@ -196,42 +192,6 @@ pub async fn split_image_source(
     );
 
     Ok(results)
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct MergeStoryboardImagesPayload {
-    pub frame_sources: Vec<String>,
-    pub rows: u32,
-    pub cols: u32,
-    pub cell_gap: u32,
-    pub outer_padding: u32,
-    pub note_height: u32,
-    pub font_size: u32,
-    pub background_color: String,
-    pub max_dimension: u32,
-    pub show_frame_index: Option<bool>,
-    pub show_frame_note: Option<bool>,
-    pub note_placement: Option<String>,
-    pub image_fit: Option<String>,
-    pub frame_index_prefix: Option<String>,
-    pub text_color: Option<String>,
-    pub frame_notes: Option<Vec<String>>,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct MergeStoryboardImagesResult {
-    pub image_path: String,
-    pub canvas_width: u32,
-    pub canvas_height: u32,
-    pub cell_width: u32,
-    pub cell_height: u32,
-    pub gap: u32,
-    pub padding: u32,
-    pub note_height: u32,
-    pub font_size: u32,
-    pub text_overlay_applied: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -531,6 +491,15 @@ fn resize_image_fast(source: &DynamicImage, target_width: u32, target_height: u3
         .ok_or_else(|| "Failed to build RGBA image from resized buffer".to_string())
 }
 
+async fn load_dynamic_image_from_project_source(
+    app_data_dir: &Path,
+    project_id: &str,
+    source: &str,
+) -> Result<DynamicImage, String> {
+    let (bytes, _extension) = resolve_project_source_bytes(app_data_dir, project_id, source).await?;
+    image::load_from_memory(&bytes).map_err(|e| format!("Failed to decode image source: {}", e))
+}
+
 async fn load_dynamic_image_from_source(source: &str) -> Result<DynamicImage, String> {
     let (bytes, _extension) = resolve_source_bytes(source).await?;
     image::load_from_memory(&bytes).map_err(|e| format!("Failed to decode image source: {}", e))
@@ -610,9 +579,9 @@ pub async fn crop_image_source(
     persist_image_bytes(&app, buffer.get_ref(), "png")
 }
 
-#[tauri::command]
-pub async fn merge_storyboard_images(
-    app: AppHandle,
+pub async fn merge_storyboard_images_for_project(
+    app_data_dir: &Path,
+    project_id: &str,
     payload: MergeStoryboardImagesPayload,
 ) -> Result<MergeStoryboardImagesResult, String> {
     let started = Instant::now();
@@ -635,7 +604,7 @@ pub async fn merge_storyboard_images(
             continue;
         }
 
-        match load_dynamic_image_from_source(source).await {
+        match load_dynamic_image_from_project_source(app_data_dir, project_id, source).await {
             Ok(image) => {
                 if reference_size.is_none() {
                     reference_size = Some((image.width().max(1), image.height().max(1)));
@@ -743,7 +712,6 @@ pub async fn merge_storyboard_images(
             } else if let Ok(resized_rgba) = resize_image_fast(frame, draw_w, draw_h) {
                 image::imageops::overlay(&mut cell_canvas, &resized_rgba, draw_x, draw_y);
             } else {
-                // Fallback path keeps behavior correct if SIMD resize fails for unexpected input.
                 let resized = frame.resize(draw_w, draw_h, image::imageops::FilterType::Triangle);
                 image::imageops::overlay(&mut cell_canvas, &resized.to_rgba8(), draw_x, draw_y);
             }
@@ -751,7 +719,6 @@ pub async fn merge_storyboard_images(
             image::imageops::overlay(&mut canvas, &cell_canvas, x as i64, y as i64);
         }
 
-        // Keep only internal split lines; do not draw an outer frame around the whole storyboard.
         if col < cols.saturating_sub(1) {
             stroke_right_edge(&mut canvas, x, y, cell_width, cell_height, border);
         }
@@ -832,9 +799,10 @@ pub async fn merge_storyboard_images(
         .write_to(&mut buffer, image::ImageFormat::Png)
         .map_err(|e| format!("Failed to encode merged storyboard image: {}", e))?;
 
-    let image_path = persist_image_bytes(&app, buffer.get_ref(), "png")?;
+    let image_path = store::persist_image_bytes(app_data_dir, project_id, buffer.get_ref(), "png")?;
     info!(
-        "merge_storyboard_images done: {} cells, load={}ms, total={}ms, text_overlay_applied={}",
+        "merge_storyboard_images_for_project done: project_id={}, cells={}, load={}ms, total={}ms, text_overlay_applied={}",
+        project_id,
         total_cells,
         load_done.duration_since(started).as_millis(),
         started.elapsed().as_millis(),
@@ -853,6 +821,19 @@ pub async fn merge_storyboard_images(
         font_size,
         text_overlay_applied,
     })
+}
+
+#[tauri::command]
+pub async fn merge_storyboard_images(
+    app: AppHandle,
+    project_id: String,
+    payload: MergeStoryboardImagesPayload,
+) -> Result<MergeStoryboardImagesResult, String> {
+    let app_data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to resolve app data dir: {}", e))?;
+    merge_storyboard_images_for_project(&app_data_dir, &project_id, payload).await
 }
 
 fn persist_image_bytes(app: &AppHandle, bytes: &[u8], extension: &str) -> Result<String, String> {
@@ -952,23 +933,37 @@ pub async fn read_storyboard_image_metadata(
     read_storyboard_metadata_from_png_bytes(&bytes)
 }
 
-#[tauri::command]
-pub async fn embed_storyboard_image_metadata(
-    app: AppHandle,
-    source: String,
-    metadata: StoryboardImageMetadata,
+pub async fn embed_storyboard_image_metadata_for_project(
+    app_data_dir: &Path,
+    project_id: &str,
+    source: &str,
+    metadata: &StoryboardImageMetadata,
 ) -> Result<String, String> {
     let trimmed = source.trim();
     if trimmed.is_empty() {
         return Err("Image source is empty".to_string());
     }
 
-    let (bytes, _extension) = resolve_source_bytes(trimmed).await?;
+    let (bytes, _extension) = resolve_project_source_bytes(app_data_dir, project_id, trimmed).await?;
     let image = image::load_from_memory(&bytes)
         .map_err(|e| format!("Failed to decode image for metadata embedding: {}", e))?;
-    let encoded = encode_png_with_storyboard_metadata(&image, &metadata)?;
+    let encoded = encode_png_with_storyboard_metadata(&image, metadata)?;
 
-    persist_image_bytes(&app, &encoded, "png")
+    store::persist_image_bytes(app_data_dir, project_id, &encoded, "png")
+}
+
+#[tauri::command]
+pub async fn embed_storyboard_image_metadata(
+    app: AppHandle,
+    project_id: String,
+    source: String,
+    metadata: StoryboardImageMetadata,
+) -> Result<String, String> {
+    let app_data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to resolve app data dir: {}", e))?;
+    embed_storyboard_image_metadata_for_project(&app_data_dir, &project_id, &source, &metadata).await
 }
 
 #[tauri::command]
