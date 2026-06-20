@@ -231,17 +231,66 @@ export async function pasteSystemClipboardToDirectory(input: {
   }
 
   if (externalItems.length > 0) {
-    const result = await rustApiClient.importProjectAssets(
-      input.projectId,
-      targetDir,
-      externalItems.map((item) => item.absolutePath)
-    );
+    manifest = await importExternalPathsToDirectory({
+      projectId: input.projectId,
+      targetDirPath: targetDir,
+      absolutePaths: externalItems.map((item) => item.absolutePath),
+      manifest,
+    });
+  }
 
-    for (const imported of result.imports) {
-      for (const filePath of imported.filePaths) {
-        manifest = registerFileAssetPath(manifest, filePath).manifest;
-      }
+  return manifest;
+}
+
+export async function importExternalPathsToDirectory(input: {
+  projectId: string;
+  targetDirPath: string;
+  absolutePaths: string[];
+  manifest: AssetManifest;
+}): Promise<AssetManifest> {
+  if (input.absolutePaths.length === 0) {
+    return input.manifest;
+  }
+
+  const targetDir = normalizeAssetPath(input.targetDirPath).replace(/\/+$/, '') || 'assets';
+  let manifest = input.manifest;
+  const result = await rustApiClient.importProjectAssets(
+    input.projectId,
+    targetDir,
+    input.absolutePaths
+  );
+
+  for (const imported of result.imports) {
+    for (const filePath of imported.filePaths) {
+      manifest = registerFileAssetPath(manifest, filePath).manifest;
     }
+  }
+
+  return manifest;
+}
+
+export async function importExternalFilesToDirectory(input: {
+  projectId: string;
+  targetDirPath: string;
+  files: File[];
+  manifest: AssetManifest;
+}): Promise<AssetManifest> {
+  if (input.files.length === 0) {
+    return input.manifest;
+  }
+
+  const targetDir = normalizeAssetPath(input.targetDirPath).replace(/\/+$/, '') || 'assets';
+  let manifest = input.manifest;
+  const existingPaths = listExistingManifestPaths(manifest);
+
+  for (const file of input.files) {
+    const baseName = file.name.trim();
+    const desiredPath = targetDir === 'assets' ? `assets/${baseName}` : `${targetDir}/${baseName}`;
+    const nextPath = resolveUniquePath(existingPaths, desiredPath);
+    existingPaths.add(nextPath);
+
+    await rustApiClient.uploadProjectAssetAtPathInChunks(input.projectId, nextPath, file);
+    manifest = registerFileAssetPath(manifest, nextPath).manifest;
   }
 
   return manifest;

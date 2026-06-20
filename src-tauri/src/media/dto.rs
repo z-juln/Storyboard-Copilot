@@ -30,6 +30,13 @@ pub struct CompleteImageUploadRequestDto {
     pub max_preview_dimension: Option<u32>,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CompleteAssetUploadRequestDto {
+    pub path: String,
+    pub total_chunks: u32,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MergeStoryboardImagesPayload {

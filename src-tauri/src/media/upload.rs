@@ -5,10 +5,11 @@ use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
 use crate::media::dto::{
-    CompleteImageUploadRequestDto, CreateImageUploadSessionResponseDto,
-    PrepareNodeImageResponseDto,
+    CompleteAssetUploadRequestDto, CompleteImageUploadRequestDto,
+    CreateImageUploadSessionResponseDto, PrepareNodeImageResponseDto,
 };
 use crate::media::store::{normalize_extension, prepare_from_bytes};
+use crate::project::file_store;
 
 pub const UPLOAD_CHUNK_SIZE: usize = 4 * 1024 * 1024;
 const MAX_UPLOAD_BYTES: u64 = 256 * 1024 * 1024;
@@ -66,13 +67,12 @@ pub fn write_upload_chunk(
     Ok(())
 }
 
-pub fn complete_upload_session(
+fn assemble_upload_session(
     app_data_dir: &Path,
-    project_id: &str,
     upload_id: &str,
-    request: CompleteImageUploadRequestDto,
-) -> Result<PrepareNodeImageResponseDto, String> {
-    if request.total_chunks == 0 {
+    total_chunks: u32,
+) -> Result<Vec<u8>, String> {
+    if total_chunks == 0 {
         return Err("totalChunks must be greater than 0".to_string());
     }
 
@@ -82,7 +82,7 @@ pub fn complete_upload_session(
     }
 
     let mut assembled = Vec::new();
-    for chunk_index in 0..request.total_chunks {
+    for chunk_index in 0..total_chunks {
         let chunk_path = dir.join(format!("{chunk_index}.part"));
         if !chunk_path.is_file() {
             return Err(format!("Missing upload chunk: {chunk_index}"));
@@ -106,12 +106,23 @@ pub fn complete_upload_session(
             .saturating_add(chunk_bytes.len()) as u64;
         if next_size > MAX_UPLOAD_BYTES {
             return Err(format!(
-                "Uploaded image exceeds limit: {next_size} > {MAX_UPLOAD_BYTES}"
+                "Uploaded file exceeds limit: {next_size} > {MAX_UPLOAD_BYTES}"
             ));
         }
 
         assembled.extend_from_slice(&chunk_bytes);
     }
+
+    Ok(assembled)
+}
+
+pub fn complete_upload_session(
+    app_data_dir: &Path,
+    project_id: &str,
+    upload_id: &str,
+    request: CompleteImageUploadRequestDto,
+) -> Result<PrepareNodeImageResponseDto, String> {
+    let assembled = assemble_upload_session(app_data_dir, upload_id, request.total_chunks)?;
 
     let max_preview = request.max_preview_dimension.unwrap_or(512);
     let prepared = prepare_from_bytes(
@@ -124,6 +135,24 @@ pub fn complete_upload_session(
 
     let _ = remove_upload_session(app_data_dir, upload_id);
     Ok(prepared)
+}
+
+pub fn complete_asset_upload_session(
+    app_data_dir: &Path,
+    project_id: &str,
+    upload_id: &str,
+    request: CompleteAssetUploadRequestDto,
+) -> Result<String, String> {
+    let assembled = assemble_upload_session(app_data_dir, upload_id, request.total_chunks)?;
+    let path = file_store::write_project_asset_at_path(
+        app_data_dir,
+        project_id,
+        &request.path,
+        &assembled,
+    )?;
+
+    let _ = remove_upload_session(app_data_dir, upload_id);
+    Ok(path)
 }
 
 pub fn remove_upload_session(app_data_dir: &Path, upload_id: &str) -> Result<(), String> {

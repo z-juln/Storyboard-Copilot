@@ -10,6 +10,10 @@
 | `PATCH` | `/projects/:id/assets` | `{ from, to }` move/rename |
 | `POST` | `/projects/:id/assets/copy` | `{ from, to }` 磁盘复制（粘贴 copy 用） |
 | `POST` | `/projects/:id/assets/import` | `{ targetDir, sources[] }` 从绝对路径磁盘导入（外部粘贴） |
+| `POST` | `/projects/:id/assets/upload-sessions` | 创建资产分片上传 session |
+| `PUT` | `/projects/:id/assets/upload-sessions/:id/chunks/:index` | 写入分片（≤4MB，octet-stream） |
+| `POST` | `/projects/:id/assets/upload-sessions/:id/complete` | `{ path, totalChunks }` 合并写入目标资产 |
+| `DELETE` | `/projects/:id/assets/upload-sessions/:id` | 取消 session |
 | `GET` | `/projects/:id/clipboard/assets` | 读取系统剪贴板并解析为资产粘贴项 |
 | `POST` | `/projects/:id/clipboard/assets` | `{ relativePaths, cut }` 写入系统剪贴板（Finder 同格式） |
 | `POST` | `/clipboard/assets/clear-cut` | 清除 Explorer 剪切标记 |

@@ -31,10 +31,20 @@ import {
 } from '@/features/project/asset/assetExplorerSelection';
 import { normalizeAssetPath } from '@/features/project/asset/assetManifest';
 import {
+  hasExternalFileDrop,
+  resolveDropImportTargetDirectory,
+  resolveExternalDropFiles,
+  resolveExternalDropPaths,
+  resolveInternalAssetDropPaths,
+  type DragTransferEvent,
+} from '@/features/project/asset/assetExplorerDropUtils';
+import {
   countAssetPathRefs,
   createProjectAssetFile,
   createProjectAssetFolder,
   deleteProjectAssetEntries,
+  importExternalFilesToDirectory,
+  importExternalPathsToDirectory,
   moveProjectAssetEntries,
   pasteSystemClipboardToDirectory,
   renameProjectAssetEntry,
@@ -108,6 +118,16 @@ export function useAssetExplorerController({
   useEffect(() => {
     void loadTree();
   }, [loadTree]);
+
+  useEffect(() => {
+    const handleDragEnd = () => {
+      dragSourcePathsRef.current = [];
+    };
+    document.addEventListener('dragend', handleDragEnd);
+    return () => {
+      document.removeEventListener('dragend', handleDragEnd);
+    };
+  }, []);
 
   const displayTree = useMemo(() => {
     if (!tree) {
@@ -522,6 +542,47 @@ export function useAssetExplorerController({
     [selectSingle, togglePath]
   );
 
+  const handleImportExternalDrop = useCallback(
+    async (event: DragTransferEvent, targetDirPath: string) => {
+      if (readOnly) {
+        return;
+      }
+
+      try {
+        const absolutePaths = resolveExternalDropPaths(event);
+        if (absolutePaths.length > 0) {
+          const nextManifest = await importExternalPathsToDirectory({
+            projectId,
+            targetDirPath,
+            absolutePaths,
+            manifest,
+          });
+          applyManifest(nextManifest);
+          await loadTree();
+          return;
+        }
+
+        const files = resolveExternalDropFiles(event);
+        if (files.length > 0) {
+          const nextManifest = await importExternalFilesToDirectory({
+            projectId,
+            targetDirPath,
+            files,
+            manifest,
+          });
+          applyManifest(nextManifest);
+          await loadTree();
+          return;
+        }
+
+        setError('无法读取拖放的文件，请尝试复制后粘贴');
+      } catch (importError) {
+        setError(importError instanceof Error ? importError.message : '导入外部文件失败');
+      }
+    },
+    [applyManifest, loadTree, manifest, projectId, readOnly]
+  );
+
   const handleDragStart = useCallback(
     (event: DragEvent, entry: ProjectDirectoryEntry) => {
       if (readOnly) {
@@ -567,12 +628,19 @@ export function useAssetExplorerController({
 
   const handleDragOver = useCallback(
     (event: DragEvent, entry: ProjectDirectoryEntry) => {
-      if (readOnly || entry.kind !== 'directory') {
+      if (readOnly) {
         return;
       }
+
+      const isExternal = hasExternalFileDrop(event);
+      if (entry.kind !== 'directory' && !isExternal) {
+        return;
+      }
+
       event.preventDefault();
-      event.dataTransfer.dropEffect = 'move';
-      setDropTargetPath(entry.path);
+      event.stopPropagation();
+      event.dataTransfer.dropEffect = isExternal ? 'copy' : 'move';
+      setDropTargetPath(resolveDropImportTargetDirectory(entry));
     },
     [readOnly]
   );
@@ -580,26 +648,35 @@ export function useAssetExplorerController({
   const handleDrop = useCallback(
     (event: DragEvent, entry: ProjectDirectoryEntry) => {
       event.preventDefault();
+      event.stopPropagation();
       setDropTargetPath(null);
-      if (readOnly || entry.kind !== 'directory') {
+      if (readOnly) {
         return;
       }
 
-      const fallbackPath = event.dataTransfer.getData('text/plain');
-      const sourcePaths = dragSourcePathsRef.current.length > 0
-        ? dragSourcePathsRef.current
-        : fallbackPath
-          ? [fallbackPath]
-          : [];
+      const targetDirPath = resolveDropImportTargetDirectory(entry);
+      const externalPaths = resolveExternalDropPaths(event);
+      const externalFiles = resolveExternalDropFiles(event);
 
+      if (externalPaths.length > 0 || externalFiles.length > 0 || hasExternalFileDrop(event)) {
+        dragSourcePathsRef.current = [];
+        void handleImportExternalDrop(event, targetDirPath);
+        return;
+      }
+
+      if (entry.kind !== 'directory') {
+        return;
+      }
+
+      const sourcePaths = resolveInternalAssetDropPaths(event, dragSourcePathsRef.current);
       if (sourcePaths.length === 0) {
         return;
       }
 
-      void handleMoveEntries(sourcePaths, entry.path);
+      void handleMoveEntries(sourcePaths, targetDirPath);
       dragSourcePathsRef.current = [];
     },
-    [handleMoveEntries, readOnly]
+    [handleImportExternalDrop, handleMoveEntries, readOnly]
   );
 
   const handleAssetsRootContextMenu = useCallback(
@@ -626,7 +703,8 @@ export function useAssetExplorerController({
         return;
       }
       event.preventDefault();
-      event.dataTransfer.dropEffect = 'move';
+      event.stopPropagation();
+      event.dataTransfer.dropEffect = hasExternalFileDrop(event) ? 'copy' : 'move';
       setDropTargetPath(tree.path);
     },
     [readOnly, tree]

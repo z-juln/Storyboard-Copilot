@@ -75,7 +75,7 @@ export interface StoryboardImageMetadata {
   frameNotes: string[];
 }
 
-interface CreateImageUploadSessionResult {
+interface CreateUploadSessionResult {
   uploadId: string;
   chunkSize: number;
 }
@@ -97,42 +97,43 @@ async function readEmpty(response: Response): Promise<void> {
   throw new Error(payload.error || `HTTP ${response.status}`);
 }
 
-async function abortImageUploadSession(
+async function abortUploadSession(
   baseUrl: string,
   projectId: string,
+  uploadKind: 'images' | 'assets',
   uploadId: string
 ): Promise<void> {
   await fetch(
-    `${baseUrl}/api/v1/projects/${encodeURIComponent(projectId)}/images/upload-sessions/${uploadId}`,
+    `${baseUrl}/api/v1/projects/${encodeURIComponent(projectId)}/${uploadKind}/upload-sessions/${uploadId}`,
     {
       method: 'DELETE',
     }
   ).catch(() => undefined);
 }
 
-async function uploadBinaryInChunks(
-  baseUrl: string,
-  projectId: string,
-  data: Blob,
-  extension: string,
-  maxPreviewDimension?: number
-): Promise<PrepareNodeImageResult> {
+async function uploadBlobInChunks(input: {
+  baseUrl: string;
+  projectId: string;
+  uploadKind: 'images' | 'assets';
+  data: Blob;
+  completeBody: (totalChunks: number) => unknown;
+}): Promise<Response> {
   const sessionResponse = await fetch(
-    `${baseUrl}/api/v1/projects/${encodeURIComponent(projectId)}/images/upload-sessions`,
+    `${input.baseUrl}/api/v1/projects/${encodeURIComponent(input.projectId)}/${input.uploadKind}/upload-sessions`,
     {
       method: 'POST',
     }
   );
-  const session = await readJson<CreateImageUploadSessionResult>(sessionResponse);
+  const session = await readJson<CreateUploadSessionResult>(sessionResponse);
   const chunkSize = session.chunkSize > 0 ? session.chunkSize : DEFAULT_UPLOAD_CHUNK_SIZE;
-  const totalChunks = Math.max(1, Math.ceil(data.size / chunkSize));
+  const totalChunks = Math.max(1, Math.ceil(input.data.size / chunkSize));
 
   try {
     for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex += 1) {
       const start = chunkIndex * chunkSize;
-      const chunk = data.slice(start, start + chunkSize);
+      const chunk = input.data.slice(start, start + chunkSize);
       const chunkResponse = await fetch(
-        `${baseUrl}/api/v1/projects/${encodeURIComponent(projectId)}/images/upload-sessions/${session.uploadId}/chunks/${chunkIndex}`,
+        `${input.baseUrl}/api/v1/projects/${encodeURIComponent(input.projectId)}/${input.uploadKind}/upload-sessions/${session.uploadId}/chunks/${chunkIndex}`,
         {
           method: 'PUT',
           headers: { 'Content-Type': 'application/octet-stream' },
@@ -142,23 +143,64 @@ async function uploadBinaryInChunks(
       await readEmpty(chunkResponse);
     }
 
-    const completeResponse = await fetch(
-      `${baseUrl}/api/v1/projects/${encodeURIComponent(projectId)}/images/upload-sessions/${session.uploadId}/complete`,
+    return fetch(
+      `${input.baseUrl}/api/v1/projects/${encodeURIComponent(input.projectId)}/${input.uploadKind}/upload-sessions/${session.uploadId}/complete`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          extension,
-          totalChunks,
-          maxPreviewDimension,
-        }),
+        body: JSON.stringify(input.completeBody(totalChunks)),
       }
     );
-    return readJson<PrepareNodeImageResult>(completeResponse);
   } catch (error) {
-    await abortImageUploadSession(baseUrl, projectId, session.uploadId);
+    await abortUploadSession(input.baseUrl, input.projectId, input.uploadKind, session.uploadId);
     throw error;
   }
+}
+
+async function uploadBinaryInChunks(
+  baseUrl: string,
+  projectId: string,
+  data: Blob,
+  extension: string,
+  maxPreviewDimension?: number
+): Promise<PrepareNodeImageResult> {
+  const completeResponse = await uploadBlobInChunks({
+    baseUrl,
+    projectId,
+    uploadKind: 'images',
+    data,
+    completeBody: (totalChunks) => ({
+      extension,
+      totalChunks,
+      maxPreviewDimension,
+    }),
+  });
+  return readJson<PrepareNodeImageResult>(completeResponse);
+}
+
+async function uploadProjectAssetAtPathInChunks(
+  baseUrl: string,
+  projectId: string,
+  relativePath: string,
+  data: Blob
+): Promise<string> {
+  const normalizedPath = relativePath.trim().replace(/\\/g, '/').replace(/^\/+/, '');
+  const path = normalizedPath.startsWith('assets/')
+    ? normalizedPath
+    : `assets/${normalizedPath.replace(/^assets\//, '')}`;
+
+  const completeResponse = await uploadBlobInChunks({
+    baseUrl,
+    projectId,
+    uploadKind: 'assets',
+    data,
+    completeBody: (totalChunks) => ({
+      path,
+      totalChunks,
+    }),
+  });
+  const payload = await readJson<{ path: string }>(completeResponse);
+  return payload.path;
 }
 
 export interface RustApiClient {
@@ -185,6 +227,11 @@ export interface RustApiClient {
   listProjectAssetsTree: (projectId: string) => Promise<ProjectDirectoryEntry>;
   putProjectAsset: (projectId: string, fileName: string, data: Blob) => Promise<string>;
   putProjectAssetAtPath: (projectId: string, relativePath: string, data: Blob) => Promise<string>;
+  uploadProjectAssetAtPathInChunks: (
+    projectId: string,
+    relativePath: string,
+    data: Blob
+  ) => Promise<string>;
   createProjectAssetDirectory: (projectId: string, path: string) => Promise<string>;
   moveProjectAsset: (
     projectId: string,
@@ -361,6 +408,8 @@ export function createRustApiClient(baseUrl = resolveBaseUrl()): RustApiClient {
       const payload = await readJson<{ path: string }>(response);
       return payload.path;
     },
+    uploadProjectAssetAtPathInChunks: async (projectId, relativePath, data) =>
+      uploadProjectAssetAtPathInChunks(normalizedBaseUrl, projectId, relativePath, data),
     createProjectAssetDirectory: async (projectId, path) => {
       const response = await fetch(
         `${normalizedBaseUrl}/api/v1/projects/${encodeURIComponent(projectId)}/assets/directories`,

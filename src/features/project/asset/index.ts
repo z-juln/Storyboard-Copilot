@@ -64,6 +64,8 @@ export {
   createProjectAssetFolder,
   deleteProjectAssetEntry,
   deleteProjectAssetEntries,
+  importExternalFilesToDirectory,
+  importExternalPathsToDirectory,
   moveProjectAssetEntry,
   moveProjectAssetEntries,
   pasteSystemClipboardToDirectory,

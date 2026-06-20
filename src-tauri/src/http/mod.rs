@@ -27,15 +27,15 @@ use crate::clipboard::{
     write_project_assets_to_clipboard, WriteProjectAssetsClipboardRequestDto,
 };
 use crate::media::dto::{
-    CompleteImageUploadRequestDto, EmbedStoryboardMetadataRequestDto,
-    MergeStoryboardImagesPayload, PrepareFromSourceRequestDto,
+    CompleteAssetUploadRequestDto, CompleteImageUploadRequestDto,
+    EmbedStoryboardMetadataRequestDto, MergeStoryboardImagesPayload, PrepareFromSourceRequestDto,
 };
 use crate::media::read_local_image;
 use crate::media::preview_cache::resolve_asset_preview_file;
 use crate::media::store::prepare_from_source;
 use crate::media::upload::{
-    cleanup_stale_upload_sessions, complete_upload_session, create_upload_session,
-    remove_upload_session, write_upload_chunk, UPLOAD_CHUNK_SIZE,
+    cleanup_stale_upload_sessions, complete_asset_upload_session, complete_upload_session,
+    create_upload_session, remove_upload_session, write_upload_chunk, UPLOAD_CHUNK_SIZE,
 };
 use crate::project::dto::{
     CreateAssetDirectoryRequestDto, ImportProjectAssetsRequestDto, MoveProjectAssetRequestDto,
@@ -124,6 +124,10 @@ pub async fn start_http_server_with_app_data(app_data_dir: PathBuf) -> Result<()
             "/api/v1/projects/:project_id/images/upload-sessions/:upload_id/chunks/:chunk_index",
             put(upload_image_chunk),
         )
+        .route(
+            "/api/v1/projects/:project_id/assets/upload-sessions/:upload_id/chunks/:chunk_index",
+            put(upload_asset_chunk),
+        )
         .layer(DefaultBodyLimit::max(UPLOAD_CHUNK_SIZE + 4096));
 
     let router = Router::new()
@@ -196,6 +200,18 @@ pub async fn start_http_server_with_app_data(app_data_dir: PathBuf) -> Result<()
         .route(
             "/api/v1/projects/:project_id/images/upload-sessions/:upload_id",
             delete(abort_image_upload),
+        )
+        .route(
+            "/api/v1/projects/:project_id/assets/upload-sessions",
+            post(create_asset_upload_session),
+        )
+        .route(
+            "/api/v1/projects/:project_id/assets/upload-sessions/:upload_id/complete",
+            post(complete_asset_upload),
+        )
+        .route(
+            "/api/v1/projects/:project_id/assets/upload-sessions/:upload_id",
+            delete(abort_asset_upload),
         )
         .route(
             "/api/v1/projects/:project_id/images/prepare-from-source",
@@ -510,6 +526,17 @@ async fn upload_image_chunk(
     }
 }
 
+async fn upload_asset_chunk(
+    State(state): State<HttpState>,
+    Path((_project_id, upload_id, chunk_index)): Path<(String, String, u32)>,
+    body: Bytes,
+) -> Response {
+    match write_upload_chunk(&state.app_data_dir, &upload_id, chunk_index, &body) {
+        Ok(()) => StatusCode::NO_CONTENT.into_response(),
+        Err(err) => api_error(StatusCode::BAD_REQUEST, err),
+    }
+}
+
 async fn complete_image_upload(
     State(state): State<HttpState>,
     Path((project_id, upload_id)): Path<(String, String)>,
@@ -522,6 +549,42 @@ async fn complete_image_upload(
 }
 
 async fn abort_image_upload(
+    State(state): State<HttpState>,
+    Path((_project_id, upload_id)): Path<(String, String)>,
+) -> Response {
+    match remove_upload_session(&state.app_data_dir, &upload_id) {
+        Ok(()) => StatusCode::NO_CONTENT.into_response(),
+        Err(err) => api_error(StatusCode::BAD_REQUEST, err),
+    }
+}
+
+async fn create_asset_upload_session(
+    State(state): State<HttpState>,
+    Path(_project_id): Path<String>,
+) -> Response {
+    match create_upload_session(&state.app_data_dir) {
+        Ok(result) => Json(result).into_response(),
+        Err(err) => api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
+    }
+}
+
+async fn complete_asset_upload(
+    State(state): State<HttpState>,
+    Path((project_id, upload_id)): Path<(String, String)>,
+    Json(request): Json<CompleteAssetUploadRequestDto>,
+) -> Response {
+    match complete_asset_upload_session(
+        &state.app_data_dir,
+        &project_id,
+        &upload_id,
+        request,
+    ) {
+        Ok(path) => Json(json!({ "path": path })).into_response(),
+        Err(err) => api_error(StatusCode::BAD_REQUEST, err),
+    }
+}
+
+async fn abort_asset_upload(
     State(state): State<HttpState>,
     Path((_project_id, upload_id)): Path<(String, String)>,
 ) -> Response {

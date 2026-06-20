@@ -3,6 +3,7 @@ import { Search, X } from 'lucide-react';
 
 import { UiInput } from '@/components/ui';
 import { getAssetBaseName } from '@/features/project/asset/assetExplorerPathUtils';
+import { hasExternalFileDrop } from '@/features/project/asset/assetExplorerDropUtils';
 
 import { AssetPreviewDialog } from '../AssetPreviewDialog';
 import { AssetExplorerContextMenu } from './AssetExplorerContextMenu';
@@ -62,6 +63,14 @@ export const AssetExplorerPanel = memo(({ projectId, readOnly = false }: AssetEx
       className="min-h-[12rem] outline-none"
       onKeyDown={handleKeyDown}
       onClick={() => containerRef.current?.focus()}
+      onDragOver={(event) => {
+        if (readOnly || !hasExternalFileDrop(event)) {
+          return;
+        }
+        event.preventDefault();
+        event.stopPropagation();
+        event.dataTransfer.dropEffect = 'copy';
+      }}
     >
       {searchScope ? (
         <div className="mb-2 flex items-center gap-1 px-1">
