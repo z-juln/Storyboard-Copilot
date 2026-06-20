@@ -1,4 +1,4 @@
-export type { Project, ProjectSnapshot, ProjectSummary } from './types';
+export type { Project, ProjectSnapshot, ProjectSummary, ProjectDirectoryEntry } from './types';
 export {
   createEmptyHistory,
   DEFAULT_VIEWPORT,

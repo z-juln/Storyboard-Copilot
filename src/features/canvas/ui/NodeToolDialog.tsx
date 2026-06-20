@@ -12,7 +12,7 @@ import {
   canvasEventBus,
   canvasToolProcessor,
 } from '@/features/canvas/application/canvasServices';
-import { prepareNodeImage, resolveImageDisplayUrl } from '@/features/canvas/application/imageData';
+import { prepareNodeImage, resolveImageDisplayUrl, toPreparedNodeImageFields } from '@/features/canvas/application/imageData';
 import { readStoryboardImageMetadata } from '@/commands/image';
 import { getToolPlugin, type ToolOptions } from '@/features/canvas/tools';
 import { useCanvasStore } from '@/stores/canvasStore';
@@ -221,16 +221,19 @@ export function NodeToolDialog() {
         }
       } else if (result.outputImageUrl) {
         const prepared = await prepareNodeImage(result.outputImageUrl);
+        const imageFields = toPreparedNodeImageFields(prepared);
         const createdNodeId = addDerivedExportNode(
           sourceNode.id,
-          prepared.imageUrl,
-          prepared.aspectRatio,
-          prepared.previewImageUrl,
+          imageFields.imageUrl,
+          imageFields.aspectRatio,
+          imageFields.previewImageUrl,
           {
             defaultTitle: resolveResultNodeTitle(activeToolDialog.toolType),
             resultKind: 'generic',
             aspectRatioStrategy: 'provided',
             sizeStrategy: 'autoMinEdge',
+            fileAssetId: imageFields.fileAssetId,
+            previewFileAssetId: imageFields.previewFileAssetId,
           }
         );
         if (createdNodeId) {

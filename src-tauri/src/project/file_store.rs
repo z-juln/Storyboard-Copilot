@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 
 use serde_json::Value;
 
-use super::dto::{ProjectSnapshot, ProjectSummaryRecord};
+use super::dto::{ProjectDirectoryEntry, ProjectSnapshot, ProjectSummaryRecord};
 
 const PROJECT_JSON: &str = "project.json";
 const ASSETS_DIR: &str = "assets";
@@ -143,6 +143,133 @@ fn read_project_snapshot_file(json_path: &Path) -> Result<ProjectSnapshot, Strin
     serde_json::from_str(&raw).map_err(|err| format!("Failed to parse project.json: {err}"))
 }
 
+pub fn normalize_asset_relative_path(path: &str) -> Result<String, String> {
+    let trimmed = path.trim().replace('\\', "/");
+    let trimmed = trimmed.trim_start_matches('/');
+
+    if trimmed.is_empty() || trimmed == ASSETS_DIR {
+        return Err("Invalid asset path".to_string());
+    }
+
+    let normalized = if trimmed.starts_with(&format!("{ASSETS_DIR}/")) {
+        trimmed.to_string()
+    } else {
+        format!("{ASSETS_DIR}/{trimmed}")
+    };
+
+    if normalized.contains("..") {
+        return Err("Invalid asset path".to_string());
+    }
+
+    for segment in normalized.split('/') {
+        if segment.is_empty() || segment == "." {
+            return Err("Invalid asset path".to_string());
+        }
+    }
+
+    Ok(normalized)
+}
+
+fn resolve_existing_project_relative_path(
+    project_dir: &Path,
+    relative_path: &str,
+) -> Result<PathBuf, String> {
+    if relative_path.contains("..") {
+        return Err("Invalid asset path".to_string());
+    }
+
+    let candidate = project_dir.join(relative_path);
+    let canonical_project = fs::canonicalize(project_dir)
+        .map_err(|err| format!("Project dir unavailable: {err}"))?;
+    let canonical = fs::canonicalize(&candidate)
+        .map_err(|err| format!("Asset not found: {err}"))?;
+    if !canonical.starts_with(&canonical_project) {
+        return Err("Asset path escapes project dir".to_string());
+    }
+    Ok(canonical)
+}
+
+fn ensure_parent_dir_for_asset_path(
+    project_dir: &Path,
+    relative_path: &str,
+) -> Result<PathBuf, String> {
+    if relative_path.contains("..") {
+        return Err("Invalid asset path".to_string());
+    }
+
+    let candidate = project_dir.join(relative_path);
+    let canonical_project = fs::canonicalize(project_dir)
+        .map_err(|err| format!("Project dir unavailable: {err}"))?;
+
+    if candidate.exists() {
+        let canonical = fs::canonicalize(&candidate)
+            .map_err(|err| format!("Asset path unavailable: {err}"))?;
+        if !canonical.starts_with(&canonical_project) {
+            return Err("Asset path escapes project dir".to_string());
+        }
+        return Ok(canonical);
+    }
+
+    let parent = candidate
+        .parent()
+        .ok_or_else(|| "Invalid asset path".to_string())?;
+    if !parent.exists() {
+        fs::create_dir_all(parent)
+            .map_err(|err| format!("Failed to create asset parent dir: {err}"))?;
+    }
+    let canonical_parent = fs::canonicalize(parent)
+        .map_err(|err| format!("Asset parent dir unavailable: {err}"))?;
+    if !canonical_parent.starts_with(&canonical_project) {
+        return Err("Asset path escapes project dir".to_string());
+    }
+
+    Ok(candidate)
+}
+
+pub fn list_assets_tree(
+    app_data_dir: &Path,
+    project_id: &str,
+) -> Result<ProjectDirectoryEntry, String> {
+    let project_dir = resolve_project_dir(app_data_dir, project_id);
+    if !project_dir.is_dir() {
+        return Err(format!("Project not found: {project_id}"));
+    }
+
+    let assets_dir = project_dir.join(ASSETS_DIR);
+    if !assets_dir.is_dir() {
+        let _ = resolve_project_assets_dir(app_data_dir, project_id)?;
+        return Ok(ProjectDirectoryEntry {
+            name: ASSETS_DIR.to_string(),
+            path: ASSETS_DIR.to_string(),
+            kind: "directory".to_string(),
+            size: None,
+            children: None,
+        });
+    }
+
+    build_directory_entry(&project_dir, ASSETS_DIR)
+}
+
+pub fn create_asset_directory(
+    app_data_dir: &Path,
+    project_id: &str,
+    path: &str,
+) -> Result<String, String> {
+    let normalized = normalize_asset_relative_path(path)?;
+    let project_dir = resolve_project_dir(app_data_dir, project_id);
+    if !project_dir.is_dir() {
+        return Err(format!("Project not found: {project_id}"));
+    }
+
+    let target = ensure_parent_dir_for_asset_path(&project_dir, &normalized)?;
+    if target.is_file() {
+        return Err("Asset path already exists as file".to_string());
+    }
+    fs::create_dir_all(&target)
+        .map_err(|err| format!("Failed to create asset directory: {err}"))?;
+    Ok(normalized)
+}
+
 pub fn write_project_asset(
     app_data_dir: &Path,
     project_id: &str,
@@ -153,10 +280,99 @@ pub fn write_project_asset(
         return Err("Invalid asset file name".to_string());
     }
 
-    let assets_dir = resolve_project_assets_dir(app_data_dir, project_id)?;
-    let target = assets_dir.join(file_name);
+    write_project_asset_at_path(app_data_dir, project_id, &format!("{ASSETS_DIR}/{file_name}"), bytes)
+}
+
+pub fn write_project_asset_at_path(
+    app_data_dir: &Path,
+    project_id: &str,
+    relative_path: &str,
+    bytes: &[u8],
+) -> Result<String, String> {
+    let normalized = normalize_asset_relative_path(relative_path)?;
+    let project_dir = resolve_project_dir(app_data_dir, project_id);
+    if !project_dir.is_dir() {
+        return Err(format!("Project not found: {project_id}"));
+    }
+
+    let target = ensure_parent_dir_for_asset_path(&project_dir, &normalized)?;
+    if target.is_dir() {
+        return Err("Asset path is a directory".to_string());
+    }
+
     fs::write(&target, bytes).map_err(|err| format!("Failed to write project asset: {err}"))?;
-    Ok(format!("{ASSETS_DIR}/{file_name}"))
+    Ok(normalized)
+}
+
+pub fn move_project_asset(
+    app_data_dir: &Path,
+    project_id: &str,
+    from_path: &str,
+    to_path: &str,
+) -> Result<(String, String), String> {
+    let from_normalized = normalize_asset_relative_path(from_path)?;
+    let to_normalized = normalize_asset_relative_path(to_path)?;
+    if from_normalized == to_normalized {
+        return Ok((from_normalized, to_normalized));
+    }
+
+    let project_dir = resolve_project_dir(app_data_dir, project_id);
+    if !project_dir.is_dir() {
+        return Err(format!("Project not found: {project_id}"));
+    }
+
+    let from_target = resolve_existing_project_relative_path(&project_dir, &from_normalized)?;
+    if !from_target.exists() {
+        return Err(format!("Asset not found: {from_normalized}"));
+    }
+
+    let to_target = project_dir.join(&to_normalized);
+    if to_target.exists() {
+        return Err(format!("Destination already exists: {to_normalized}"));
+    }
+
+    if let Some(parent) = to_target.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|err| format!("Failed to create destination parent dir: {err}"))?;
+    }
+
+    let canonical_project = fs::canonicalize(&project_dir)
+        .map_err(|err| format!("Project dir unavailable: {err}"))?;
+    let canonical_to_parent = fs::canonicalize(to_target.parent().unwrap_or(&project_dir))
+        .map_err(|err| format!("Destination parent unavailable: {err}"))?;
+    if !canonical_to_parent.starts_with(&canonical_project) {
+        return Err("Asset path escapes project dir".to_string());
+    }
+
+    fs::rename(&from_target, &to_target)
+        .map_err(|err| format!("Failed to move asset: {err}"))?;
+    Ok((from_normalized, to_normalized))
+}
+
+pub fn delete_project_asset(
+    app_data_dir: &Path,
+    project_id: &str,
+    relative_path: &str,
+) -> Result<(), String> {
+    let normalized = normalize_asset_relative_path(relative_path)?;
+    let project_dir = resolve_project_dir(app_data_dir, project_id);
+    if !project_dir.is_dir() {
+        return Err(format!("Project not found: {project_id}"));
+    }
+
+    let target = resolve_existing_project_relative_path(&project_dir, &normalized)?;
+
+    if target.is_dir() {
+        let mut entries = fs::read_dir(&target)
+            .map_err(|err| format!("Failed to read asset directory: {err}"))?;
+        if entries.next().is_some() {
+            return Err("Directory is not empty".to_string());
+        }
+        fs::remove_dir(&target).map_err(|err| format!("Failed to delete asset directory: {err}"))?;
+        return Ok(());
+    }
+
+    fs::remove_file(&target).map_err(|err| format!("Failed to delete asset file: {err}"))
 }
 
 pub fn read_project_asset(
@@ -164,20 +380,110 @@ pub fn read_project_asset(
     project_id: &str,
     relative_path: &str,
 ) -> Result<PathBuf, String> {
-    if relative_path.contains("..") {
-        return Err("Invalid asset path".to_string());
-    }
-
     let project_dir = resolve_project_dir(app_data_dir, project_id);
-    let candidate = project_dir.join(relative_path);
-    let canonical_project = fs::canonicalize(&project_dir)
-        .map_err(|err| format!("Project dir unavailable: {err}"))?;
-    let canonical_file = fs::canonicalize(&candidate)
-        .map_err(|err| format!("Asset not found: {err}"))?;
+    resolve_existing_project_relative_path(&project_dir, relative_path)
+}
 
-    if !canonical_file.starts_with(&canonical_project) {
-        return Err("Asset path escapes project dir".to_string());
+pub fn list_project_directory(
+    app_data_dir: &Path,
+    project_id: &str,
+) -> Result<ProjectDirectoryEntry, String> {
+    let project_dir = resolve_project_dir(app_data_dir, project_id);
+    if !project_dir.is_dir() {
+        return Err(format!("Project not found: {project_id}"));
     }
 
-    Ok(canonical_file)
+    let root_name = get_project_snapshot(app_data_dir, project_id)?
+        .map(|snapshot| snapshot.name)
+        .unwrap_or_else(|| project_id.to_string());
+
+    let mut children = Vec::new();
+    let json_path = project_dir.join(PROJECT_JSON);
+    if json_path.is_file() {
+        children.push(build_file_entry(&project_dir, PROJECT_JSON)?);
+    }
+
+    let assets_dir = project_dir.join(ASSETS_DIR);
+    if assets_dir.is_dir() {
+        children.push(build_directory_entry(&project_dir, ASSETS_DIR)?);
+    }
+
+    children.sort_by(|left, right| left.name.to_lowercase().cmp(&right.name.to_lowercase()));
+
+    Ok(ProjectDirectoryEntry {
+        name: root_name,
+        path: ".".to_string(),
+        kind: "directory".to_string(),
+        size: None,
+        children: Some(children),
+    })
+}
+
+fn build_file_entry(project_dir: &Path, relative_path: &str) -> Result<ProjectDirectoryEntry, String> {
+    let path = project_dir.join(relative_path);
+    let metadata = fs::metadata(&path).map_err(|err| format!("Failed to read file metadata: {err}"))?;
+    let name = Path::new(relative_path)
+        .file_name()
+        .and_then(|value| value.to_str())
+        .unwrap_or(relative_path)
+        .to_string();
+
+    Ok(ProjectDirectoryEntry {
+        name,
+        path: relative_path.replace('\\', "/"),
+        kind: "file".to_string(),
+        size: Some(metadata.len()),
+        children: None,
+    })
+}
+
+fn build_directory_entry(project_dir: &Path, relative_path: &str) -> Result<ProjectDirectoryEntry, String> {
+    let path = project_dir.join(relative_path);
+    let name = Path::new(relative_path)
+        .file_name()
+        .and_then(|value| value.to_str())
+        .unwrap_or(relative_path)
+        .to_string();
+
+    let mut children = Vec::new();
+    let entries = fs::read_dir(&path).map_err(|err| format!("Failed to read directory: {err}"))?;
+    for entry_result in entries {
+        let entry = entry_result.map_err(|err| format!("Failed to read directory entry: {err}"))?;
+        let file_name = entry.file_name().to_string_lossy().to_string();
+        if file_name.starts_with('.') {
+            continue;
+        }
+
+        let child_relative = format!("{relative_path}/{file_name}").replace('\\', "/");
+        let file_type = entry
+            .file_type()
+            .map_err(|err| format!("Failed to read entry type: {err}"))?;
+        if file_type.is_dir() {
+            children.push(build_directory_entry(project_dir, &child_relative)?);
+        } else if file_type.is_file() {
+            children.push(build_file_entry(project_dir, &child_relative)?);
+        }
+    }
+
+    children.sort_by(|left, right| {
+        let left_is_dir = left.kind == "directory";
+        let right_is_dir = right.kind == "directory";
+        match (left_is_dir, right_is_dir) {
+            (true, false) => std::cmp::Ordering::Less,
+            (false, true) => std::cmp::Ordering::Greater,
+            _ => left.name.to_lowercase().cmp(&right.name.to_lowercase()),
+        }
+    });
+
+    Ok(ProjectDirectoryEntry {
+        name,
+        path: relative_path.replace('\\', "/"),
+        kind: "directory".to_string(),
+        size: None,
+        children: if children.is_empty() {
+            None
+        } else {
+            Some(children)
+        },
+    })
 }

@@ -4,6 +4,7 @@ import {
   type PrepareNodeImageResult,
 } from '@/infrastructure/rustApiClient';
 import { isProjectRelativeAssetPath, resolveProjectImageDisplayUrl } from '@/features/project/projectPaths';
+import { resolveFileAssetDisplayUrl } from '@/features/project/asset';
 import { useProjectStore } from '@/stores/projectStore';
 
 function requireCurrentProjectId(): string {
@@ -51,6 +52,8 @@ const LOCAL_PATH_PREFIX_PATTERN = /^(?:[A-Za-z]:[\\/]|\\\\|\/)/;
 export interface PreparedNodeImage {
   imageUrl: string;
   previewImageUrl: string;
+  fileAssetId: string;
+  previewFileAssetId: string;
   aspectRatio: string;
 }
 
@@ -118,17 +121,59 @@ export function isLikelyLocalImagePath(imageUrl: string): boolean {
   return LOCAL_PATH_PREFIX_PATTERN.test(imageUrl);
 }
 
-export function resolveImageDisplayUrl(imageUrl: string): string {
+export function resolveImageDisplayUrl(
+  imageUrl: string,
+  options?: { fileAssetId?: string | null }
+): string {
   const projectId = useProjectStore.getState().currentProjectId;
+  const assetManifest = useProjectStore.getState().currentProject?.assetManifest;
+
+  if (projectId && (options?.fileAssetId || isProjectRelativeAssetPath(imageUrl))) {
+    return resolveFileAssetDisplayUrl({
+      projectId,
+      fileAssetId: options?.fileAssetId,
+      imageUrl,
+      assetManifest,
+      resolveAbsolutePath: buildLocalImageUrl,
+    });
+  }
+
   return resolveProjectImageDisplayUrl(projectId, imageUrl, buildLocalImageUrl);
 }
 
-function mapPreparedResult(prepared: PrepareNodeImageResult): PreparedNodeImage {
+export function toPreparedNodeImageFields(prepared: PreparedNodeImage) {
   return {
-    imageUrl: prepared.imagePath,
-    previewImageUrl: prepared.previewImagePath,
+    imageUrl: prepared.imageUrl,
+    previewImageUrl: prepared.previewImageUrl,
+    fileAssetId: prepared.fileAssetId,
+    previewFileAssetId: prepared.previewFileAssetId,
     aspectRatio: prepared.aspectRatio,
   };
+}
+
+function attachPreparedFileAssetRefs(prepared: PreparedNodeImage): PreparedNodeImage {
+  const refs = useProjectStore.getState().registerPreparedFileAssets(
+    prepared.imageUrl,
+    prepared.previewImageUrl
+  );
+  if (!refs) {
+    return prepared;
+  }
+  return {
+    ...prepared,
+    fileAssetId: refs.fileAssetId,
+    previewFileAssetId: refs.previewFileAssetId,
+  };
+}
+
+function mapPreparedResult(prepared: PrepareNodeImageResult): PreparedNodeImage {
+  return attachPreparedFileAssetRefs({
+    imageUrl: prepared.imagePath,
+    previewImageUrl: prepared.previewImagePath,
+    fileAssetId: '',
+    previewFileAssetId: '',
+    aspectRatio: prepared.aspectRatio,
+  });
 }
 
 function isInlineImageSource(source: string): boolean {

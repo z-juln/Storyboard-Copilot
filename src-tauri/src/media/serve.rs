@@ -59,12 +59,16 @@ pub fn read_local_image(app_data_dir: &Path, raw_path: &str) -> Result<(Vec<u8>,
 
     let bytes = std::fs::read(&canonical_file)
         .map_err(|err| format!("读取图片失败: {err}"))?;
-    let mime = guess_image_mime(&canonical_file);
+    let mime = guess_asset_mime(&canonical_file);
 
     Ok((bytes, mime))
 }
 
 pub fn guess_image_mime(path: &Path) -> &'static str {
+    guess_asset_mime(path)
+}
+
+pub fn guess_asset_mime(path: &Path) -> &'static str {
     match path
         .extension()
         .and_then(|value| value.to_str())
@@ -78,6 +82,29 @@ pub fn guess_image_mime(path: &Path) -> &'static str {
         Some("bmp") => "image/bmp",
         Some("tif") | Some("tiff") => "image/tiff",
         Some("avif") => "image/avif",
+        Some("svg") => "image/svg+xml",
+        Some("mp4") | Some("m4v") => "video/mp4",
+        Some("webm") => "video/webm",
+        Some("mov") => "video/quicktime",
+        Some("mkv") => "video/x-matroska",
+        Some("avi") => "video/x-msvideo",
+        Some("ogv") => "video/ogg",
+        Some("mp3") => "audio/mpeg",
+        Some("wav") => "audio/wav",
+        Some("ogg") | Some("opus") => "audio/ogg",
+        Some("m4a") => "audio/mp4",
+        Some("aac") => "audio/aac",
+        Some("flac") => "audio/flac",
+        Some("weba") => "audio/webm",
+        Some("txt") | Some("log") | Some("csv") => "text/plain; charset=utf-8",
+        Some("md") | Some("markdown") => "text/markdown; charset=utf-8",
+        Some("json") | Some("jsonc") => "application/json; charset=utf-8",
+        Some("html") | Some("htm") => "text/html; charset=utf-8",
+        Some("css") => "text/css; charset=utf-8",
+        Some("js") | Some("mjs") | Some("cjs") => "text/javascript; charset=utf-8",
+        Some("ts") | Some("tsx") | Some("jsx") => "text/plain; charset=utf-8",
+        Some("xml") => "application/xml; charset=utf-8",
+        Some("yaml") | Some("yml") => "application/yaml; charset=utf-8",
         _ => "application/octet-stream",
     }
 }

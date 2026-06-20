@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use super::dto::{ProjectSnapshot, ProjectSummaryRecord};
+use super::dto::{ProjectDirectoryEntry, ProjectSnapshot, ProjectSummaryRecord};
 use super::file_store;
 
 pub struct ProjectService {
@@ -42,5 +42,39 @@ impl ProjectService {
 
     pub fn delete(&self, project_id: &str) -> Result<(), String> {
         file_store::delete_project(&self.app_data_dir, project_id)
+    }
+
+    pub fn list_directory(&self, project_id: &str) -> Result<ProjectDirectoryEntry, String> {
+        file_store::list_project_directory(&self.app_data_dir, project_id)
+    }
+
+    pub fn list_assets_tree(&self, project_id: &str) -> Result<ProjectDirectoryEntry, String> {
+        file_store::list_assets_tree(&self.app_data_dir, project_id)
+    }
+
+    pub fn create_asset_directory(&self, project_id: &str, path: &str) -> Result<String, String> {
+        file_store::create_asset_directory(&self.app_data_dir, project_id, path)
+    }
+
+    pub fn write_asset_at_path(
+        &self,
+        project_id: &str,
+        relative_path: &str,
+        bytes: &[u8],
+    ) -> Result<String, String> {
+        file_store::write_project_asset_at_path(&self.app_data_dir, project_id, relative_path, bytes)
+    }
+
+    pub fn move_asset(
+        &self,
+        project_id: &str,
+        from_path: &str,
+        to_path: &str,
+    ) -> Result<(String, String), String> {
+        file_store::move_project_asset(&self.app_data_dir, project_id, from_path, to_path)
+    }
+
+    pub fn delete_asset(&self, project_id: &str, path: &str) -> Result<(), String> {
+        file_store::delete_project_asset(&self.app_data_dir, project_id, path)
     }
 }

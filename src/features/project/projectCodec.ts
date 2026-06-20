@@ -2,6 +2,7 @@ import type { Viewport } from '@xyflow/react';
 
 import type { CanvasHistoryState } from '@/stores/canvasStore';
 
+import { createEmptyAssetManifest } from './asset';
 import type { Project, ProjectSnapshot } from './types';
 
 export const MAX_PERSISTED_HISTORY_STEPS = 12;
@@ -27,6 +28,7 @@ export function snapshotToProject(snapshot: ProjectSnapshot): Project {
       nodeCount: snapshot.nodes.length,
       viewport: snapshot.viewport ?? DEFAULT_VIEWPORT,
       history: { past: [], future: [] },
+      assetManifest: snapshot.assetManifest ?? createEmptyAssetManifest(),
     };
   }
 
@@ -35,6 +37,7 @@ export function snapshotToProject(snapshot: ProjectSnapshot): Project {
     nodeCount: snapshot.nodes.length,
     viewport: snapshot.viewport ?? DEFAULT_VIEWPORT,
     history: snapshot.history ?? { past: [], future: [] },
+    assetManifest: snapshot.assetManifest ?? createEmptyAssetManifest(),
   };
 }
 
@@ -51,6 +54,7 @@ export function projectToSnapshot(project: Project): ProjectSnapshot {
     nodes: project.nodes,
     edges: project.edges,
     history,
+    assetManifest: project.assetManifest ?? createEmptyAssetManifest(),
   };
 }
 

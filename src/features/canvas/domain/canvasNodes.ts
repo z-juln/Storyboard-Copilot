@@ -40,13 +40,19 @@ export interface NodeDisplayData {
 export interface NodeImageData extends NodeDisplayData {
   imageUrl: string | null;
   previewImageUrl?: string | null;
+  fileAssetId?: string | null;
+  previewFileAssetId?: string | null;
   aspectRatio: string;
   isSizeManuallyAdjusted?: boolean;
   [key: string]: unknown;
 }
 
+export type UploadMediaKind = 'image' | 'video' | 'audio' | 'text';
+
 export interface UploadImageNodeData extends NodeImageData {
   sourceFileName?: string | null;
+  mediaKind?: UploadMediaKind | null;
+  textContent?: string | null;
 }
 
 export type ExportImageNodeResultKind =
@@ -84,6 +90,8 @@ export interface StoryboardFrameItem {
   id: string;
   imageUrl: string | null;
   previewImageUrl?: string | null;
+  fileAssetId?: string | null;
+  previewFileAssetId?: string | null;
   aspectRatio?: string;
   note: string;
   order: number;
@@ -133,6 +141,8 @@ export interface StoryboardGenNodeData {
   extraParams?: Record<string, unknown>;
   imageUrl: string | null;
   previewImageUrl?: string | null;
+  fileAssetId?: string | null;
+  previewFileAssetId?: string | null;
   aspectRatio: string;
   isGenerating?: boolean;
   generationStartedAt?: number | null;

@@ -10,6 +10,7 @@ import {
 import { canvasNodeDefinitions } from '@/features/canvas/domain/nodeRegistry';
 const DEFAULT_DOC_IMAGE_MODEL_ID = 'kie/nano-banana-2';
 import type { Project } from '@/features/project/types';
+import { createEmptyAssetManifest } from '@/features/project/asset';
 
 import {
   COMPONENT_DOC_PROJECT_ID,
@@ -404,5 +405,6 @@ export function buildComponentDocProject(): Project {
     edges,
     viewport: DOC_VIEWPORT,
     history: { past: [], future: [] },
+    assetManifest: createEmptyAssetManifest(),
   };
 }

@@ -49,6 +49,7 @@ import {
   reduceAspectRatio,
   resolveImageDisplayUrl,
   shouldUseOriginalImageByZoom,
+  toPreparedNodeImageFields,
 } from '@/features/canvas/application/imageData';
 import { UiButton, UiCheckbox, UiChipButton, UiInput, UiPanel, UiSelect } from '@/components/ui';
 import {
@@ -683,14 +684,17 @@ export const StoryboardNode = memo(({ id, data, selected, width, height }: Story
           : EXPORT_RESULT_DISPLAY_NAME.storyboardFrameEdit;
 
         const prepared = await prepareNodeImage(sourceImage);
+        const imageFields = toPreparedNodeImageFields(prepared);
         const createdNodeId = addDerivedExportNode(
           id,
-          prepared.imageUrl,
-          prepared.aspectRatio,
-          prepared.previewImageUrl,
+          imageFields.imageUrl,
+          imageFields.aspectRatio,
+          imageFields.previewImageUrl,
           {
             defaultTitle: frameTitle,
             resultKind: 'storyboardFrameEdit',
+            fileAssetId: imageFields.fileAssetId,
+            previewFileAssetId: imageFields.previewFileAssetId,
           }
         );
 

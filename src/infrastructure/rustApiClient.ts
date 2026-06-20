@@ -6,7 +6,7 @@ import type {
   ModelInvokeInput,
   ProviderSecretStatus,
 } from '@/features/aiModels/types';
-import type { ProjectSnapshot } from '@/features/project/types';
+import type { ProjectDirectoryEntry, ProjectSnapshot } from '@/features/project/types';
 import type { ProjectSummaryRecord } from '@/commands/projectState';
 
 const DEFAULT_BASE_URL = 'http://127.0.0.1:1421';
@@ -175,7 +175,17 @@ export interface RustApiClient {
   updateProjectViewportRecord: (projectId: string, viewport: Viewport) => Promise<void>;
   renameProjectRecord: (projectId: string, name: string, updatedAt: number) => Promise<void>;
   deleteProjectRecord: (projectId: string) => Promise<void>;
+  listProjectDirectory: (projectId: string) => Promise<ProjectDirectoryEntry>;
+  listProjectAssetsTree: (projectId: string) => Promise<ProjectDirectoryEntry>;
   putProjectAsset: (projectId: string, fileName: string, data: Blob) => Promise<string>;
+  putProjectAssetAtPath: (projectId: string, relativePath: string, data: Blob) => Promise<string>;
+  createProjectAssetDirectory: (projectId: string, path: string) => Promise<string>;
+  moveProjectAsset: (
+    projectId: string,
+    from: string,
+    to: string
+  ) => Promise<{ from: string; to: string }>;
+  deleteProjectAsset: (projectId: string, path: string) => Promise<void>;
   prepareNodeImageFromBlob: (
     projectId: string,
     data: Blob,
@@ -281,6 +291,18 @@ export function createRustApiClient(baseUrl = resolveBaseUrl()): RustApiClient {
       });
       await readEmpty(response);
     },
+    listProjectDirectory: async (projectId) => {
+      const response = await fetch(
+        `${normalizedBaseUrl}/api/v1/projects/${encodeURIComponent(projectId)}/directory`
+      );
+      return readJson<ProjectDirectoryEntry>(response);
+    },
+    listProjectAssetsTree: async (projectId) => {
+      const response = await fetch(
+        `${normalizedBaseUrl}/api/v1/projects/${encodeURIComponent(projectId)}/assets/tree`
+      );
+      return readJson<ProjectDirectoryEntry>(response);
+    },
     putProjectAsset: async (projectId, fileName, data) => {
       const response = await fetch(
         `${normalizedBaseUrl}/api/v1/projects/${encodeURIComponent(projectId)}/assets/${encodeURIComponent(fileName)}`,
@@ -292,6 +314,52 @@ export function createRustApiClient(baseUrl = resolveBaseUrl()): RustApiClient {
       );
       const payload = await readJson<{ path: string }>(response);
       return payload.path;
+    },
+    putProjectAssetAtPath: async (projectId, relativePath, data) => {
+      const normalizedPath = relativePath.trim().replace(/\\/g, '/').replace(/^\/+/, '');
+      const path = normalizedPath.startsWith('assets/')
+        ? normalizedPath
+        : `assets/${normalizedPath.replace(/^assets\//, '')}`;
+      const response = await fetch(
+        `${normalizedBaseUrl}/api/v1/projects/${encodeURIComponent(projectId)}/assets?path=${encodeURIComponent(path)}`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/octet-stream' },
+          body: data,
+        }
+      );
+      const payload = await readJson<{ path: string }>(response);
+      return payload.path;
+    },
+    createProjectAssetDirectory: async (projectId, path) => {
+      const response = await fetch(
+        `${normalizedBaseUrl}/api/v1/projects/${encodeURIComponent(projectId)}/assets/directories`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path }),
+        }
+      );
+      const payload = await readJson<{ path: string }>(response);
+      return payload.path;
+    },
+    moveProjectAsset: async (projectId, from, to) => {
+      const response = await fetch(
+        `${normalizedBaseUrl}/api/v1/projects/${encodeURIComponent(projectId)}/assets`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ from, to }),
+        }
+      );
+      return readJson<{ from: string; to: string }>(response);
+    },
+    deleteProjectAsset: async (projectId, path) => {
+      const response = await fetch(
+        `${normalizedBaseUrl}/api/v1/projects/${encodeURIComponent(projectId)}/assets?path=${encodeURIComponent(path)}`,
+        { method: 'DELETE' }
+      );
+      await readEmpty(response);
     },
     prepareNodeImageFromBlob: async (projectId, data, extension, maxPreviewDimension) =>
       uploadBinaryInChunks(normalizedBaseUrl, projectId, data, extension, maxPreviewDimension),

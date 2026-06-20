@@ -39,10 +39,15 @@ import {
   prepareNodeImageFromFile,
   resolveImageDisplayUrl,
   shouldUseOriginalImageByZoom,
+  toPreparedNodeImageFields,
 } from '@/features/canvas/application/imageData';
 import { CanvasNodeImage } from '@/features/canvas/ui/CanvasNodeImage';
 import { useCanvasStore } from '@/stores/canvasStore';
+import { useProjectStore } from '@/stores/projectStore';
 import { useSettingsStore } from '@/stores/settingsStore';
+import { resolveFileAssetDisplayUrl } from '@/features/project/asset';
+import { MAX_TEXT_PREVIEW_CHARS } from '@/features/project/asset/assetPreviewUtils';
+import { buildProjectAssetUrl } from '@/features/project/projectPaths';
 
 type UploadNodeProps = NodeProps & {
   id: string;
@@ -73,6 +78,8 @@ export const UploadNode = memo(({ id, data, selected, width, height }: UploadNod
   const updateNodeInternals = useUpdateNodeInternals();
   const setSelectedNode = useCanvasStore((state) => state.setSelectedNode);
   const updateNodeData = useCanvasStore((state) => state.updateNodeData);
+  const projectId = useProjectStore((state) => state.currentProjectId);
+  const assetManifest = useProjectStore((state) => state.currentProject?.assetManifest);
   const useUploadFilenameAsNodeTitle = useSettingsStore((state) => state.useUploadFilenameAsNodeTitle);
   const { zoom } = useViewport();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -150,9 +157,7 @@ export const UploadNode = memo(({ id, data, selected, width, height }: UploadNod
       try {
         const prepared = await prepareNodeImageFromFile(file);
         const nextData: Partial<UploadImageNodeData> = {
-          imageUrl: prepared.imageUrl,
-          previewImageUrl: prepared.previewImageUrl,
-          aspectRatio: prepared.aspectRatio || '1:1',
+          ...toPreparedNodeImageFields(prepared),
           sourceFileName: file.name,
         };
         if (useUploadFilenameAsNodeTitle) {
@@ -276,10 +281,12 @@ export const UploadNode = memo(({ id, data, selected, width, height }: UploadNod
 
   const handleNodeClick = useCallback(() => {
     setSelectedNode(id);
-    if (!data.imageUrl && !transientPreviewUrl) {
+    const mediaKind = data.mediaKind ?? (data.imageUrl ? 'image' : null);
+    const hasBoundAsset = Boolean(data.imageUrl || transientPreviewUrl || data.textContent);
+    if (!hasBoundAsset && (!mediaKind || mediaKind === 'image')) {
       inputRef.current?.click();
     }
-  }, [data.imageUrl, id, setSelectedNode, transientPreviewUrl]);
+  }, [data.imageUrl, data.mediaKind, data.textContent, id, setSelectedNode, transientPreviewUrl]);
 
   useEffect(() => () => {
     uploadPerfRef.current = null;
@@ -296,6 +303,58 @@ export const UploadNode = memo(({ id, data, selected, width, height }: UploadNod
       : data.previewImageUrl || data.imageUrl;
     return picked ? resolveImageDisplayUrl(picked) : null;
   }, [data.imageUrl, data.previewImageUrl, transientPreviewUrl, zoom]);
+
+  const resolvedMediaKind = data.mediaKind ?? (data.imageUrl ? 'image' : null);
+  const assetMediaUrl = useMemo(() => {
+    if (!resolvedMediaKind || resolvedMediaKind === 'text') {
+      return '';
+    }
+    return resolveFileAssetDisplayUrl({
+      projectId,
+      fileAssetId: data.fileAssetId,
+      imageUrl: data.imageUrl,
+      assetManifest,
+    });
+  }, [assetManifest, data.fileAssetId, data.imageUrl, projectId, resolvedMediaKind]);
+
+  const hasMediaContent = Boolean(
+    transientPreviewUrl
+    || data.textContent
+    || (resolvedMediaKind === 'image' && data.imageUrl)
+    || (resolvedMediaKind && resolvedMediaKind !== 'image' && data.imageUrl)
+  );
+
+  useEffect(() => {
+    if (resolvedMediaKind !== 'text' || data.textContent || !projectId || !data.imageUrl) {
+      return;
+    }
+
+    let cancelled = false;
+    const assetPath = data.imageUrl;
+
+    void (async () => {
+      try {
+        const response = await fetch(buildProjectAssetUrl(projectId, assetPath));
+        if (!response.ok || cancelled) {
+          return;
+        }
+        const raw = await response.text();
+        if (cancelled) {
+          return;
+        }
+        const nextContent = raw.length > MAX_TEXT_PREVIEW_CHARS
+          ? `${raw.slice(0, MAX_TEXT_PREVIEW_CHARS)}\n\n…（内容过长，已截断）`
+          : raw;
+        updateNodeData(id, { textContent: nextContent });
+      } catch {
+        // ignore load failures; node still references asset path
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [data.imageUrl, data.textContent, id, projectId, resolvedMediaKind, updateNodeData]);
 
   useEffect(() => {
     updateNodeInternals(id);
@@ -322,17 +381,40 @@ export const UploadNode = memo(({ id, data, selected, width, height }: UploadNod
         onTitleChange={(nextTitle) => updateNodeData(id, { displayName: nextTitle })}
       />
 
-      {data.imageUrl || transientPreviewUrl ? (
-        <div
-          className="block h-full w-full overflow-hidden rounded-[var(--node-radius)] bg-bg-dark"
-        >
-          <CanvasNodeImage
-            src={imageSource ?? ''}
-            viewerSourceUrl={data.imageUrl ? resolveImageDisplayUrl(data.imageUrl) : null}
-            alt="已上传图片"
-            className="h-full w-full object-contain"
-            onLoad={handleImageLoad}
-          />
+      {hasMediaContent ? (
+        <div className="block h-full w-full overflow-hidden rounded-[var(--node-radius)] bg-bg-dark">
+          {resolvedMediaKind === 'video' && assetMediaUrl ? (
+            <video
+              src={assetMediaUrl}
+              controls
+              className="h-full w-full object-contain"
+              onClick={(event) => event.stopPropagation()}
+            />
+          ) : resolvedMediaKind === 'audio' && assetMediaUrl ? (
+            <div
+              className="flex h-full w-full items-center justify-center px-4"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <audio src={assetMediaUrl} controls className="w-full" />
+            </div>
+          ) : resolvedMediaKind === 'text' ? (
+            <pre
+              className="h-full w-full overflow-auto whitespace-pre-wrap break-words p-3 text-left text-[11px] leading-5 text-text-dark"
+              onClick={(event) => event.stopPropagation()}
+            >
+              {typeof data.textContent === 'string' && data.textContent.length > 0
+                ? data.textContent
+                : '加载中…'}
+            </pre>
+          ) : (
+            <CanvasNodeImage
+              src={imageSource ?? ''}
+              viewerSourceUrl={data.imageUrl ? resolveImageDisplayUrl(data.imageUrl) : null}
+              alt="已上传图片"
+              className="h-full w-full object-contain"
+              onLoad={handleImageLoad}
+            />
+          )}
         </div>
       ) : (
         <label

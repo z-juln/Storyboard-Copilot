@@ -109,6 +109,8 @@ interface CanvasState {
       aspectRatioStrategy?: 'provided' | 'derivedFromSource';
       sizeStrategy?: 'generated' | 'autoMinEdge' | 'matchSource';
       matchSourceNodeSize?: boolean;
+      fileAssetId?: string | null;
+      previewFileAssetId?: string | null;
     }
   ) => string | null;
   addStoryboardSplitNode: (
@@ -1009,6 +1011,13 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       previewImageUrl: previewImageUrl ?? null,
       aspectRatio: resolvedAspectRatio,
     };
+    if (options?.fileAssetId) {
+      (exportNodeData as { fileAssetId?: string }).fileAssetId = options.fileAssetId;
+    }
+    if (options?.previewFileAssetId) {
+      (exportNodeData as { previewFileAssetId?: string }).previewFileAssetId =
+        options.previewFileAssetId;
+    }
     if (options?.defaultTitle) {
       (exportNodeData as { displayName?: string }).displayName = options.defaultTitle;
     }

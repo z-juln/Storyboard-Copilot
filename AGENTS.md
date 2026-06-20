@@ -17,6 +17,7 @@
 - 工具：`src/features/canvas/tools/`, `src/features/canvas/application/toolProcessor.ts`
 - 模型：`src/features/canvas/models/`, `src-tauri/src/ai/`
 - 持久化：`src/features/project/`, `src/commands/projectState.ts`, `src-tauri/src/project/file_store.rs`
+- 资产体系：`src/features/project/asset/`；架构说明 `openspec/asset-system/README.md`
 
 ## 改动路由
 
@@ -27,12 +28,14 @@
 | 新工具 | `tools/types.ts`, `builtInTools.ts`, `tool-editors/`, `toolProcessor.ts` |
 | 新模型/供应商 | `models/image/<provider>/`, `models/providers/`, `src-tauri/src/ai/providers/` |
 | 持久化 | `projectStore.ts`, `features/project/`, `projectState.ts`, `file_store.rs` |
+| 资产 / 绑定 | `features/project/asset/`、`openspec/asset-system/` |
 
 ## 硬约束
 
 - 沿数据流改动：UI -> Store -> 应用服务 -> 命令/API -> 持久化。
 - UI 不直接耦合 Tauri/API/外部网络；通过应用层或命令层中转。
 - Store 不承载重业务逻辑；业务逻辑放应用层。
+- **单一职责 / 渐进式披露（代码）**：不把多条业务链堆在同一文件；UI/Store 枢纽只加胶水。新能力先进 `application/` 或领域 service；大改前先过 refactor 判断。详见 `.agents/skills/storyboard-openspec-sync/`。
 - 节点类型、默认数据、菜单和连线能力以 `domain/nodeRegistry.ts` + `domain/canvasNodes.ts` 为单一真相源。
 - 菜单候选节点由注册表函数推导，禁止在 UI 层手写类型白名单。
 - 工具和 AI 处理结果默认生成新下游节点，不覆盖源节点。
@@ -45,8 +48,10 @@
 - 拖拽中不写盘，不做重计算；拖拽结束后保存。
 - 项目快照使用防抖 + idle 调度。
 - 视口保存走独立轻量 HTTP 通道 `PUT /api/v1/projects/:id/viewport`，不要回退到整项目 upsert。
-- 大图渲染优先用 `previewImageUrl`，模型/工具处理使用原图 `imageUrl`。
-- 项目资源写入 `projects/<id>/assets/`；JSON 存 `assets/...` 相对路径或网络 URL。
+- 大图渲染优先 preview；展示：**fileAssetId → assetManifest.path → HTTP**（`v=updatedAt`）；迁移期可读 `imageUrl` path 缓存。
+- **`fileAssetId` 是 `assets/` 下文件的稳定 id（manifest 键），不是画布 nodeId。**
+- 节点通过 `fileAssetId` **引用**文件；manifest 存 id→path。打开项目必须 reconcile；upload 落盘 register 新 fileAssetId。
+- 文件 move/rename 只改 manifest 中该 fileAssetId 的 path；禁止只改磁盘不改 manifest。
 
 ## 验证
 
@@ -83,7 +88,8 @@ npm run build
 ## 文档边界
 
 - 根 `AGENTS.md`：稳定工程规则、验证、发布约定。
-- `openspec/`：产品定位、轻量架构、迭代需求与验收。
+- `openspec/`：产品定位、轻量架构、迭代需求与验收；专题见 `openspec/asset-system/` 等子目录。
 - `docs/`：用户向或专题说明、API 参考、发布说明。
+- 改架构/功能时：**代码结构评估 + 文档是否同步**，见 `.agents/skills/storyboard-openspec-sync/SKILL.md`（双门禁：先划模块/判断是否重构，再同步 openspec）。
 
 只有新增稳定约束或架构边界变化时才更新本文档；临时交互细节放到 `openspec/changes/`。

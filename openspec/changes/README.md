@@ -15,4 +15,4 @@
 - 如何确认完成。
 ```
 
-完成后可删除、归档，或在发布说明里吸收。
+完成后：勾选 Tasks / Acceptance；稳定内容迁入 `openspec/<topic>/`（见 `.agents/skills/storyboard-openspec-sync/`）。可保留作归档，或发布后在 `docs/releases/` 吸收要点。

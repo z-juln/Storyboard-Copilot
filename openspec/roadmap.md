@@ -221,13 +221,33 @@ Tauri 壳：窗口 / 文件 / 部分持久化（非 AI 主通道，逐步也迁 
 
 ## 三、画布与媒体组件
 
-### [P0] 工作台目录结构可视化
+### [P0] 资产管理（可编辑目录 + 画布绑定）
 
-**目标**：以树形/层级视图展示当前项目的节点组织（分组、命名、类型），支持定位、重命名、拖拽调整层级（与画布双向同步）。
+**目标**：IDE 式管理 `assets/`；**每个文件**有 `fileAssetId`（manifest）；节点**引用文件 id**；打开项目 reconcile。
+
+**与现状**：只读目录树；节点多为 path 字符串；无 fileAssetId / manifest。
 
 **验收**：
 
-- [ ] 侧栏或独立面板展示项目内节点树（含 group 嵌套）
+- [ ] manifest 键为 **fileAssetId**（文件 id）；与 **nodeId** 无关
+- [ ] 打开旧项目：文件 register id，节点 backfill `fileAssetId`
+- [ ] 虚拟根为 `assets/` 内容
+- [ ] 文件 move/rename 只改 manifest.path；节点 `fileAssetId` 不变
+- [ ] 同路径覆盖、拖文件绑节点、删除被引用文件有拦截
+
+**规格**：`openspec/architecture.md`（Asset System）、`openspec/changes/editable-asset-explorer.md`
+
+---
+
+### [P0] 工作台节点树（画布结构）
+
+**目标**：以树形视图展示画布节点组织（分组、命名、类型），支持定位；重命名/删组/调层级与画布双向同步。
+
+**与资产管理分工**：节点树放在「资产管理」面板的「画布节点」Tab；文件目录在「资产目录」Tab，二者通过绑定关联，不共用同一 CRUD API。
+
+**验收**：
+
+- [ ] 侧栏展示节点树（含 group 嵌套）
 - [ ] 点击条目定位并选中画布节点
 - [ ] 重命名、删除、移动分组与画布一致
 - [ ] 大项目（100+ 节点）滚动与搜索性能可接受

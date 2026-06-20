@@ -32,7 +32,10 @@ use crate::media::upload::{
     cleanup_stale_upload_sessions, complete_upload_session, create_upload_session,
     remove_upload_session, write_upload_chunk, UPLOAD_CHUNK_SIZE,
 };
-use crate::project::dto::{ProjectSnapshot, RenameProjectRequestDto, UpdateProjectViewportRequestDto};
+use crate::project::dto::{
+    CreateAssetDirectoryRequestDto, MoveProjectAssetRequestDto, ProjectSnapshot,
+    RenameProjectRequestDto, UpdateProjectViewportRequestDto,
+};
 use crate::project::ProjectService;
 
 #[derive(Clone)]
@@ -99,6 +102,7 @@ pub async fn start_http_server_with_app_data(app_data_dir: PathBuf) -> Result<()
             Method::GET,
             Method::POST,
             Method::PUT,
+            Method::PATCH,
             Method::DELETE,
             Method::OPTIONS,
         ])
@@ -128,12 +132,27 @@ pub async fn start_http_server_with_app_data(app_data_dir: PathBuf) -> Result<()
         )
         .route("/api/v1/projects/:project_id/rename", put(rename_project))
         .route(
+            "/api/v1/projects/:project_id/directory",
+            get(list_project_directory),
+        )
+        .route(
+            "/api/v1/projects/:project_id/assets/tree",
+            get(list_assets_tree),
+        )
+        .route(
+            "/api/v1/projects/:project_id/assets/directories",
+            post(create_asset_directory),
+        )
+        .route(
             "/api/v1/projects/:project_id/assets/:file_name",
             put(put_project_asset),
         )
         .route(
             "/api/v1/projects/:project_id/assets",
-            get(serve_project_asset),
+            get(serve_project_asset)
+                .put(put_project_asset_by_query)
+                .patch(move_project_asset)
+                .delete(delete_project_asset),
         )
         .route(
             "/api/v1/projects/:project_id/images/upload-sessions",
@@ -312,6 +331,62 @@ async fn rename_project(
     }
 }
 
+async fn list_project_directory(
+    State(state): State<HttpState>,
+    Path(project_id): Path<String>,
+) -> Response {
+    match state.project.list_directory(&project_id) {
+        Ok(directory) => Json(directory).into_response(),
+        Err(err) => api_error(StatusCode::NOT_FOUND, err),
+    }
+}
+
+async fn list_assets_tree(
+    State(state): State<HttpState>,
+    Path(project_id): Path<String>,
+) -> Response {
+    match state.project.list_assets_tree(&project_id) {
+        Ok(tree) => Json(tree).into_response(),
+        Err(err) => api_error(StatusCode::NOT_FOUND, err),
+    }
+}
+
+async fn create_asset_directory(
+    State(state): State<HttpState>,
+    Path(project_id): Path<String>,
+    Json(request): Json<CreateAssetDirectoryRequestDto>,
+) -> Response {
+    match state.project.create_asset_directory(&project_id, &request.path) {
+        Ok(path) => Json(json!({ "path": path })).into_response(),
+        Err(err) => api_error(StatusCode::BAD_REQUEST, err),
+    }
+}
+
+async fn move_project_asset(
+    State(state): State<HttpState>,
+    Path(project_id): Path<String>,
+    Json(request): Json<MoveProjectAssetRequestDto>,
+) -> Response {
+    match state
+        .project
+        .move_asset(&project_id, &request.from, &request.to)
+    {
+        Ok((from, to)) => Json(json!({ "from": from, "to": to })).into_response(),
+        Err(err) => api_error(StatusCode::BAD_REQUEST, err),
+    }
+}
+
+async fn delete_project_asset(
+    State(state): State<HttpState>,
+    Path(project_id): Path<String>,
+    Query(query): Query<ProjectAssetQuery>,
+) -> Response {
+    match state.project.delete_asset(&project_id, &query.path) {
+        Ok(()) => StatusCode::NO_CONTENT.into_response(),
+        Err(err) => api_error(StatusCode::BAD_REQUEST, err),
+    }
+}
+
 async fn delete_project(
     State(state): State<HttpState>,
     Path(project_id): Path<String>,
@@ -436,6 +511,21 @@ async fn put_project_asset(
         &file_name,
         &body,
     ) {
+        Ok(path) => Json(json!({ "path": path })).into_response(),
+        Err(err) => api_error(StatusCode::BAD_REQUEST, err),
+    }
+}
+
+async fn put_project_asset_by_query(
+    State(state): State<HttpState>,
+    Path(project_id): Path<String>,
+    Query(query): Query<ProjectAssetQuery>,
+    body: Bytes,
+) -> Response {
+    match state
+        .project
+        .write_asset_at_path(&project_id, &query.path, &body)
+    {
         Ok(path) => Json(json!({ "path": path })).into_response(),
         Err(err) => api_error(StatusCode::BAD_REQUEST, err),
     }

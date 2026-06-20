@@ -31,6 +31,12 @@ import {
   type Project,
   type ProjectSummary,
 } from '@/features/project';
+import {
+  createEmptyAssetManifest,
+  reconcileProjectAssets,
+  registerPreparedAssetPaths,
+  type AssetManifest,
+} from '@/features/project/asset';
 
 export type { Project, ProjectSummary } from '@/features/project';
 
@@ -322,6 +328,11 @@ interface ProjectState {
   ) => void;
   saveCurrentProjectViewport: (viewport: Viewport) => void;
   cancelPendingViewportPersist: () => void;
+  registerPreparedFileAssets: (
+    imagePath: string,
+    previewImagePath: string
+  ) => { fileAssetId: string; previewFileAssetId: string } | null;
+  commitAssetManifest: (manifest: AssetManifest) => void;
 }
 
 export const useProjectStore = create<ProjectState>((set, get) => ({
@@ -371,6 +382,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       edges: [],
       viewport: DEFAULT_VIEWPORT,
       history: createEmptyHistory(),
+      assetManifest: createEmptyAssetManifest(),
     };
 
     set((state) => ({
@@ -481,7 +493,20 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
           return;
         }
 
-        const project = snapshotToProject(snapshot);
+        const baseProject = snapshotToProject(snapshot);
+        const reconciled = await reconcileProjectAssets({
+          projectId: id,
+          nodes: baseProject.nodes,
+          assetManifest: baseProject.assetManifest,
+        });
+
+        const project: Project = {
+          ...baseProject,
+          nodes: reconciled.nodes,
+          assetManifest: reconciled.assetManifest,
+          nodeCount: reconciled.nodes.length,
+        };
+
         set((state) => ({
           currentProjectId: id,
           currentProject: project,
@@ -494,6 +519,10 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
             nodeCount: project.nodeCount,
           }),
         }));
+
+        if (reconciled.dirty) {
+          persistProject(project, { immediate: true });
+        }
       } catch (error) {
         if (reqSeq !== openProjectRequestSeq) {
           return;
@@ -638,5 +667,48 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       return;
     }
     clearQueuedViewportUpsert(currentProjectId);
+  },
+
+  registerPreparedFileAssets: (imagePath, previewImagePath) => {
+    const { currentProjectId, currentProject } = get();
+    if (!currentProjectId || !currentProject || currentProject.id !== currentProjectId) {
+      return null;
+    }
+
+    const registered = registerPreparedAssetPaths(
+      currentProject.assetManifest ?? createEmptyAssetManifest(),
+      imagePath,
+      previewImagePath
+    );
+    const nextProject: Project = {
+      ...currentProject,
+      assetManifest: registered.manifest,
+      updatedAt: Date.now(),
+    };
+
+    set({ currentProject: nextProject });
+    persistProject(nextProject);
+    return {
+      fileAssetId: registered.fileAssetId,
+      previewFileAssetId: registered.previewFileAssetId,
+    };
+  },
+
+  commitAssetManifest: (manifest) => {
+    const { currentProjectId, currentProject } = get();
+    if (!currentProjectId || !currentProject || currentProject.id !== currentProjectId) {
+      return;
+    }
+    if (isComponentDocProjectId(currentProjectId)) {
+      return;
+    }
+
+    const nextProject: Project = {
+      ...currentProject,
+      assetManifest: manifest,
+      updatedAt: Date.now(),
+    };
+    set({ currentProject: nextProject });
+    persistProject(nextProject);
   },
 }));

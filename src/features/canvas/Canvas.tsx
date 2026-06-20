@@ -4,6 +4,7 @@ import {
   useEffect,
   useMemo,
   useRef,
+  type DragEvent as ReactDragEvent,
   type MouseEvent as ReactMouseEvent,
 } from 'react';
 import {
@@ -34,7 +35,12 @@ import {
   type CanvasNodeType,
   DEFAULT_NODE_WIDTH,
 } from '@/features/canvas/domain/canvasNodes';
-import { prepareNodeImage } from '@/features/canvas/application/imageData';
+import { prepareNodeImage, toPreparedNodeImageFields } from '@/features/canvas/application/imageData';
+import {
+  buildUploadNodeDataFromProjectAsset,
+  parseProjectAssetDragPayload,
+  PROJECT_ASSET_DRAG_MIME,
+} from '@/features/canvas/application/createUploadNodeFromProjectAsset';
 import {
   buildGenerationErrorReport,
   CURRENT_RUNTIME_SESSION_ID,
@@ -52,8 +58,11 @@ import { edgeTypes } from './edges';
 import { NodeSelectionMenu } from './NodeSelectionMenu';
 import { SelectedNodeOverlay } from './ui/SelectedNodeOverlay';
 import { NodeToolDialog } from './ui/NodeToolDialog';
+import { CanvasWorkspaceToolbar } from './ui/CanvasWorkspaceToolbar';
+import { AssetManagerPanel } from './ui/AssetManagerPanel';
 import { ImageViewerModal } from './ui/ImageViewerModal';
 import { MissingApiKeyHint } from '@/features/settings/MissingApiKeyHint';
+import { createEmptyAssetManifest } from '@/features/project/asset';
 
 const DEFAULT_VIEWPORT: Viewport = { x: 0, y: 0, zoom: 1 };
 
@@ -246,6 +255,7 @@ export function Canvas() {
   );
   const [previewConnectionVisual, setPreviewConnectionVisual] =
     useState<PreviewConnectionVisual | null>(null);
+  const [showAssetManager, setShowAssetManager] = useState(false);
 
   const isRestoringCanvasRef = useRef(true);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -304,6 +314,7 @@ export function Canvas() {
 
   const getCurrentProject = useProjectStore((state) => state.getCurrentProject);
   const currentProjectId = useProjectStore((state) => state.currentProjectId);
+  const commitAssetManifest = useProjectStore((state) => state.commitAssetManifest);
   const saveCurrentProject = useProjectStore((state) => state.saveCurrentProject);
   const saveCurrentProjectViewport = useProjectStore((state) => state.saveCurrentProjectViewport);
   const cancelPendingViewportPersist = useProjectStore(
@@ -495,9 +506,9 @@ export function Canvas() {
                 : prepared.previewImageUrl;
 
               updateNodeData(pendingNode.id, {
+                ...toPreparedNodeImageFields(prepared),
                 imageUrl: imageWithMetadata,
                 previewImageUrl: previewWithMetadata,
-                aspectRatio: prepared.aspectRatio,
                 isGenerating: false,
                 generationStartedAt: null,
                 generationJobId: null,
@@ -1586,8 +1597,105 @@ export function Canvas() {
     [configuredApiKeyCount]
   );
 
+  const handleFocusNodeFromAssetManager = useCallback(
+    (nodeId: string) => {
+      const node = nodes.find((item) => item.id === nodeId);
+      setSelectedNode(nodeId);
+      if (!node) {
+        return;
+      }
+
+      const size = getNodeSize(node);
+      void reactFlowInstance.setCenter(
+        node.position.x + size.width / 2,
+        node.position.y + size.height / 2,
+        {
+          zoom: reactFlowInstance.getZoom(),
+          duration: 280,
+        }
+      );
+    },
+    [nodes, reactFlowInstance, setSelectedNode]
+  );
+
+  const handlePaneDragOver = useCallback((event: ReactDragEvent) => {
+    if (!event.dataTransfer.types.includes(PROJECT_ASSET_DRAG_MIME)) {
+      return;
+    }
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+  }, []);
+
+  const handlePaneDrop = useCallback(
+    async (event: ReactDragEvent) => {
+      const raw = event.dataTransfer.getData(PROJECT_ASSET_DRAG_MIME);
+      const payload = parseProjectAssetDragPayload(raw);
+      if (!payload || !currentProjectId) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+      suppressNextPaneClickRef.current = true;
+
+      const currentProject = getCurrentProject();
+      if (!currentProject) {
+        return;
+      }
+
+      const flowPos = reactFlowInstance.screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
+      });
+
+      try {
+        const { nodeData, manifest, manifestChanged } = await buildUploadNodeDataFromProjectAsset({
+          projectId: currentProjectId,
+          path: payload.path,
+          name: payload.name,
+          mediaKind: payload.mediaKind,
+          manifest: currentProject.assetManifest ?? createEmptyAssetManifest(),
+        });
+
+        if (manifestChanged) {
+          commitAssetManifest(manifest);
+        }
+
+        const nodeId = addNode(CANVAS_NODE_TYPES.upload, flowPos, nodeData);
+        setSelectedNode(nodeId);
+        scheduleCanvasPersist(0);
+      } catch (error) {
+        void showErrorDialog(
+          error instanceof Error ? error.message : '无法从资产目录创建节点',
+          '添加资产节点失败'
+        );
+      }
+    },
+    [
+      addNode,
+      commitAssetManifest,
+      currentProjectId,
+      getCurrentProject,
+      reactFlowInstance,
+      scheduleCanvasPersist,
+      setSelectedNode,
+    ]
+  );
+
   return (
     <div ref={wrapperRef} className="relative h-full w-full">
+      <CanvasWorkspaceToolbar
+        showAssetManager={showAssetManager}
+        onToggleAssetManager={() => setShowAssetManager((value) => !value)}
+      />
+      {showAssetManager && currentProjectId ? (
+        <AssetManagerPanel
+          projectId={currentProjectId}
+          selectedNodeId={selectedNodeId}
+          onFocusNode={handleFocusNodeFromAssetManager}
+          onClose={() => setShowAssetManager(false)}
+        />
+      ) : null}
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -1603,6 +1711,8 @@ export function Canvas() {
         onNodeDragStop={handleNodeDragStop}
         onPaneClick={handlePaneClick}
         onPaneContextMenu={handlePaneContextMenu}
+        onDragOver={handlePaneDragOver}
+        onDrop={handlePaneDrop}
         onMove={handleMove}
         onMoveStart={handleMoveStart}
         onMoveEnd={handleMoveEnd}
