@@ -9,8 +9,8 @@ async fn main() {
         )
         .init();
 
-    let db_path = http::resolve_api_db_path_standalone();
-    if let Err(err) = http::start_http_server_with_db(db_path).await {
+    let app_data_dir = http::resolve_api_app_data_dir_standalone();
+    if let Err(err) = http::start_http_server_with_app_data(app_data_dir).await {
         eprintln!("failed to start storyboard-api: {err}");
         std::process::exit(1);
     }

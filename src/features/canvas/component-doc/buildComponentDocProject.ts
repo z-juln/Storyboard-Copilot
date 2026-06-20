@@ -8,16 +8,27 @@ import {
   type CanvasNodeType,
 } from '@/features/canvas/domain/canvasNodes';
 import { canvasNodeDefinitions } from '@/features/canvas/domain/nodeRegistry';
-import { DEFAULT_IMAGE_MODEL_ID } from '@/features/canvas/models';
-import type { Project, ProjectSummary } from '@/stores/projectStore';
+const DEFAULT_DOC_IMAGE_MODEL_ID = 'kie/nano-banana-2';
+import type { Project } from '@/features/project/types';
 
 import {
   COMPONENT_DOC_PROJECT_ID,
   COMPONENT_DOC_PROJECT_NAME,
 } from './constants';
-import { DOC_PLACEHOLDER_IMAGE, DOC_SAMPLE_IMAGE } from './placeholders';
 
-const DOC_VIEWPORT: Viewport = { x: 24, y: 24, zoom: 0.58 };
+const DOC_SAMPLE_IMAGE = 'assets/sample.png';
+const DOC_PLACEHOLDER_IMAGE = 'assets/placeholder.png';
+
+const DOC_VIEWPORT: Viewport = { x: 16, y: 16, zoom: 0.48 };
+
+/** 分组网格：加宽加高，组间留足间距 */
+const GROUP_GAP_X = 160;
+const GROUP_GAP_Y = 140;
+const GROUP_W = 1080;
+const GROUP_ORIGIN = { x: 80, y: 80 };
+const ROW0_H = 620;
+const ROW1_Y = GROUP_ORIGIN.y + ROW0_H + GROUP_GAP_Y;
+const PAD = 40;
 
 function defaultsFor<T extends CanvasNodeType>(type: T) {
   return canvasNodeDefinitions[type].createDefaultData();
@@ -66,45 +77,53 @@ function buildComponentDocNodes(): CanvasNode[] {
   const genDefaults = defaultsFor(CANVAS_NODE_TYPES.storyboardGen);
 
   const groupInput = withMeta(
-    canvasNodeFactory.createNode(CANVAS_NODE_TYPES.group, { x: 80, y: 80 }, {
+    canvasNodeFactory.createNode(CANVAS_NODE_TYPES.group, GROUP_ORIGIN, {
       displayName: '图片输入 · uploadNode',
       label: '图片输入 · uploadNode',
     }),
     'doc-group-input',
-    { style: { width: 920, height: 520 } }
+    { style: { width: GROUP_W, height: ROW0_H } }
   );
 
   const groupAi = withMeta(
-    canvasNodeFactory.createNode(CANVAS_NODE_TYPES.group, { x: 1080, y: 80 }, {
-      displayName: 'AI 生图 · imageNode / exportImageNode',
-      label: 'AI 生图 · imageNode / exportImageNode',
-    }),
+    canvasNodeFactory.createNode(
+      CANVAS_NODE_TYPES.group,
+      { x: GROUP_ORIGIN.x + GROUP_W + GROUP_GAP_X, y: GROUP_ORIGIN.y },
+      {
+        displayName: 'AI 生图 · imageNode / exportImageNode',
+        label: 'AI 生图 · imageNode / exportImageNode',
+      }
+    ),
     'doc-group-ai',
-    { style: { width: 920, height: 520 } }
+    { style: { width: GROUP_W, height: 760 } }
   );
 
   const groupStoryboard = withMeta(
-    canvasNodeFactory.createNode(CANVAS_NODE_TYPES.group, { x: 80, y:680 }, {
+    canvasNodeFactory.createNode(CANVAS_NODE_TYPES.group, { x: GROUP_ORIGIN.x, y: ROW1_Y }, {
       displayName: '分镜 · storyboardNode / storyboardGenNode',
       label: '分镜 · storyboardNode / storyboardGenNode',
     }),
     'doc-group-storyboard',
-    { style: { width: 920, height: 480 } }
+    { style: { width: GROUP_W, height: 860 } }
   );
 
   const groupMeta = withMeta(
-    canvasNodeFactory.createNode(CANVAS_NODE_TYPES.group, { x: 1080, y: 680 }, {
-      displayName: '注释与容器 · textAnnotationNode / groupNode',
-      label: '注释与容器 · textAnnotationNode / groupNode',
-    }),
+    canvasNodeFactory.createNode(
+      CANVAS_NODE_TYPES.group,
+      { x: GROUP_ORIGIN.x + GROUP_W + GROUP_GAP_X, y: ROW1_Y },
+      {
+        displayName: '注释与容器 · textAnnotationNode / groupNode',
+        label: '注释与容器 · textAnnotationNode / groupNode',
+      }
+    ),
     'doc-group-meta',
-    { style: { width: 920, height: 360 } }
+    { style: { width: GROUP_W, height: 480 } }
   );
 
   const intro = docTextNode(
     'doc-intro',
     'doc-group-input',
-    { x: 24, y: 48 },
+    { x: PAD, y: 52 },
     [
       '# Component Doc',
       '',
@@ -116,13 +135,13 @@ function buildComponentDocNodes(): CanvasNode[] {
       '',
       '注册表：`canvasNodes.ts` → `nodeRegistry.ts` → `nodes/index.ts`',
     ].join('\n'),
-    { width: 860, height: 200 }
+    { width: GROUP_W - PAD * 2, height: 168 }
   );
 
   const uploadDoc = docTextNode(
     'doc-upload-text',
     'doc-group-input',
-    { x: 24, y: 268 },
+    { x: PAD, y: 248 },
     [
       '## uploadNode · `UploadNode.tsx`',
       '',
@@ -130,19 +149,19 @@ function buildComponentDocNodes(): CanvasNode[] {
       '- 点击 / 拖拽 / 重新上传；落盘走 HTTP 分片',
       '- 字段：`imageUrl` `previewImageUrl` `aspectRatio` `sourceFileName`',
     ].join('\n'),
-    { width: 400, height: 180 }
+    { width: 400, height: 160 }
   );
 
   const uploadEmpty = withMeta(
-    canvasNodeFactory.createNode(CANVAS_NODE_TYPES.upload, { x: 460, y: 268 }, uploadDefaults),
+    canvasNodeFactory.createNode(CANVAS_NODE_TYPES.upload, { x: 480, y: 248 }, uploadDefaults),
     'doc-upload-empty',
-    { parentId: 'doc-group-input', position: { x: 460, y: 268 }, style: { width: 200, height: 200 } }
+    { parentId: 'doc-group-input', position: { x: 480, y: 248 }, style: { width: 220, height: 200 } }
   );
 
   const uploadFilled = withMeta(
     canvasNodeFactory.createNode(
       CANVAS_NODE_TYPES.upload,
-      { x: 680, y: 268 },
+      { x: 740, y: 248 },
       {
         ...uploadDefaults,
         imageUrl: DOC_SAMPLE_IMAGE,
@@ -153,13 +172,13 @@ function buildComponentDocNodes(): CanvasNode[] {
       }
     ),
     'doc-upload-filled',
-    { parentId: 'doc-group-input', position: { x: 680, y: 268 }, style: { width: 220, height: 180 } }
+    { parentId: 'doc-group-input', position: { x: 740, y: 248 }, style: { width: 240, height: 200 } }
   );
 
   const aiDoc = docTextNode(
     'doc-ai-text',
     'doc-group-ai',
-    { x: 24, y: 48 },
+    { x: PAD, y: 52 },
     [
       '## imageNode · `ImageEditNode.tsx`',
       '',
@@ -171,37 +190,37 @@ function buildComponentDocNodes(): CanvasNode[] {
       '- 菜单隐藏；工具/AI 产物只读展示',
       '- `resultKind`：generic / storyboardGenOutput / …',
     ].join('\n'),
-    { width: 420, height: 260 }
+    { width: 480, height: 240 }
   );
 
   const imageEditEmpty = withMeta(
-    canvasNodeFactory.createNode(CANVAS_NODE_TYPES.imageEdit, { x: 480, y: 48 }, imageEditDefaults),
+    canvasNodeFactory.createNode(CANVAS_NODE_TYPES.imageEdit, { x: 560, y: 52 }, imageEditDefaults),
     'doc-image-edit-empty',
-    { parentId: 'doc-group-ai', position: { x: 480, y: 48 }, style: { width: 380, height: 288 } }
+    { parentId: 'doc-group-ai', position: { x: 560, y: 52 }, style: { width: 480, height: 300 } }
   );
 
   const imageEditFilled = withMeta(
     canvasNodeFactory.createNode(
       CANVAS_NODE_TYPES.imageEdit,
-      { x: 480, y: 360 },
+      { x: 560, y: 388 },
       {
         ...imageEditDefaults,
         imageUrl: DOC_SAMPLE_IMAGE,
         previewImageUrl: DOC_SAMPLE_IMAGE,
         aspectRatio: '16:9',
         prompt: '示例 prompt：赛博朋克雨夜街道',
-        model: DEFAULT_IMAGE_MODEL_ID,
+        model: DEFAULT_DOC_IMAGE_MODEL_ID,
         displayName: 'AI 图片 · 示例',
       }
     ),
     'doc-image-edit-filled',
-    { parentId: 'doc-group-ai', position: { x: 480, y: 360 }, style: { width: 380, height: 288 } }
+    { parentId: 'doc-group-ai', position: { x: 560, y: 388 }, style: { width: 480, height: 300 } }
   );
 
   const exportGeneric = withMeta(
     canvasNodeFactory.createNode(
       CANVAS_NODE_TYPES.exportImage,
-      { x: 24, y: 360 },
+      { x: PAD, y: 320 },
       {
         ...exportDefaults,
         imageUrl: DOC_SAMPLE_IMAGE,
@@ -211,13 +230,13 @@ function buildComponentDocNodes(): CanvasNode[] {
       }
     ),
     'doc-export-generic',
-    { parentId: 'doc-group-ai', position: { x: 24, y: 360 }, style: { width: 320, height: 200 } }
+    { parentId: 'doc-group-ai', position: { x: PAD, y: 320 }, style: { width: 340, height: 220 } }
   );
 
   const storyboardDoc = docTextNode(
     'doc-storyboard-text',
     'doc-group-storyboard',
-    { x: 24, y: 48 },
+    { x: PAD, y: 52 },
     [
       '## storyboardNode · `StoryboardNode.tsx`',
       '',
@@ -227,13 +246,13 @@ function buildComponentDocNodes(): CanvasNode[] {
       '',
       '- 菜单：**分镜生成**；按格子描述批量 AI 生帧',
     ].join('\n'),
-    { width: 360, height: 200 }
+    { width: 380, height: 180 }
   );
 
   const storyboardSplit = withMeta(
     canvasNodeFactory.createNode(
       CANVAS_NODE_TYPES.storyboardSplit,
-      { x: 420, y: 48 },
+      { x: 480, y: 52 },
       {
         ...splitDefaults,
         gridRows: 2,
@@ -275,13 +294,17 @@ function buildComponentDocNodes(): CanvasNode[] {
       }
     ),
     'doc-storyboard-split',
-    { parentId: 'doc-group-storyboard', position: { x: 420, y: 48 }, style: { width: 460, height: 360 } }
+    {
+      parentId: 'doc-group-storyboard',
+      position: { x: 480, y: 52 },
+      style: { width: 560, height: 400 },
+    }
   );
 
   const storyboardGen = withMeta(
     canvasNodeFactory.createNode(
       CANVAS_NODE_TYPES.storyboardGen,
-      { x: 24, y: 280 },
+      { x: PAD, y: 260 },
       {
         ...genDefaults,
         frames: [
@@ -293,13 +316,17 @@ function buildComponentDocNodes(): CanvasNode[] {
       }
     ),
     'doc-storyboard-gen',
-    { parentId: 'doc-group-storyboard', position: { x: 24, y: 280 }, style: { width: 380, height: 400 } }
+    {
+      parentId: 'doc-group-storyboard',
+      position: { x: PAD, y: 260 },
+      style: { width: 400, height: 520 },
+    }
   );
 
   const metaDoc = docTextNode(
     'doc-meta-text',
     'doc-group-meta',
-    { x: 24, y: 48 },
+    { x: PAD, y: 52 },
     [
       '## textAnnotationNode',
       '',
@@ -311,17 +338,17 @@ function buildComponentDocNodes(): CanvasNode[] {
       '',
       '操作与正式项目相同：右键画布、拖线到空白处出菜单、Alt 拖拽复制等。',
     ].join('\n'),
-    { width: 520, height: 280 }
+    { width: 560, height: 300 }
   );
 
   const metaExampleText = withMeta(
-    canvasNodeFactory.createNode(CANVAS_NODE_TYPES.textAnnotation, { x: 580, y: 48 }, {
+    canvasNodeFactory.createNode(CANVAS_NODE_TYPES.textAnnotation, { x: 640, y: 52 }, {
       ...defaultsFor(CANVAS_NODE_TYPES.textAnnotation),
       displayName: '短注释示例',
       content: '独立 textAnnotationNode，不参与图片连线。',
     }),
     'doc-meta-text-node',
-    { parentId: 'doc-group-meta', position: { x: 580, y: 48 }, style: { width: 300, height: 160 } }
+    { parentId: 'doc-group-meta', position: { x: 640, y: 52 }, style: { width: 400, height: 160 } }
   );
 
   return [
@@ -378,20 +405,4 @@ export function buildComponentDocProject(): Project {
     viewport: DOC_VIEWPORT,
     history: { past: [], future: [] },
   };
-}
-
-export function getComponentDocProjectSummary(): ProjectSummary {
-  const project = buildComponentDocProject();
-  return {
-    id: project.id,
-    name: project.name,
-    createdAt: project.createdAt,
-    updatedAt: project.updatedAt,
-    nodeCount: project.nodeCount,
-  };
-}
-
-export function mergeComponentDocProjectSummaries(projects: ProjectSummary[]): ProjectSummary[] {
-  const withoutDoc = projects.filter((project) => project.id !== COMPONENT_DOC_PROJECT_ID);
-  return [getComponentDocProjectSummary(), ...withoutDoc];
 }

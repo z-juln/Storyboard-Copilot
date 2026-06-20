@@ -1,8 +1,9 @@
 pub mod dto;
+pub mod file_store;
 pub mod service;
-pub mod store;
 
 pub use dto::{
-    ProjectRecord, ProjectSummaryRecord, RenameProjectRequestDto, UpdateProjectViewportRequestDto,
+    ProjectSnapshot, ProjectSummaryRecord, RenameProjectRequestDto,
+    UpdateProjectViewportRequestDto,
 };
 pub use service::ProjectService;

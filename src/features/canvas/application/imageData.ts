@@ -3,6 +3,16 @@ import {
   rustApiClient,
   type PrepareNodeImageResult,
 } from '@/infrastructure/rustApiClient';
+import { isProjectRelativeAssetPath, resolveProjectImageDisplayUrl } from '@/features/project/projectPaths';
+import { useProjectStore } from '@/stores/projectStore';
+
+function requireCurrentProjectId(): string {
+  const projectId = useProjectStore.getState().currentProjectId;
+  if (!projectId) {
+    throw createImagePipelineError('未打开项目，无法处理图片', 'currentProjectId is empty');
+  }
+  return projectId;
+}
 
 export function parseAspectRatio(value: string): number {
   const [width, height] = value.split(':').map((item) => Number(item));
@@ -88,6 +98,10 @@ export function isLikelyLocalImagePath(imageUrl: string): boolean {
     return false;
   }
 
+  if (isProjectRelativeAssetPath(imageUrl)) {
+    return true;
+  }
+
   const lower = imageUrl.toLowerCase();
   if (
     lower.startsWith('data:') ||
@@ -104,42 +118,9 @@ export function isLikelyLocalImagePath(imageUrl: string): boolean {
   return LOCAL_PATH_PREFIX_PATTERN.test(imageUrl);
 }
 
-function normalizeLocalFilesystemPath(imageUrl: string): string | null {
-  const trimmed = imageUrl.trim();
-  if (!trimmed) {
-    return null;
-  }
-
-  if (trimmed.includes('/image?path=')) {
-    return null;
-  }
-
-  const lower = trimmed.toLowerCase();
-  if (lower.startsWith('file://')) {
-    try {
-      const parsed = new URL(trimmed);
-      const decodedPathname = decodeURIComponent(parsed.pathname);
-      const normalizedPath = decodedPathname.replace(/^\/([A-Za-z]:[\\/])/, '$1');
-      return normalizedPath || null;
-    } catch {
-      return null;
-    }
-  }
-
-  if (isLikelyLocalImagePath(trimmed)) {
-    return trimmed;
-  }
-
-  return null;
-}
-
 export function resolveImageDisplayUrl(imageUrl: string): string {
-  const localPath = normalizeLocalFilesystemPath(imageUrl);
-  if (localPath) {
-    return buildLocalImageUrl(localPath);
-  }
-
-  return imageUrl;
+  const projectId = useProjectStore.getState().currentProjectId;
+  return resolveProjectImageDisplayUrl(projectId, imageUrl, buildLocalImageUrl);
 }
 
 function mapPreparedResult(prepared: PrepareNodeImageResult): PreparedNodeImage {
@@ -186,6 +167,7 @@ async function prepareInlineImageSource(
   }
   const blob = await response.blob();
   const prepared = await rustApiClient.prepareNodeImageFromBlob(
+    requireCurrentProjectId(),
     blob,
     resolveBlobExtension(blob, source),
     maxPreviewDimension
@@ -204,7 +186,7 @@ export async function persistImageLocally(source: string): Promise<string> {
     return prepared.imageUrl;
   }
 
-  const prepared = await rustApiClient.prepareNodeImageFromSource(trimmed);
+  const prepared = await rustApiClient.prepareNodeImageFromSource(requireCurrentProjectId(), trimmed);
   return prepared.imagePath;
 }
 
@@ -320,7 +302,12 @@ export async function prepareNodeImageFromFile(
   const extension = resolveFileExtension(file);
   const prepareStarted = performance.now();
   const prepared = mapPreparedResult(
-    await rustApiClient.prepareNodeImageFromBlob(file, extension, safeMaxDimension)
+    await rustApiClient.prepareNodeImageFromBlob(
+      requireCurrentProjectId(),
+      file,
+      extension,
+      safeMaxDimension
+    )
   );
   const prepareElapsed = Math.round(performance.now() - prepareStarted);
   console.info(
@@ -408,7 +395,11 @@ export async function prepareNodeImage(
     const prepared = isInlineImageSource(trimmedImageUrl)
       ? await prepareInlineImageSource(trimmedImageUrl, safeMaxDimension)
       : mapPreparedResult(
-          await rustApiClient.prepareNodeImageFromSource(trimmedImageUrl, safeMaxDimension)
+          await rustApiClient.prepareNodeImageFromSource(
+            requireCurrentProjectId(),
+            trimmedImageUrl,
+            safeMaxDimension
+          )
         );
     console.info(
       `[upload-perf][imageData] prepareNodeImage http elapsed=${Math.round(performance.now() - prepareStarted)}ms total=${Math.round(performance.now() - started)}ms`

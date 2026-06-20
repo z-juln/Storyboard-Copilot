@@ -1,0 +1,447 @@
+{
+  "id": "component-doc",
+  "name": "Component Doc",
+  "createdAt": 1781921249275,
+  "updatedAt": 1781921249275,
+  "nodeCount": 17,
+  "viewport": {
+    "x": 16,
+    "y": 16,
+    "zoom": 0.48
+  },
+  "nodes": [
+    {
+      "id": "doc-group-input",
+      "type": "groupNode",
+      "position": {
+        "x": 80,
+        "y": 80
+      },
+      "data": {
+        "displayName": "图片输入 · uploadNode",
+        "label": "图片输入 · uploadNode"
+      },
+      "style": {
+        "width": 1080,
+        "height": 620
+      }
+    },
+    {
+      "id": "doc-group-ai",
+      "type": "groupNode",
+      "position": {
+        "x": 1320,
+        "y": 80
+      },
+      "data": {
+        "displayName": "AI 生图 · imageNode / exportImageNode",
+        "label": "AI 生图 · imageNode / exportImageNode"
+      },
+      "style": {
+        "width": 1080,
+        "height": 760
+      }
+    },
+    {
+      "id": "doc-group-storyboard",
+      "type": "groupNode",
+      "position": {
+        "x": 80,
+        "y": 840
+      },
+      "data": {
+        "displayName": "分镜 · storyboardNode / storyboardGenNode",
+        "label": "分镜 · storyboardNode / storyboardGenNode"
+      },
+      "style": {
+        "width": 1080,
+        "height": 860
+      }
+    },
+    {
+      "id": "doc-group-meta",
+      "type": "groupNode",
+      "position": {
+        "x": 1320,
+        "y": 840
+      },
+      "data": {
+        "displayName": "注释与容器 · textAnnotationNode / groupNode",
+        "label": "注释与容器 · textAnnotationNode / groupNode"
+      },
+      "style": {
+        "width": 1080,
+        "height": 480
+      }
+    },
+    {
+      "id": "doc-intro",
+      "type": "textAnnotationNode",
+      "position": {
+        "x": 40,
+        "y": 52
+      },
+      "data": {
+        "displayName": "说明",
+        "content": "# Component Doc\n\n本页是**开发环境专用**的内置项目，交互与正式画布一致（右键添加、拖线连线、工具条、撤销等）。\n\n- 组件示例按**分组**归类\n- 详细说明用 **textAnnotationNode**（本节点类型）\n- **不写入本地数据库**；刷新或重新打开本项目会恢复初始内容\n\n注册表：`canvasNodes.ts` → `nodeRegistry.ts` → `nodes/index.ts`"
+      },
+      "parentId": "doc-group-input",
+      "extent": "parent",
+      "style": {
+        "width": 1000,
+        "height": 168
+      }
+    },
+    {
+      "id": "doc-upload-text",
+      "type": "textAnnotationNode",
+      "position": {
+        "x": 40,
+        "y": 248
+      },
+      "data": {
+        "displayName": "说明",
+        "content": "## uploadNode · `UploadNode.tsx`\n\n- 菜单可见；仅 **Source** Handle\n- 点击 / 拖拽 / 重新上传；落盘走 HTTP 分片\n- 字段：`imageUrl` `previewImageUrl` `aspectRatio` `sourceFileName`"
+      },
+      "parentId": "doc-group-input",
+      "extent": "parent",
+      "style": {
+        "width": 400,
+        "height": 160
+      }
+    },
+    {
+      "id": "doc-upload-empty",
+      "type": "uploadNode",
+      "position": {
+        "x": 480,
+        "y": 248
+      },
+      "data": {
+        "displayName": "上传图片",
+        "imageUrl": null,
+        "previewImageUrl": null,
+        "aspectRatio": "1:1",
+        "isSizeManuallyAdjusted": false,
+        "sourceFileName": null
+      },
+      "parentId": "doc-group-input",
+      "extent": "parent",
+      "style": {
+        "width": 220,
+        "height": 200
+      }
+    },
+    {
+      "id": "doc-upload-filled",
+      "type": "uploadNode",
+      "position": {
+        "x": 740,
+        "y": 248
+      },
+      "data": {
+        "displayName": "已上传示例",
+        "imageUrl": "assets/sample.png",
+        "previewImageUrl": "assets/sample.png",
+        "aspectRatio": "16:9",
+        "isSizeManuallyAdjusted": false,
+        "sourceFileName": "sample.png"
+      },
+      "parentId": "doc-group-input",
+      "extent": "parent",
+      "style": {
+        "width": 240,
+        "height": 200
+      }
+    },
+    {
+      "id": "doc-ai-text",
+      "type": "textAnnotationNode",
+      "position": {
+        "x": 40,
+        "y": 52
+      },
+      "data": {
+        "displayName": "说明",
+        "content": "## imageNode · `ImageEditNode.tsx`\n\n- 菜单：**AI 图片**；Source + Target\n- Prompt、模型参数、生成进度；结果生成下游 **exportImageNode**\n\n## exportImageNode · `ImageNode.tsx`\n\n- 菜单隐藏；工具/AI 产物只读展示\n- `resultKind`：generic / storyboardGenOutput / …"
+      },
+      "parentId": "doc-group-ai",
+      "extent": "parent",
+      "style": {
+        "width": 480,
+        "height": 240
+      }
+    },
+    {
+      "id": "doc-image-edit-empty",
+      "type": "imageNode",
+      "position": {
+        "x": 560,
+        "y": 52
+      },
+      "data": {
+        "displayName": "AI 图片",
+        "imageUrl": null,
+        "previewImageUrl": null,
+        "aspectRatio": "1:1",
+        "isSizeManuallyAdjusted": false,
+        "requestAspectRatio": "auto",
+        "prompt": "",
+        "model": "kie/nano-banana-2",
+        "size": "2K",
+        "extraParams": {},
+        "isGenerating": false,
+        "generationStartedAt": null,
+        "generationDurationMs": 60000
+      },
+      "parentId": "doc-group-ai",
+      "extent": "parent",
+      "style": {
+        "width": 480,
+        "height": 300
+      }
+    },
+    {
+      "id": "doc-image-edit-filled",
+      "type": "imageNode",
+      "position": {
+        "x": 560,
+        "y": 388
+      },
+      "data": {
+        "displayName": "AI 图片 · 示例",
+        "imageUrl": "assets/sample.png",
+        "previewImageUrl": "assets/sample.png",
+        "aspectRatio": "16:9",
+        "isSizeManuallyAdjusted": false,
+        "requestAspectRatio": "auto",
+        "prompt": "示例 prompt：赛博朋克雨夜街道",
+        "model": "kie/nano-banana-2",
+        "size": "2K",
+        "extraParams": {},
+        "isGenerating": false,
+        "generationStartedAt": null,
+        "generationDurationMs": 60000
+      },
+      "parentId": "doc-group-ai",
+      "extent": "parent",
+      "style": {
+        "width": 480,
+        "height": 300
+      }
+    },
+    {
+      "id": "doc-export-generic",
+      "type": "exportImageNode",
+      "position": {
+        "x": 40,
+        "y": 320
+      },
+      "data": {
+        "displayName": "结果图片",
+        "imageUrl": "assets/sample.png",
+        "previewImageUrl": "assets/sample.png",
+        "aspectRatio": "16:9",
+        "isSizeManuallyAdjusted": false,
+        "resultKind": "generic"
+      },
+      "parentId": "doc-group-ai",
+      "extent": "parent",
+      "style": {
+        "width": 340,
+        "height": 220
+      }
+    },
+    {
+      "id": "doc-storyboard-text",
+      "type": "textAnnotationNode",
+      "position": {
+        "x": 40,
+        "y": 52
+      },
+      "data": {
+        "displayName": "说明",
+        "content": "## storyboardNode · `StoryboardNode.tsx`\n\n- 分镜切割结果；网格帧 + 导出选项\n\n## storyboardGenNode · `StoryboardGenNode.tsx`\n\n- 菜单：**分镜生成**；按格子描述批量 AI 生帧"
+      },
+      "parentId": "doc-group-storyboard",
+      "extent": "parent",
+      "style": {
+        "width": 380,
+        "height": 180
+      }
+    },
+    {
+      "id": "doc-storyboard-split",
+      "type": "storyboardNode",
+      "position": {
+        "x": 480,
+        "y": 52
+      },
+      "data": {
+        "displayName": "切割结果",
+        "aspectRatio": "1:1",
+        "frameAspectRatio": "1:1",
+        "gridRows": 2,
+        "gridCols": 2,
+        "frames": [
+          {
+            "id": "doc-frame-1",
+            "imageUrl": "assets/sample.png",
+            "previewImageUrl": "assets/placeholder.png",
+            "aspectRatio": "16:9",
+            "note": "帧 1",
+            "order": 0
+          },
+          {
+            "id": "doc-frame-2",
+            "imageUrl": "assets/placeholder.png",
+            "previewImageUrl": "assets/placeholder.png",
+            "aspectRatio": "16:9",
+            "note": "",
+            "order": 1
+          },
+          {
+            "id": "doc-frame-3",
+            "imageUrl": "assets/placeholder.png",
+            "previewImageUrl": "assets/placeholder.png",
+            "aspectRatio": "16:9",
+            "note": "",
+            "order": 2
+          },
+          {
+            "id": "doc-frame-4",
+            "imageUrl": "assets/placeholder.png",
+            "previewImageUrl": "assets/placeholder.png",
+            "aspectRatio": "16:9",
+            "note": "帧 4",
+            "order": 3
+          }
+        ],
+        "exportOptions": {
+          "showFrameIndex": false,
+          "showFrameNote": false,
+          "notePlacement": "overlay",
+          "imageFit": "cover",
+          "frameIndexPrefix": "S",
+          "cellGap": 8,
+          "outerPadding": 0,
+          "fontSize": 4,
+          "backgroundColor": "#0f1115",
+          "textColor": "#f8fafc"
+        }
+      },
+      "parentId": "doc-group-storyboard",
+      "extent": "parent",
+      "style": {
+        "width": 560,
+        "height": 400
+      }
+    },
+    {
+      "id": "doc-storyboard-gen",
+      "type": "storyboardGenNode",
+      "position": {
+        "x": 40,
+        "y": 260
+      },
+      "data": {
+        "displayName": "分镜生成",
+        "gridRows": 2,
+        "gridCols": 2,
+        "frames": [
+          {
+            "id": "doc-gen-1",
+            "description": "开场远景",
+            "referenceIndex": null
+          },
+          {
+            "id": "doc-gen-2",
+            "description": "人物特写",
+            "referenceIndex": 0
+          },
+          {
+            "id": "doc-gen-3",
+            "description": "室内场景",
+            "referenceIndex": null
+          },
+          {
+            "id": "doc-gen-4",
+            "description": "结尾拉远",
+            "referenceIndex": 2
+          }
+        ],
+        "ratioControlMode": "cell",
+        "model": "kie/nano-banana-2",
+        "size": "2K",
+        "requestAspectRatio": "auto",
+        "extraParams": {},
+        "imageUrl": null,
+        "previewImageUrl": null,
+        "aspectRatio": "1:1",
+        "isGenerating": false,
+        "generationStartedAt": null,
+        "generationDurationMs": 60000
+      },
+      "parentId": "doc-group-storyboard",
+      "extent": "parent",
+      "style": {
+        "width": 400,
+        "height": 520
+      }
+    },
+    {
+      "id": "doc-meta-text",
+      "type": "textAnnotationNode",
+      "position": {
+        "x": 40,
+        "y": 52
+      },
+      "data": {
+        "displayName": "说明",
+        "content": "## textAnnotationNode\n\n本节点即说明载体，支持 Markdown（GFM）。\n\n## groupNode · `GroupNode.tsx`\n\n框选多节点后可分组；本页各区块外层分组即为 groupNode。\n\n操作与正式项目相同：右键画布、拖线到空白处出菜单、Alt 拖拽复制等。"
+      },
+      "parentId": "doc-group-meta",
+      "extent": "parent",
+      "style": {
+        "width": 560,
+        "height": 300
+      }
+    },
+    {
+      "id": "doc-meta-text-node",
+      "type": "textAnnotationNode",
+      "position": {
+        "x": 640,
+        "y": 52
+      },
+      "data": {
+        "displayName": "短注释示例",
+        "content": "独立 textAnnotationNode，不参与图片连线。"
+      },
+      "parentId": "doc-group-meta",
+      "extent": "parent",
+      "style": {
+        "width": 400,
+        "height": 160
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "doc-edge-upload-to-edit",
+      "source": "doc-upload-filled",
+      "target": "doc-image-edit-filled",
+      "type": "disconnectableEdge"
+    },
+    {
+      "id": "doc-edge-edit-to-export",
+      "source": "doc-image-edit-filled",
+      "target": "doc-export-generic",
+      "type": "disconnectableEdge"
+    }
+  ],
+  "history": {
+    "past": [],
+    "future": []
+  }
+}

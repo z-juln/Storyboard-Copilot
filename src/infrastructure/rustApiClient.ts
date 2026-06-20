@@ -1,13 +1,13 @@
+import type { Viewport } from '@xyflow/react';
+
 import type {
   BuiltinAdapterSummary,
   ModelCallResult,
   ModelInvokeInput,
   ProviderSecretStatus,
 } from '@/features/aiModels/types';
-import type {
-  ProjectRecord,
-  ProjectSummaryRecord,
-} from '@/commands/projectState';
+import type { ProjectSnapshot } from '@/features/project/types';
+import type { ProjectSummaryRecord } from '@/commands/projectState';
 
 const DEFAULT_BASE_URL = 'http://127.0.0.1:1421';
 const DEFAULT_UPLOAD_CHUNK_SIZE = 4 * 1024 * 1024;
@@ -53,21 +53,32 @@ async function readEmpty(response: Response): Promise<void> {
   throw new Error(payload.error || `HTTP ${response.status}`);
 }
 
-async function abortImageUploadSession(baseUrl: string, uploadId: string): Promise<void> {
-  await fetch(`${baseUrl}/api/v1/images/upload-sessions/${uploadId}`, {
-    method: 'DELETE',
-  }).catch(() => undefined);
+async function abortImageUploadSession(
+  baseUrl: string,
+  projectId: string,
+  uploadId: string
+): Promise<void> {
+  await fetch(
+    `${baseUrl}/api/v1/projects/${encodeURIComponent(projectId)}/images/upload-sessions/${uploadId}`,
+    {
+      method: 'DELETE',
+    }
+  ).catch(() => undefined);
 }
 
 async function uploadBinaryInChunks(
   baseUrl: string,
+  projectId: string,
   data: Blob,
   extension: string,
   maxPreviewDimension?: number
 ): Promise<PrepareNodeImageResult> {
-  const sessionResponse = await fetch(`${baseUrl}/api/v1/images/upload-sessions`, {
-    method: 'POST',
-  });
+  const sessionResponse = await fetch(
+    `${baseUrl}/api/v1/projects/${encodeURIComponent(projectId)}/images/upload-sessions`,
+    {
+      method: 'POST',
+    }
+  );
   const session = await readJson<CreateImageUploadSessionResult>(sessionResponse);
   const chunkSize = session.chunkSize > 0 ? session.chunkSize : DEFAULT_UPLOAD_CHUNK_SIZE;
   const totalChunks = Math.max(1, Math.ceil(data.size / chunkSize));
@@ -77,7 +88,7 @@ async function uploadBinaryInChunks(
       const start = chunkIndex * chunkSize;
       const chunk = data.slice(start, start + chunkSize);
       const chunkResponse = await fetch(
-        `${baseUrl}/api/v1/images/upload-sessions/${session.uploadId}/chunks/${chunkIndex}`,
+        `${baseUrl}/api/v1/projects/${encodeURIComponent(projectId)}/images/upload-sessions/${session.uploadId}/chunks/${chunkIndex}`,
         {
           method: 'PUT',
           headers: { 'Content-Type': 'application/octet-stream' },
@@ -88,7 +99,7 @@ async function uploadBinaryInChunks(
     }
 
     const completeResponse = await fetch(
-      `${baseUrl}/api/v1/images/upload-sessions/${session.uploadId}/complete`,
+      `${baseUrl}/api/v1/projects/${encodeURIComponent(projectId)}/images/upload-sessions/${session.uploadId}/complete`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -101,7 +112,7 @@ async function uploadBinaryInChunks(
     );
     return readJson<PrepareNodeImageResult>(completeResponse);
   } catch (error) {
-    await abortImageUploadSession(baseUrl, session.uploadId);
+    await abortImageUploadSession(baseUrl, projectId, session.uploadId);
     throw error;
   }
 }
@@ -121,17 +132,20 @@ export interface RustApiClient {
   getSecretStatus: (providerId: string) => Promise<ProviderSecretStatus>;
   setProviderSecret: (providerId: string, apiKey: string) => Promise<ProviderSecretStatus>;
   listProjectSummaries: () => Promise<ProjectSummaryRecord[]>;
-  getProjectRecord: (projectId: string) => Promise<ProjectRecord | null>;
-  upsertProjectRecord: (record: ProjectRecord) => Promise<void>;
-  updateProjectViewportRecord: (projectId: string, viewportJson: string) => Promise<void>;
+  getProjectSnapshot: (projectId: string) => Promise<ProjectSnapshot | null>;
+  upsertProjectSnapshot: (snapshot: ProjectSnapshot) => Promise<void>;
+  updateProjectViewportRecord: (projectId: string, viewport: Viewport) => Promise<void>;
   renameProjectRecord: (projectId: string, name: string, updatedAt: number) => Promise<void>;
   deleteProjectRecord: (projectId: string) => Promise<void>;
+  putProjectAsset: (projectId: string, fileName: string, data: Blob) => Promise<string>;
   prepareNodeImageFromBlob: (
+    projectId: string,
     data: Blob,
     extension: string,
     maxPreviewDimension?: number
   ) => Promise<PrepareNodeImageResult>;
   prepareNodeImageFromSource: (
+    projectId: string,
     source: string,
     maxPreviewDimension?: number
   ) => Promise<PrepareNodeImageResult>;
@@ -183,26 +197,26 @@ export function createRustApiClient(baseUrl = resolveBaseUrl()): RustApiClient {
       const payload = await readJson<{ projects: ProjectSummaryRecord[] }>(response);
       return payload.projects;
     },
-    getProjectRecord: async (projectId) => {
+    getProjectSnapshot: async (projectId) => {
       const response = await fetch(`${normalizedBaseUrl}/api/v1/projects/${projectId}`);
       if (response.status === 404) {
         return null;
       }
-      return readJson<ProjectRecord>(response);
+      return readJson<ProjectSnapshot>(response);
     },
-    upsertProjectRecord: async (record) => {
-      const response = await fetch(`${normalizedBaseUrl}/api/v1/projects/${record.id}`, {
+    upsertProjectSnapshot: async (snapshot) => {
+      const response = await fetch(`${normalizedBaseUrl}/api/v1/projects/${snapshot.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(record),
+        body: JSON.stringify(snapshot),
       });
       await readEmpty(response);
     },
-    updateProjectViewportRecord: async (projectId, viewportJson) => {
+    updateProjectViewportRecord: async (projectId, viewport) => {
       const response = await fetch(`${normalizedBaseUrl}/api/v1/projects/${projectId}/viewport`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ viewportJson }),
+        body: JSON.stringify({ viewport }),
       });
       await readEmpty(response);
     },
@@ -220,17 +234,32 @@ export function createRustApiClient(baseUrl = resolveBaseUrl()): RustApiClient {
       });
       await readEmpty(response);
     },
-    prepareNodeImageFromBlob: async (data, extension, maxPreviewDimension) =>
-      uploadBinaryInChunks(normalizedBaseUrl, data, extension, maxPreviewDimension),
-    prepareNodeImageFromSource: async (source, maxPreviewDimension) => {
-      const response = await fetch(`${normalizedBaseUrl}/api/v1/images/prepare-from-source`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          source,
-          maxPreviewDimension,
-        }),
-      });
+    putProjectAsset: async (projectId, fileName, data) => {
+      const response = await fetch(
+        `${normalizedBaseUrl}/api/v1/projects/${encodeURIComponent(projectId)}/assets/${encodeURIComponent(fileName)}`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/octet-stream' },
+          body: data,
+        }
+      );
+      const payload = await readJson<{ path: string }>(response);
+      return payload.path;
+    },
+    prepareNodeImageFromBlob: async (projectId, data, extension, maxPreviewDimension) =>
+      uploadBinaryInChunks(normalizedBaseUrl, projectId, data, extension, maxPreviewDimension),
+    prepareNodeImageFromSource: async (projectId, source, maxPreviewDimension) => {
+      const response = await fetch(
+        `${normalizedBaseUrl}/api/v1/projects/${encodeURIComponent(projectId)}/images/prepare-from-source`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            source,
+            maxPreviewDimension,
+          }),
+        }
+      );
       return readJson<PrepareNodeImageResult>(response);
     },
   };

@@ -4,8 +4,9 @@ export {
   isComponentDocProjectId,
   isComponentDocEnabled,
 } from './constants';
+export { loadComponentDocProject, getComponentDocSnapshot } from './loadComponentDocProject';
+export { seedComponentDocBundle } from './seedComponentDocBundle';
 export {
-  buildComponentDocProject,
   getComponentDocProjectSummary,
   mergeComponentDocProjectSummaries,
-} from './buildComponentDocProject';
+} from './mergeComponentDocProjectSummaries';

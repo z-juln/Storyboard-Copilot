@@ -160,9 +160,8 @@ docs/development-guides/    # 开发与扩展文档
 ## 持久化与数据说明
 
 - 自动持久化由 `projectStore` 驱动，不需要手动保存
-- SQLite 文件位于 Tauri `app_data_dir/projects.db`
-- `projects` 表核心字段：`nodes_json`、`edges_json`、`viewport_json`、`history_json`、`node_count`
-- 图片字段通过 `imagePool + __img_ref__` 去重编码
+- 每个项目位于 `{app_data}/projects/<id>/project.json` + `assets/`
+- 图片字段使用 `assets/...` 相对路径或 `https://` URL
 
 ## i18n 约定
 

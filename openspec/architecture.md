@@ -24,7 +24,7 @@ Source Node -> Process Node / Tool / AI -> Derived Output Node
 | Node Domain | 节点类型、默认数据、菜单、连线能力 | `src/features/canvas/domain/` |
 | Tools | 裁剪、标注、分镜切割等工具 | `src/features/canvas/tools/`, `toolProcessor.ts` |
 | AI Models | 模型定义、供应商、请求映射 | `src/features/canvas/models/`, `src-tauri/src/ai/` |
-| Persistence | SQLite 项目快照、视口、图片池；本地图片读写走 `:1421` HTTP | `src/commands/projectState.ts`, `src/infrastructure/rustApiClient.ts`, `src-tauri/src/project/`, `src-tauri/src/media/` |
+| Persistence | 项目 Bundle（`projects/<id>/project.json` + `assets/`）；本地/远程图片 URL 引用；读写走 `:1421` HTTP | `src/features/project/`, `src/commands/projectState.ts`, `src-tauri/src/project/`, `src-tauri/src/media/` |
 | i18n | 中英文文案 | `src/i18n/` |
 
 ## Change Routing
@@ -35,7 +35,7 @@ Source Node -> Process Node / Tool / AI -> Derived Output Node
 | 新节点 | `canvasNodes.ts`, `nodeRegistry.ts`, `nodes/index.ts` |
 | 新工具 | `tools/types.ts`, `builtInTools.ts`, `ui/tool-editors/`, `toolProcessor.ts` |
 | 新模型 | `models/image/<provider>/`, `models/providers/`, Rust provider |
-| 持久化 | `projectStore.ts`, `projectState.ts`, `project_state.rs` |
+| 持久化 | `projectStore.ts`, `features/project/projectCodec.ts`, `projectState.ts`, `src-tauri/src/project/file_store.rs` |
 | 文案 | `src/i18n/locales/zh.json`, `src/i18n/locales/en.json` |
 
 ## Invariants
@@ -47,8 +47,25 @@ Source Node -> Process Node / Tool / AI -> Derived Output Node
 - 工具产物走“生成新节点”链路。
 - 拖拽中不做重持久化；结束后防抖保存。
 - 视口保存走独立轻量通道。
-- 新图片字段如果持久化，必须同步 `imagePool` 编码/解码。
+- 每个项目自包含：`projects/<project-id>/project.json` + `assets/`；JSON 内图片用 `assets/...` 相对路径或 `https://` URL。
+- 开发内置 `component-doc` 与正式项目同结构（源码在 `src/features/canvas/component-doc/`，打开时重置、不落用户盘改动）。
 - 新文案必须同时更新中英文语言包。
+
+## Project Bundle Layout
+
+```text
+{app_data}/projects/{project-id}/
+├── project.json    # nodes / edges / viewport / history（可读 JSON）
+└── assets/         # 本项目专属图片等资源
+```
+
+`component-doc`（仅 dev）：
+
+```text
+src/features/canvas/component-doc/
+├── project.json
+└── assets/
+```
 
 ## Minimal Validation
 

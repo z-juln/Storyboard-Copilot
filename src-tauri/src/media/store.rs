@@ -150,13 +150,33 @@ fn resize_image_fast(source: &DynamicImage, target_width: u32, target_height: u3
 
 pub fn persist_image_bytes(
     app_data_dir: &Path,
+    project_id: &str,
+    bytes: &[u8],
+    extension: &str,
+) -> Result<String, String> {
+    let assets_dir = crate::project::file_store::resolve_project_assets_dir(app_data_dir, project_id)?;
+    let digest = md5::compute(bytes);
+    let filename = format!("{:x}.{}", digest, normalize_extension(extension));
+    let output_path = assets_dir.join(&filename);
+
+    if !output_path.exists() {
+        std::fs::write(&output_path, bytes)
+            .map_err(|e| format!("Failed to persist generated image: {}", e))?;
+    }
+
+    Ok(format!("assets/{}", filename))
+}
+
+#[allow(dead_code)]
+pub fn persist_image_bytes_legacy(
+    app_data_dir: &Path,
     bytes: &[u8],
     extension: &str,
 ) -> Result<String, String> {
     let images_dir = resolve_images_dir(app_data_dir)?;
     let digest = md5::compute(bytes);
     let filename = format!("{:x}.{}", digest, normalize_extension(extension));
-    let output_path = images_dir.join(filename);
+    let output_path = images_dir.join(&filename);
 
     if !output_path.exists() {
         std::fs::write(&output_path, bytes)
@@ -229,6 +249,7 @@ pub async fn resolve_source_bytes(source: &str) -> Result<(Vec<u8>, String), Str
 
 fn prepare_node_image_from_bytes(
     app_data_dir: &Path,
+    project_id: &str,
     bytes: &[u8],
     extension: &str,
     safe_max_dimension: u32,
@@ -246,7 +267,7 @@ fn prepare_node_image_from_bytes(
     let height = raw_height.max(1);
 
     let persist_started = Instant::now();
-    let image_path = persist_image_bytes(app_data_dir, bytes, extension)?;
+    let image_path = persist_image_bytes(app_data_dir, project_id, bytes, extension)?;
     let persist_elapsed = persist_started.elapsed().as_millis();
     let longest_side = width.max(height);
     let bypass_preview = longest_side <= safe_max_dimension
@@ -293,7 +314,7 @@ fn prepare_node_image_from_bytes(
     resized
         .write_to(&mut preview_buffer, image::ImageFormat::Png)
         .map_err(|e| format!("Failed to encode preview image: {}", e))?;
-    let preview_image_path = persist_image_bytes(app_data_dir, preview_buffer.get_ref(), "png")?;
+    let preview_image_path = persist_image_bytes(app_data_dir, project_id, preview_buffer.get_ref(), "png")?;
     let resize_elapsed = resize_started.elapsed().as_millis();
 
     info!(
@@ -320,6 +341,7 @@ fn prepare_node_image_from_bytes(
 
 pub fn prepare_from_bytes(
     app_data_dir: &Path,
+    project_id: &str,
     bytes: &[u8],
     extension: &str,
     max_preview_dimension: u32,
@@ -331,6 +353,7 @@ pub fn prepare_from_bytes(
     let safe_max_dimension = max_preview_dimension.clamp(64, 4096);
     prepare_node_image_from_bytes(
         app_data_dir,
+        project_id,
         bytes,
         &normalize_extension(extension),
         safe_max_dimension,
@@ -340,6 +363,7 @@ pub fn prepare_from_bytes(
 
 pub async fn prepare_from_source(
     app_data_dir: &Path,
+    project_id: &str,
     source: &str,
     max_preview_dimension: u32,
 ) -> Result<PrepareNodeImageResponseDto, String> {
@@ -351,10 +375,24 @@ pub async fn prepare_from_source(
 
     let safe_max_dimension = max_preview_dimension.clamp(64, 4096);
     let resolve_started = Instant::now();
-    let (bytes, extension) = resolve_source_bytes(trimmed).await?;
+    let (bytes, extension) = if trimmed.starts_with("assets/") {
+        let asset_path =
+            crate::project::file_store::read_project_asset(app_data_dir, project_id, trimmed)?;
+        let ext = asset_path
+            .extension()
+            .and_then(|item| item.to_str())
+            .map(normalize_extension)
+            .unwrap_or_else(|| "png".to_string());
+        let bytes = std::fs::read(&asset_path)
+            .map_err(|err| format!("Failed to read project asset: {err}"))?;
+        (bytes, ext)
+    } else {
+        resolve_source_bytes(trimmed).await?
+    };
     let resolve_elapsed = resolve_started.elapsed().as_millis();
     let result = prepare_node_image_from_bytes(
         app_data_dir,
+        project_id,
         &bytes,
         &extension,
         safe_max_dimension,

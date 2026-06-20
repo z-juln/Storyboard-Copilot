@@ -31,7 +31,7 @@ use crate::media::upload::{
     cleanup_stale_upload_sessions, complete_upload_session, create_upload_session,
     remove_upload_session, write_upload_chunk, UPLOAD_CHUNK_SIZE,
 };
-use crate::project::dto::{ProjectRecord, RenameProjectRequestDto, UpdateProjectViewportRequestDto};
+use crate::project::dto::{ProjectSnapshot, RenameProjectRequestDto, UpdateProjectViewportRequestDto};
 use crate::project::ProjectService;
 
 #[derive(Clone)]
@@ -46,44 +46,46 @@ struct ImagePathQuery {
     path: String,
 }
 
-pub fn resolve_api_db_path(app: &AppHandle) -> Result<PathBuf, String> {
+#[derive(Debug, Deserialize)]
+struct ProjectAssetQuery {
+    path: String,
+}
+
+pub fn resolve_app_data_dir(app: &AppHandle) -> Result<PathBuf, String> {
     let app_data_dir = app
         .path()
         .app_data_dir()
         .map_err(|err| format!("Failed to resolve app data dir: {err}"))?;
     std::fs::create_dir_all(&app_data_dir)
         .map_err(|err| format!("Failed to create app data dir: {err}"))?;
-    Ok(app_data_dir.join("projects.db"))
+    Ok(app_data_dir)
 }
 
-pub fn resolve_api_db_path_standalone() -> PathBuf {
+pub fn resolve_api_app_data_dir_standalone() -> PathBuf {
     directories::ProjectDirs::from("com", "storyboard", "copilot")
-        .map(|dirs| dirs.data_dir().join("projects.db"))
-        .unwrap_or_else(|| std::env::temp_dir().join("storyboard-copilot/projects.db"))
+        .map(|dirs| dirs.data_dir().to_path_buf())
+        .unwrap_or_else(|| std::env::temp_dir().join("storyboard-copilot"))
 }
 
 pub async fn start_http_server(app: AppHandle) -> Result<(), String> {
-    let db_path = resolve_api_db_path(&app)?;
-    start_http_server_with_db(db_path).await
+    let app_data_dir = resolve_app_data_dir(&app)?;
+    start_http_server_with_app_data(app_data_dir).await
 }
 
-pub async fn start_http_server_with_db(db_path: PathBuf) -> Result<(), String> {
+pub async fn start_http_server_with_app_data(app_data_dir: PathBuf) -> Result<(), String> {
     let host = std::env::var("STORYBOARD_API_HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
     let port = std::env::var("STORYBOARD_API_PORT")
         .ok()
         .and_then(|value| value.parse::<u16>().ok())
         .unwrap_or(1421);
 
-    let app_data_dir = db_path
-        .parent()
-        .map(PathBuf::from)
-        .unwrap_or_else(|| db_path.clone());
+    let ai_db_path = app_data_dir.join("projects.db");
 
     let _ = cleanup_stale_upload_sessions(&app_data_dir);
 
     let state = HttpState {
-        ai: Arc::new(AiService::new(db_path.clone())),
-        project: Arc::new(ProjectService::new(db_path)),
+        ai: Arc::new(AiService::new(ai_db_path)),
+        project: Arc::new(ProjectService::new(app_data_dir.clone())),
         app_data_dir,
     };
 
@@ -103,7 +105,7 @@ pub async fn start_http_server_with_db(db_path: PathBuf) -> Result<(), String> {
 
     let upload_routes = Router::new()
         .route(
-            "/api/v1/images/upload-sessions/:upload_id/chunks/:chunk_index",
+            "/api/v1/projects/:project_id/images/upload-sessions/:upload_id/chunks/:chunk_index",
             put(upload_image_chunk),
         )
         .layer(DefaultBodyLimit::max(UPLOAD_CHUNK_SIZE + 4096));
@@ -124,20 +126,31 @@ pub async fn start_http_server_with_db(db_path: PathBuf) -> Result<(), String> {
             put(update_project_viewport),
         )
         .route("/api/v1/projects/:project_id/rename", put(rename_project))
-        .route("/api/v1/image", get(serve_image))
-        .route("/api/v1/images/upload-sessions", post(create_image_upload_session))
         .route(
-            "/api/v1/images/upload-sessions/:upload_id/complete",
+            "/api/v1/projects/:project_id/assets/:file_name",
+            put(put_project_asset),
+        )
+        .route(
+            "/api/v1/projects/:project_id/assets",
+            get(serve_project_asset),
+        )
+        .route(
+            "/api/v1/projects/:project_id/images/upload-sessions",
+            post(create_image_upload_session),
+        )
+        .route(
+            "/api/v1/projects/:project_id/images/upload-sessions/:upload_id/complete",
             post(complete_image_upload),
         )
         .route(
-            "/api/v1/images/upload-sessions/:upload_id",
+            "/api/v1/projects/:project_id/images/upload-sessions/:upload_id",
             delete(abort_image_upload),
         )
         .route(
-            "/api/v1/images/prepare-from-source",
+            "/api/v1/projects/:project_id/images/prepare-from-source",
             post(prepare_image_from_source),
         )
+        .route("/api/v1/image", get(serve_image))
         .route("/image", get(serve_image))
         .merge(upload_routes)
         .layer(cors)
@@ -159,6 +172,14 @@ pub async fn start_http_server_with_db(db_path: PathBuf) -> Result<(), String> {
     });
 
     Ok(())
+}
+
+pub async fn start_http_server_with_db(db_path: PathBuf) -> Result<(), String> {
+    let app_data_dir = db_path
+        .parent()
+        .map(PathBuf::from)
+        .unwrap_or_else(|| db_path.clone());
+    start_http_server_with_app_data(app_data_dir).await
 }
 
 async fn health() -> Json<HealthResponseDto> {
@@ -227,8 +248,8 @@ async fn get_project(
     State(state): State<HttpState>,
     Path(project_id): Path<String>,
 ) -> Response {
-    match state.project.get_record(&project_id) {
-        Ok(Some(record)) => Json(record).into_response(),
+    match state.project.get_snapshot(&project_id) {
+        Ok(Some(snapshot)) => Json(snapshot).into_response(),
         Ok(None) => api_error(StatusCode::NOT_FOUND, format!("项目不存在: {project_id}")),
         Err(err) => api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
     }
@@ -237,16 +258,16 @@ async fn get_project(
 async fn upsert_project(
     State(state): State<HttpState>,
     Path(project_id): Path<String>,
-    Json(record): Json<ProjectRecord>,
+    Json(snapshot): Json<ProjectSnapshot>,
 ) -> Response {
-    if record.id != project_id {
+    if snapshot.id != project_id {
         return api_error(
             StatusCode::BAD_REQUEST,
             "路径 projectId 与请求体 id 不一致".to_string(),
         );
     }
 
-    match state.project.upsert_record(record) {
+    match state.project.upsert_snapshot(snapshot) {
         Ok(()) => StatusCode::NO_CONTENT.into_response(),
         Err(err) => api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
     }
@@ -257,10 +278,12 @@ async fn update_project_viewport(
     Path(project_id): Path<String>,
     Json(request): Json<UpdateProjectViewportRequestDto>,
 ) -> Response {
-    match state
-        .project
-        .update_viewport(&project_id, &request.viewport_json)
-    {
+    let viewport = match serde_json::from_str(&request.viewport_json) {
+        Ok(value) => value,
+        Err(err) => return api_error(StatusCode::BAD_REQUEST, format!("Invalid viewport_json: {err}")),
+    };
+
+    match state.project.update_viewport(&project_id, viewport) {
         Ok(()) => StatusCode::NO_CONTENT.into_response(),
         Err(err) => api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
     }
@@ -290,7 +313,10 @@ async fn delete_project(
     }
 }
 
-async fn create_image_upload_session(State(state): State<HttpState>) -> Response {
+async fn create_image_upload_session(
+    State(state): State<HttpState>,
+    Path(_project_id): Path<String>,
+) -> Response {
     match create_upload_session(&state.app_data_dir) {
         Ok(result) => Json(result).into_response(),
         Err(err) => api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
@@ -299,7 +325,7 @@ async fn create_image_upload_session(State(state): State<HttpState>) -> Response
 
 async fn upload_image_chunk(
     State(state): State<HttpState>,
-    Path((upload_id, chunk_index)): Path<(String, u32)>,
+    Path((_project_id, upload_id, chunk_index)): Path<(String, String, u32)>,
     body: Bytes,
 ) -> Response {
     match write_upload_chunk(&state.app_data_dir, &upload_id, chunk_index, &body) {
@@ -310,10 +336,10 @@ async fn upload_image_chunk(
 
 async fn complete_image_upload(
     State(state): State<HttpState>,
-    Path(upload_id): Path<String>,
+    Path((project_id, upload_id)): Path<(String, String)>,
     Json(request): Json<CompleteImageUploadRequestDto>,
 ) -> Response {
-    match complete_upload_session(&state.app_data_dir, &upload_id, request) {
+    match complete_upload_session(&state.app_data_dir, &project_id, &upload_id, request) {
         Ok(result) => Json(result).into_response(),
         Err(err) => api_error(StatusCode::BAD_REQUEST, err),
     }
@@ -321,7 +347,7 @@ async fn complete_image_upload(
 
 async fn abort_image_upload(
     State(state): State<HttpState>,
-    Path(upload_id): Path<String>,
+    Path((_project_id, upload_id)): Path<(String, String)>,
 ) -> Response {
     match remove_upload_session(&state.app_data_dir, &upload_id) {
         Ok(()) => StatusCode::NO_CONTENT.into_response(),
@@ -331,6 +357,7 @@ async fn abort_image_upload(
 
 async fn prepare_image_from_source(
     State(state): State<HttpState>,
+    Path(project_id): Path<String>,
     Json(request): Json<PrepareFromSourceRequestDto>,
 ) -> Response {
     if request.source.trim().starts_with("data:") {
@@ -341,9 +368,55 @@ async fn prepare_image_from_source(
     }
 
     let max_preview = request.max_preview_dimension.unwrap_or(512);
-    match prepare_from_source(&state.app_data_dir, &request.source, max_preview).await {
+    match prepare_from_source(
+        &state.app_data_dir,
+        &project_id,
+        &request.source,
+        max_preview,
+    )
+    .await
+    {
         Ok(result) => Json(result).into_response(),
         Err(err) => api_error(StatusCode::BAD_REQUEST, err),
+    }
+}
+
+async fn put_project_asset(
+    State(state): State<HttpState>,
+    Path((project_id, file_name)): Path<(String, String)>,
+    body: Bytes,
+) -> Response {
+    match crate::project::file_store::write_project_asset(
+        &state.app_data_dir,
+        &project_id,
+        &file_name,
+        &body,
+    ) {
+        Ok(path) => Json(json!({ "path": path })).into_response(),
+        Err(err) => api_error(StatusCode::BAD_REQUEST, err),
+    }
+}
+
+async fn serve_project_asset(
+    State(state): State<HttpState>,
+    Path(project_id): Path<String>,
+    Query(query): Query<ProjectAssetQuery>,
+) -> Response {
+    match crate::project::file_store::read_project_asset(
+        &state.app_data_dir,
+        &project_id,
+        &query.path,
+    ) {
+        Ok(path) => match read_local_image(&state.app_data_dir, &path.to_string_lossy()) {
+            Ok((bytes, mime)) => (
+                StatusCode::OK,
+                [(header::CONTENT_TYPE, mime)],
+                bytes,
+            )
+                .into_response(),
+            Err(err) => api_error(StatusCode::NOT_FOUND, err),
+        },
+        Err(err) => api_error(StatusCode::NOT_FOUND, err),
     }
 }
 

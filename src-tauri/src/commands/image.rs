@@ -860,7 +860,7 @@ fn persist_image_bytes(app: &AppHandle, bytes: &[u8], extension: &str) -> Result
         .path()
         .app_data_dir()
         .map_err(|e| format!("Failed to resolve app data dir: {}", e))?;
-    store::persist_image_bytes(&app_data_dir, bytes, extension)
+    store::persist_image_bytes_legacy(&app_data_dir, bytes, extension)
 }
 
 fn read_storyboard_metadata_from_png_bytes(bytes: &[u8]) -> Result<Option<StoryboardImageMetadata>, String> {

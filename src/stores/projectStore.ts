@@ -6,274 +6,50 @@ import {
   type CanvasEdge,
   type CanvasHistoryState,
   type CanvasNode,
-  type CanvasNodeData,
 } from './canvasStore';
 import {
   deleteProjectRecord,
-  getProjectRecord,
+  getProjectSnapshot,
   listProjectSummaries,
   renameProjectRecord,
   updateProjectViewportRecord,
-  upsertProjectRecord,
-  type ProjectRecord,
+  upsertProjectSnapshot,
   type ProjectSummaryRecord,
 } from '@/commands/projectState';
 import {
-  buildComponentDocProject,
+  loadComponentDocProject,
+  seedComponentDocBundle,
   isComponentDocEnabled,
   isComponentDocProjectId,
   mergeComponentDocProjectSummaries,
 } from '@/features/canvas/component-doc';
+import {
+  createEmptyHistory,
+  DEFAULT_VIEWPORT,
+  projectToSnapshot,
+  snapshotToProject,
+  type Project,
+  type ProjectSummary,
+} from '@/features/project';
 
-const DEFAULT_VIEWPORT: Viewport = {
-  x: 0,
-  y: 0,
-  zoom: 1,
-};
+export type { Project, ProjectSummary } from '@/features/project';
 
-function createEmptyHistory(): CanvasHistoryState {
-  return {
-    past: [],
-    future: [],
-  };
-}
-
-const IMAGE_REF_PREFIX = '__img_ref__:';
 let openProjectRequestSeq = 0;
 const UPSERT_DEBOUNCE_MS = 260;
 const VIEWPORT_UPSERT_DEBOUNCE_MS = 280;
 const VIEWPORT_EPSILON = 0.001;
 const IDLE_PERSIST_TIMEOUT_MS = 1200;
 const FALLBACK_IDLE_DELAY_MS = 64;
-const MAX_PERSISTED_HISTORY_STEPS = 12;
-const MAX_HISTORY_RESTORE_JSON_CHARS = 1_500_000;
 const DELETE_RETRY_DELAY_MS = 80;
 const MAX_DELETE_RETRIES = 10;
 
 const queuedProjectUpserts = new Map<string, Project>();
 const projectUpsertTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const projectUpsertsInFlight = new Set<string>();
-const queuedViewportUpserts = new Map<string, string>();
+const queuedViewportUpserts = new Map<string, Viewport>();
 const viewportUpsertTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const viewportUpsertsInFlight = new Set<string>();
 const deletingProjectIds = new Set<string>();
-
-export interface ProjectSummary {
-  id: string;
-  name: string;
-  createdAt: number;
-  updatedAt: number;
-  nodeCount: number;
-}
-
-export interface Project extends ProjectSummary {
-  nodes: CanvasNode[];
-  edges: CanvasEdge[];
-  viewport: Viewport;
-  history: CanvasHistoryState;
-}
-
-type PersistedProject = Project & {
-  imagePool?: string[];
-};
-
-function encodeImageReference(
-  imageUrl: string | null | undefined,
-  imagePool: string[],
-  imageIndexMap: Map<string, number>
-): string | null | undefined {
-  if (typeof imageUrl !== 'string' || imageUrl.length === 0) {
-    return imageUrl;
-  }
-
-  const existingIndex = imageIndexMap.get(imageUrl);
-  if (typeof existingIndex === 'number') {
-    return `${IMAGE_REF_PREFIX}${existingIndex}`;
-  }
-
-  const nextIndex = imagePool.length;
-  imagePool.push(imageUrl);
-  imageIndexMap.set(imageUrl, nextIndex);
-  return `${IMAGE_REF_PREFIX}${nextIndex}`;
-}
-
-function decodeImageReference(
-  imageUrl: string | null | undefined,
-  imagePool: string[] | undefined
-): string | null | undefined {
-  if (typeof imageUrl !== 'string' || !imagePool || !imageUrl.startsWith(IMAGE_REF_PREFIX)) {
-    return imageUrl;
-  }
-
-  const index = Number.parseInt(imageUrl.slice(IMAGE_REF_PREFIX.length), 10);
-  if (!Number.isFinite(index) || index < 0) {
-    return imageUrl;
-  }
-
-  return imagePool[index] ?? null;
-}
-
-function mapNodeImageReferences(
-  nodes: CanvasNode[],
-  mapImageUrl: (imageUrl: string | null | undefined) => string | null | undefined
-): CanvasNode[] {
-  return nodes.map((node) => {
-    const nodeData = node.data as Record<string, unknown>;
-    const nextData: Record<string, unknown> = { ...nodeData };
-
-    if ('imageUrl' in nextData) {
-      nextData.imageUrl = mapImageUrl(nextData.imageUrl as string | null | undefined) ?? null;
-    }
-    if ('previewImageUrl' in nextData) {
-      nextData.previewImageUrl =
-        mapImageUrl(nextData.previewImageUrl as string | null | undefined) ?? null;
-    }
-
-    if (Array.isArray(nextData.frames)) {
-      nextData.frames = nextData.frames.map((frame) => {
-        if (!frame || typeof frame !== 'object') {
-          return frame;
-        }
-
-        const frameRecord = frame as Record<string, unknown>;
-        if (!('imageUrl' in frameRecord)) {
-          return frame;
-        }
-
-        return {
-          ...frameRecord,
-          imageUrl: mapImageUrl(frameRecord.imageUrl as string | null | undefined) ?? null,
-          previewImageUrl:
-            mapImageUrl(frameRecord.previewImageUrl as string | null | undefined) ?? null,
-        };
-      });
-    }
-
-    return {
-      ...node,
-      data: nextData as CanvasNodeData,
-    };
-  });
-}
-
-function mapHistoryImageReferences(
-  history: CanvasHistoryState,
-  mapImageUrl: (imageUrl: string | null | undefined) => string | null | undefined
-): CanvasHistoryState {
-  return {
-    past: history.past.map((snapshot) => ({
-      ...snapshot,
-      nodes: mapNodeImageReferences(snapshot.nodes, mapImageUrl),
-    })),
-    future: history.future.map((snapshot) => ({
-      ...snapshot,
-      nodes: mapNodeImageReferences(snapshot.nodes, mapImageUrl),
-    })),
-  };
-}
-
-function trimHistoryForPersistence(history: CanvasHistoryState): CanvasHistoryState {
-  return {
-    past: history.past.slice(-MAX_PERSISTED_HISTORY_STEPS),
-    future: history.future.slice(-MAX_PERSISTED_HISTORY_STEPS),
-  };
-}
-
-function encodeProject(project: Project): PersistedProject {
-  const imagePool: string[] = [];
-  const imageIndexMap = new Map<string, number>();
-  const encode = (imageUrl: string | null | undefined) =>
-    encodeImageReference(imageUrl, imagePool, imageIndexMap);
-
-  return {
-    ...project,
-    nodes: mapNodeImageReferences(project.nodes, encode),
-    history: mapHistoryImageReferences(project.history, encode),
-    imagePool,
-  };
-}
-
-function decodeProject(project: PersistedProject): Project {
-  const decode = (imageUrl: string | null | undefined) =>
-    decodeImageReference(imageUrl, project.imagePool);
-
-  return {
-    ...project,
-    nodes: mapNodeImageReferences(project.nodes, decode),
-    history: mapHistoryImageReferences(project.history, decode),
-  };
-}
-
-function safeParseJson<T>(value: string, fallback: T): T {
-  try {
-    return JSON.parse(value) as T;
-  } catch {
-    return fallback;
-  }
-}
-
-function extractImagePoolFromHistoryJson(historyJson: string): string[] {
-  const imagePoolKey = '"imagePool"';
-  const keyIndex = historyJson.indexOf(imagePoolKey);
-  if (keyIndex < 0) {
-    return [];
-  }
-
-  const arrayStart = historyJson.indexOf('[', keyIndex + imagePoolKey.length);
-  if (arrayStart < 0) {
-    return [];
-  }
-
-  let depth = 0;
-  let inString = false;
-  let escaped = false;
-  let arrayEnd = -1;
-
-  for (let index = arrayStart; index < historyJson.length; index += 1) {
-    const char = historyJson[index];
-
-    if (inString) {
-      if (escaped) {
-        escaped = false;
-      } else if (char === '\\') {
-        escaped = true;
-      } else if (char === '"') {
-        inString = false;
-      }
-      continue;
-    }
-
-    if (char === '"') {
-      inString = true;
-      continue;
-    }
-
-    if (char === '[') {
-      depth += 1;
-      continue;
-    }
-
-    if (char === ']') {
-      depth -= 1;
-      if (depth === 0) {
-        arrayEnd = index;
-        break;
-      }
-    }
-  }
-
-  if (arrayEnd < 0) {
-    return [];
-  }
-
-  const rawArrayJson = historyJson.slice(arrayStart, arrayEnd + 1);
-  const parsed = safeParseJson<unknown>(rawArrayJson, []);
-  if (!Array.isArray(parsed)) {
-    return [];
-  }
-
-  return parsed.filter((item): item is string => typeof item === 'string');
-}
 
 function toProjectSummary(record: ProjectSummaryRecord): ProjectSummary {
   return {
@@ -282,74 +58,6 @@ function toProjectSummary(record: ProjectSummaryRecord): ProjectSummary {
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
     nodeCount: record.nodeCount,
-  };
-}
-
-function toProjectRecord(project: Project): ProjectRecord {
-  const encodedProject = encodeProject(project);
-  const persistedNodes = encodedProject.nodes;
-  const persistedHistory = trimHistoryForPersistence(encodedProject.history);
-
-  return {
-    id: encodedProject.id,
-    name: encodedProject.name,
-    createdAt: encodedProject.createdAt,
-    updatedAt: encodedProject.updatedAt,
-    nodeCount: encodedProject.nodeCount,
-    nodesJson: JSON.stringify(persistedNodes),
-    edgesJson: JSON.stringify(encodedProject.edges),
-    viewportJson: JSON.stringify(encodedProject.viewport),
-    historyJson: JSON.stringify({
-      ...persistedHistory,
-      imagePool: encodedProject.imagePool ?? [],
-    }),
-  };
-}
-
-function fromProjectRecord(record: ProjectRecord): Project {
-  const parsedNodes = safeParseJson<CanvasNode[]>(record.nodesJson, []);
-  const parsedEdges = safeParseJson<CanvasEdge[]>(record.edgesJson, []);
-  const parsedViewport = safeParseJson<Viewport>(record.viewportJson, DEFAULT_VIEWPORT);
-  const shouldRestoreHistory = record.historyJson.length <= MAX_HISTORY_RESTORE_JSON_CHARS;
-  const extractedImagePool = extractImagePoolFromHistoryJson(record.historyJson);
-  const parsedHistoryPayload = shouldRestoreHistory
-    ? safeParseJson<{
-        past?: CanvasHistoryState['past'];
-        future?: CanvasHistoryState['future'];
-        imagePool?: string[];
-      }>(record.historyJson, {})
-    : {};
-
-  if (!shouldRestoreHistory) {
-    console.warn(
-      `Skip restoring oversized history payload (${record.historyJson.length} chars) for project ${record.id}`
-    );
-  }
-
-  const parsedHistory = {
-    past: parsedHistoryPayload.past ?? [],
-    future: parsedHistoryPayload.future ?? [],
-  };
-
-  const persistedProject: PersistedProject = {
-    id: record.id,
-    name: record.name,
-    createdAt: record.createdAt,
-    updatedAt: record.updatedAt,
-    nodeCount: record.nodeCount,
-    nodes: parsedNodes,
-    edges: parsedEdges,
-    viewport: parsedViewport ?? DEFAULT_VIEWPORT,
-    history: parsedHistory,
-    imagePool: parsedHistoryPayload.imagePool ?? extractedImagePool,
-  };
-
-  const decodedProject = decodeProject(persistedProject);
-  return {
-    ...decodedProject,
-    nodeCount: parsedNodes.length,
-    viewport: decodedProject.viewport ?? DEFAULT_VIEWPORT,
-    history: decodedProject.history ?? createEmptyHistory(),
   };
 }
 
@@ -445,8 +153,8 @@ function flushProjectUpsert(projectId: string, options?: FlushProjectUpsertOptio
       return;
     }
 
-    const record = toProjectRecord(project);
-    void upsertProjectRecord(record)
+    const snapshot = projectToSnapshot(project);
+    void upsertProjectSnapshot(snapshot)
       .catch((error) => {
         console.error('Failed to persist project record', error);
       })
@@ -498,15 +206,15 @@ function flushViewportUpsert(projectId: string): void {
     return;
   }
 
-  const viewportJson = queuedViewportUpserts.get(projectId);
-  if (typeof viewportJson !== 'string') {
+  const viewport = queuedViewportUpserts.get(projectId);
+  if (!viewport) {
     return;
   }
 
   queuedViewportUpserts.delete(projectId);
   viewportUpsertsInFlight.add(projectId);
 
-  void updateProjectViewportRecord(projectId, viewportJson)
+  void updateProjectViewportRecord(projectId, viewport)
     .catch((error) => {
       console.error('Failed to persist project viewport', error);
     })
@@ -532,7 +240,7 @@ function queueViewportUpsert(
     return;
   }
   deletingProjectIds.delete(projectId);
-  queuedViewportUpserts.set(projectId, JSON.stringify(viewport));
+  queuedViewportUpserts.set(projectId, viewport);
 
   const existingTimer = viewportUpsertTimers.get(projectId);
   if (existingTimer) {
@@ -735,13 +443,28 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     useCanvasStore.getState().closeImageViewer();
 
     if (isComponentDocProjectId(id)) {
-      const project = buildComponentDocProject();
-      set({
-        currentProjectId: id,
-        currentProject: project,
-        isOpeningProject: false,
-        projects: mergeComponentDocProjectSummaries(get().projects),
-      });
+      set({ isOpeningProject: true });
+      void (async () => {
+        try {
+          await seedComponentDocBundle();
+          if (reqSeq !== openProjectRequestSeq) {
+            return;
+          }
+          const project = loadComponentDocProject();
+          set({
+            currentProjectId: id,
+            currentProject: project,
+            isOpeningProject: false,
+            projects: mergeComponentDocProjectSummaries(get().projects),
+          });
+        } catch (error) {
+          if (reqSeq !== openProjectRequestSeq) {
+            return;
+          }
+          console.error('Failed to open component doc project', error);
+          set({ isOpeningProject: false });
+        }
+      })();
       return;
     }
 
@@ -749,16 +472,16 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
     void (async () => {
       try {
-        const record = await getProjectRecord(id);
+        const snapshot = await getProjectSnapshot(id);
         if (reqSeq !== openProjectRequestSeq) {
           return;
         }
-        if (!record) {
+        if (!snapshot) {
           set({ isOpeningProject: false });
           return;
         }
 
-        const project = fromProjectRecord(record);
+        const project = snapshotToProject(snapshot);
         set((state) => ({
           currentProjectId: id,
           currentProject: project,

@@ -68,6 +68,7 @@ pub fn write_upload_chunk(
 
 pub fn complete_upload_session(
     app_data_dir: &Path,
+    project_id: &str,
     upload_id: &str,
     request: CompleteImageUploadRequestDto,
 ) -> Result<PrepareNodeImageResponseDto, String> {
@@ -115,6 +116,7 @@ pub fn complete_upload_session(
     let max_preview = request.max_preview_dimension.unwrap_or(512);
     let prepared = prepare_from_bytes(
         app_data_dir,
+        project_id,
         &assembled,
         &normalize_extension(&request.extension),
         max_preview,

@@ -6,7 +6,7 @@
 
 - 产品：节点画布工作台，支持图片上传、AI 生成/编辑、裁剪/标注/分镜、导出。
 - 前端：React + TypeScript + Zustand + @xyflow/react + TailwindCSS。
-- 后端：Tauri 2 + Rust + SQLite（rusqlite，WAL）。
+- 后端：Tauri 2 + Rust；项目画布持久化为目录 Bundle（`project.json` + `assets/`），SQLite 仅作旧数据迁移来源。
 - 原则：解耦、可扩展、可回归验证、自动持久化、交互性能优先。
 
 ## 优先阅读
@@ -16,7 +16,7 @@
 - 节点：`src/features/canvas/nodes/`, `src/features/canvas/ui/`
 - 工具：`src/features/canvas/tools/`, `src/features/canvas/application/toolProcessor.ts`
 - 模型：`src/features/canvas/models/`, `src-tauri/src/ai/`
-- 持久化：`src/commands/projectState.ts`, `src-tauri/src/commands/project_state.rs`
+- 持久化：`src/features/project/`, `src/commands/projectState.ts`, `src-tauri/src/project/file_store.rs`
 
 ## 改动路由
 
@@ -26,7 +26,7 @@
 | 新节点 | `canvasNodes.ts`, `nodeRegistry.ts`, `nodes/index.ts` |
 | 新工具 | `tools/types.ts`, `builtInTools.ts`, `tool-editors/`, `toolProcessor.ts` |
 | 新模型/供应商 | `models/image/<provider>/`, `models/providers/`, `src-tauri/src/ai/providers/` |
-| 持久化 | `projectStore.ts`, `projectState.ts`, `project_state.rs` |
+| 持久化 | `projectStore.ts`, `features/project/`, `projectState.ts`, `file_store.rs` |
 
 ## 硬约束
 
@@ -46,8 +46,7 @@
 - 项目快照使用防抖 + idle 调度。
 - 视口保存走独立轻量通道 `update_project_viewport_record`，不要回退到整项目 upsert。
 - 大图渲染优先用 `previewImageUrl`，模型/工具处理使用原图 `imageUrl`。
-- 新增图片字段需同步 `imagePool + __img_ref__` 编码/解码。
-- SQLite 表结构变化必须在 `ensure_projects_table` 中做自愈迁移。
+- 项目资源写入 `projects/<id>/assets/`；JSON 存 `assets/...` 相对路径或网络 URL。
 
 ## 验证
 

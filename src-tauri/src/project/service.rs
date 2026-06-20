@@ -1,50 +1,46 @@
 use std::path::{Path, PathBuf};
 
-use super::dto::{ProjectRecord, ProjectSummaryRecord};
-use super::store;
+use super::dto::{ProjectSnapshot, ProjectSummaryRecord};
+use super::file_store;
 
 pub struct ProjectService {
-    db_path: PathBuf,
     app_data_dir: PathBuf,
 }
 
 impl ProjectService {
-    pub fn new(db_path: PathBuf) -> Self {
-        let app_data_dir = db_path
-            .parent()
-            .map(Path::to_path_buf)
-            .unwrap_or_else(|| db_path.clone());
-        Self {
-            db_path,
-            app_data_dir,
-        }
+    pub fn new(app_data_dir: PathBuf) -> Self {
+        Self { app_data_dir }
     }
 
-    pub fn db_path(&self) -> &Path {
-        &self.db_path
+    pub fn app_data_dir(&self) -> &Path {
+        &self.app_data_dir
     }
 
     pub fn list_summaries(&self) -> Result<Vec<ProjectSummaryRecord>, String> {
-        store::list_project_summaries(&self.db_path)
+        file_store::list_project_summaries(&self.app_data_dir)
     }
 
-    pub fn get_record(&self, project_id: &str) -> Result<Option<ProjectRecord>, String> {
-        store::get_project_record(&self.db_path, project_id)
+    pub fn get_snapshot(&self, project_id: &str) -> Result<Option<ProjectSnapshot>, String> {
+        file_store::get_project_snapshot(&self.app_data_dir, project_id)
     }
 
-    pub fn upsert_record(&self, record: ProjectRecord) -> Result<(), String> {
-        store::upsert_project_record(&self.db_path, &self.app_data_dir, record)
+    pub fn upsert_snapshot(&self, snapshot: ProjectSnapshot) -> Result<(), String> {
+        file_store::write_project_snapshot(&self.app_data_dir, &snapshot)
     }
 
-    pub fn update_viewport(&self, project_id: &str, viewport_json: &str) -> Result<(), String> {
-        store::update_project_viewport_record(&self.db_path, project_id, viewport_json)
+    pub fn update_viewport(
+        &self,
+        project_id: &str,
+        viewport: serde_json::Value,
+    ) -> Result<(), String> {
+        file_store::update_project_viewport(&self.app_data_dir, project_id, viewport)
     }
 
     pub fn rename(&self, project_id: &str, name: &str, updated_at: i64) -> Result<(), String> {
-        store::rename_project_record(&self.db_path, project_id, name, updated_at)
+        file_store::rename_project(&self.app_data_dir, project_id, name, updated_at)
     }
 
     pub fn delete(&self, project_id: &str) -> Result<(), String> {
-        store::delete_project_record(&self.db_path, &self.app_data_dir, project_id)
+        file_store::delete_project(&self.app_data_dir, project_id)
     }
 }
