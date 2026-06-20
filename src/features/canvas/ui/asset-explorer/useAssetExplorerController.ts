@@ -56,6 +56,7 @@ import {
   PROJECT_ASSET_DRAG_MIME,
   serializeProjectAssetDragPayload,
 } from '@/features/canvas/application/createUploadNodeFromProjectAsset';
+import { subscribeAssetExplorerReveal } from '@/features/canvas/application/assetExplorerRevealBridge';
 import { rustApiClient } from '@/infrastructure/rustApiClient';
 import { isTypingTarget } from '@/features/canvas/application/canvasKeyboard';
 import { useCanvasStore } from '@/stores/canvasStore';
@@ -87,6 +88,8 @@ export function useAssetExplorerController({
   const [deleteConfirm, setDeleteConfirm] = useState<DeleteConfirmState | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [previewState, setPreviewState] = useState<AssetPreviewState | null>(null);
+  const [flashPath, setFlashPath] = useState<string | null>(null);
+  const [revealPath, setRevealPath] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const dragSourcePathsRef = useRef<string[]>([]);
 
@@ -118,6 +121,56 @@ export function useAssetExplorerController({
   useEffect(() => {
     void loadTree();
   }, [loadTree]);
+
+  const revealAssetInTree = useCallback(
+    async (path: string) => {
+      const normalized = normalizeAssetPath(path);
+      setSearchScope(null);
+      setRevealPath(normalized);
+      setFlashPath(normalized);
+      selectSingle(normalized);
+      await loadTree();
+      window.requestAnimationFrame(() => {
+        const escaped = typeof CSS !== 'undefined' && 'escape' in CSS ? CSS.escape(normalized) : normalized;
+        containerRef.current
+          ?.querySelector(`[data-asset-path="${escaped}"]`)
+          ?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      });
+    },
+    [loadTree, selectSingle]
+  );
+
+  useEffect(() => {
+    return subscribeAssetExplorerReveal((path) => {
+      void revealAssetInTree(path);
+    });
+  }, [revealAssetInTree]);
+
+  useEffect(() => {
+    if (!flashPath) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setFlashPath(null);
+    }, 2400);
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [flashPath]);
+
+  useEffect(() => {
+    if (!revealPath) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setRevealPath(null);
+    }, 8000);
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [revealPath]);
 
   useEffect(() => {
     const handleDragEnd = () => {
@@ -770,6 +823,8 @@ export function useAssetExplorerController({
     selectedPaths,
     renamingPath,
     dropTargetPath,
+    flashPath,
+    revealPath,
     contextMenu,
     searchScope,
     deleteConfirm,

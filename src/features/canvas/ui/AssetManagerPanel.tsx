@@ -1,4 +1,4 @@
-import { memo, useState } from 'react';
+import { memo, useEffect, useState } from 'react';
 import {
   ChevronDown,
   ChevronRight,
@@ -9,6 +9,7 @@ import {
 
 import { UiChipButton, UiIconButton, UiPanel } from '@/components/ui';
 import { buildCanvasNodeTree, type CanvasNodeTreeItem } from '@/features/canvas/application/buildCanvasNodeTree';
+import { canvasEventBus } from '@/features/canvas/application/canvasServices';
 import { isComponentDocProjectId } from '@/features/canvas/component-doc';
 import { useCanvasStore } from '@/stores/canvasStore';
 
@@ -94,6 +95,12 @@ export const AssetManagerPanel = memo(({
   const [activeTab, setActiveTab] = useState<'assets' | 'nodes'>('assets');
   const [explorerKey, setExplorerKey] = useState(0);
   const readOnly = isComponentDocProjectId(projectId);
+
+  useEffect(() => {
+    return canvasEventBus.subscribe('asset-explorer/reveal-asset', () => {
+      setActiveTab('assets');
+    });
+  }, []);
 
   const nodeTree = buildCanvasNodeTree(nodes);
 

@@ -90,6 +90,9 @@ export interface CanvasEventMap {
     nodeId: string;
     file: File;
   };
+  'asset-explorer/reveal-asset': {
+    path: string;
+  };
 }
 
 export interface CanvasEventBus {

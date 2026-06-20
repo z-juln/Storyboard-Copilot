@@ -273,3 +273,28 @@ html[data-platform='macos'][data-shell='tauri'] #root {
     animation: none;
   }
 }
+
+@keyframes asset-explorer-flash {
+  0%,
+  100% {
+    background-color: transparent;
+    box-shadow: none;
+  }
+
+  25%,
+  75% {
+    background-color: color-mix(in srgb, var(--accent) 22%, transparent);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent);
+  }
+}
+
+.asset-explorer-flash {
+  animation: asset-explorer-flash 0.8s ease-in-out 3;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .asset-explorer-flash {
+    animation: none;
+    background-color: color-mix(in srgb, var(--accent) 18%, transparent);
+  }
+}

@@ -25,6 +25,8 @@ export interface AssetExplorerTreeItemProps {
   onOpenPreview: (entry: ProjectDirectoryEntry) => void;
   /** 选中且展开的祖先目录下，当前可见子项也应显示激活态 */
   activeDescendantOfSelection?: boolean;
+  revealPath?: string | null;
+  flashPath?: string | null;
 }
 
 export function AssetExplorerTreeItem({
@@ -44,6 +46,8 @@ export function AssetExplorerTreeItem({
   onDrop,
   onOpenPreview,
   activeDescendantOfSelection = false,
+  revealPath = null,
+  flashPath = null,
 }: AssetExplorerTreeItemProps) {
   const isDirectory = entry.kind === 'directory';
   const [expanded, setExpanded] = useState(depth === 0);
@@ -57,12 +61,22 @@ export function AssetExplorerTreeItem({
     }
   }, [entry.kind, entry.path, renamingPath]);
 
+  useEffect(() => {
+    if (!revealPath || entry.kind !== 'directory') {
+      return;
+    }
+    if (isDescendantAssetPath(entry.path, revealPath)) {
+      setExpanded(true);
+    }
+  }, [entry.kind, entry.path, revealPath]);
+
   const isSelected = selectedPaths.has(normalizeAssetPath(entry.path));
   const isActive = isSelected || activeDescendantOfSelection;
   const childActiveDescendantOfSelection =
     (isSelected || activeDescendantOfSelection) && isDirectory && expanded;
   const isDropTarget = dropTargetPath === entry.path && isDirectory;
   const isRenaming = renamingPath === entry.path;
+  const isFlashing = flashPath === normalizeAssetPath(entry.path);
   const renameInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -103,10 +117,11 @@ export function AssetExplorerTreeItem({
       <div
         role="treeitem"
         aria-selected={isActive}
+        data-asset-path={entry.path}
         draggable={!readOnly && !isRenaming}
         className={`flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-xs ${
           isActive ? 'bg-accent/15 text-accent' : 'text-text-dark hover:bg-bg-dark/70'
-        } ${isDropTarget ? 'ring-1 ring-accent/60' : ''} ${isDirectory ? 'font-medium' : ''}`}
+        } ${isDropTarget ? 'ring-1 ring-accent/60' : ''} ${isFlashing ? 'asset-explorer-flash' : ''} ${isDirectory ? 'font-medium' : ''}`}
         style={{ paddingLeft: `${depth * 12 + 8}px` }}
         onClick={(event) => onSelect(entry.path, event)}
         onDoubleClick={(event) => {
@@ -175,6 +190,8 @@ export function AssetExplorerTreeItem({
           onDrop={onDrop}
           onOpenPreview={onOpenPreview}
           activeDescendantOfSelection={childActiveDescendantOfSelection}
+          revealPath={revealPath}
+          flashPath={flashPath}
         />
       ))}
     </div>

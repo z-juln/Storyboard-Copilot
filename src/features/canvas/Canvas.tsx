@@ -29,6 +29,7 @@ import { useCanvasStore } from '@/stores/canvasStore';
 import { useProjectStore } from '@/stores/projectStore';
 import { getConfiguredApiKeyCount, useSettingsStore } from '@/stores/settingsStore';
 import { canvasAiGateway, canvasEventBus } from '@/features/canvas/application/canvasServices';
+import { publishUploadNodePasteImage } from '@/features/canvas/application/uploadNodePasteBridge';
 import {
   CANVAS_NODE_TYPES,
   type CanvasEdge,
@@ -42,6 +43,11 @@ import {
   PROJECT_ASSET_DRAG_MIME,
 } from '@/features/canvas/application/createUploadNodeFromProjectAsset';
 import { dropProjectAssetOnCanvas } from '@/features/canvas/application/dropProjectAssetOnCanvas';
+import { dropExternalImageOnCanvas } from '@/features/canvas/application/dropExternalImageOnCanvas';
+import {
+  hasExternalImageDrop,
+  resolveDroppedImageFile,
+} from '@/features/canvas/application/resolveDroppedImageFile';
 import { isTypingTarget, shouldHandleCanvasShortcut } from '@/features/canvas/application/canvasKeyboard';
 import {
   buildGenerationErrorReport,
@@ -348,6 +354,12 @@ export function Canvas() {
     },
     [persistCanvasSnapshot]
   );
+
+  useEffect(() => {
+    return canvasEventBus.subscribe('asset-explorer/reveal-asset', () => {
+      setShowAssetManager(true);
+    });
+  }, []);
 
   useEffect(() => {
     const unsubscribeOpen = canvasEventBus.subscribe('tool-dialog/open', (payload) => {
@@ -837,10 +849,7 @@ export function Canvas() {
 
       event.preventDefault();
       pasteImageHandledRef.current = true;
-      canvasEventBus.publish('upload-node/paste-image', {
-        nodeId: selectedUploadNodeId,
-        file: imageFile,
-      });
+      publishUploadNodePasteImage(selectedUploadNodeId, imageFile);
     };
 
     document.addEventListener('paste', handlePaste);
@@ -1623,7 +1632,9 @@ export function Canvas() {
   );
 
   const handlePaneDragOver = useCallback((event: ReactDragEvent) => {
-    if (!event.dataTransfer.types.includes(PROJECT_ASSET_DRAG_MIME)) {
+    const acceptsProjectAsset = event.dataTransfer.types.includes(PROJECT_ASSET_DRAG_MIME);
+    const acceptsExternalImage = hasExternalImageDrop(event);
+    if (!acceptsProjectAsset && !acceptsExternalImage) {
       return;
     }
     event.preventDefault();
@@ -1632,15 +1643,9 @@ export function Canvas() {
 
   const handlePaneDrop = useCallback(
     async (event: ReactDragEvent) => {
-      const raw = event.dataTransfer.getData(PROJECT_ASSET_DRAG_MIME);
-      const payload = parseProjectAssetDragPayload(raw);
-      if (!payload || !currentProjectId) {
+      if (!currentProjectId) {
         return;
       }
-
-      event.preventDefault();
-      event.stopPropagation();
-      suppressNextPaneClickRef.current = true;
 
       const currentProject = getCurrentProject();
       if (!currentProject) {
@@ -1652,22 +1657,54 @@ export function Canvas() {
         y: event.clientY,
       });
 
-      try {
-        await dropProjectAssetOnCanvas({
-          projectId: currentProjectId,
-          payload,
-          position: flowPos,
-          assetManifest: currentProject.assetManifest,
-          commitAssetManifest,
-          addNode,
-          setSelectedNode,
-        });
-        scheduleCanvasPersist(0);
-      } catch (error) {
-        void showErrorDialog(
-          error instanceof Error ? error.message : '无法从资产目录创建节点',
-          '添加资产节点失败'
-        );
+      const raw = event.dataTransfer.getData(PROJECT_ASSET_DRAG_MIME);
+      const payload = parseProjectAssetDragPayload(raw);
+      if (payload) {
+        event.preventDefault();
+        event.stopPropagation();
+        suppressNextPaneClickRef.current = true;
+
+        try {
+          await dropProjectAssetOnCanvas({
+            projectId: currentProjectId,
+            payload,
+            position: flowPos,
+            assetManifest: currentProject.assetManifest,
+            commitAssetManifest,
+            addNode,
+            setSelectedNode,
+          });
+          scheduleCanvasPersist(0);
+        } catch (error) {
+          void showErrorDialog(
+            error instanceof Error ? error.message : '无法从资产目录创建节点',
+            '添加资产节点失败'
+          );
+        }
+        return;
+      }
+
+      const externalImageFile = resolveDroppedImageFile(event);
+      if (externalImageFile) {
+        event.preventDefault();
+        event.stopPropagation();
+        suppressNextPaneClickRef.current = true;
+
+        try {
+          dropExternalImageOnCanvas({
+            file: externalImageFile,
+            position: flowPos,
+            addNode,
+            setSelectedNode,
+          });
+          scheduleCanvasPersist(0);
+        } catch (error) {
+          void showErrorDialog(
+            error instanceof Error ? error.message : '无法从拖放创建上传节点',
+            '添加图片失败'
+          );
+        }
+        return;
       }
     },
     [

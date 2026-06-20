@@ -33,6 +33,8 @@ import {
   resolveNodeDisplayName,
 } from '@/features/canvas/domain/nodeDisplay';
 import { canvasEventBus } from '@/features/canvas/application/canvasServices';
+import { subscribeUploadNodePasteImage } from '@/features/canvas/application/uploadNodePasteBridge';
+import { resolveDroppedImageFile } from '@/features/canvas/application/resolveDroppedImageFile';
 import { NodeHeader, NODE_HEADER_FLOATING_POSITION_CLASS } from '@/features/canvas/ui/NodeHeader';
 import { NodeResizeHandle } from '@/features/canvas/ui/NodeResizeHandle';
 import {
@@ -47,6 +49,7 @@ import { useProjectStore } from '@/stores/projectStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { resolveFileAssetDisplayUrl } from '@/features/project/asset';
 import { fetchAssetTextContent } from '@/features/project/asset/assetPreviewUtils';
+import { isProjectRelativeAssetPath } from '@/features/project/projectPaths';
 
 type UploadNodeProps = NodeProps & {
   id: string;
@@ -59,18 +62,6 @@ function resolveNodeDimension(value: number | undefined, fallback: number): numb
     return Math.round(value);
   }
   return fallback;
-}
-
-function resolveDroppedImageFile(event: DragEvent<HTMLElement>): File | null {
-  const directFile = event.dataTransfer.files?.[0];
-  if (directFile) {
-    return directFile;
-  }
-
-  const item = Array.from(event.dataTransfer.items || []).find(
-    (candidate) => candidate.kind === 'file' && candidate.type.startsWith('image/')
-  );
-  return item?.getAsFile() ?? null;
 }
 
 export const UploadNode = memo(({ id, data, selected, width, height }: UploadNodeProps) => {
@@ -163,6 +154,10 @@ export const UploadNode = memo(({ id, data, selected, width, height }: UploadNod
           nextData.displayName = file.name;
         }
         updateNodeData(id, nextData);
+
+        if (isProjectRelativeAssetPath(prepared.imageUrl)) {
+          canvasEventBus.publish('asset-explorer/reveal-asset', { path: prepared.imageUrl });
+        }
 
         console.info(
           `[upload-perf][node] processFile success nodeId=${id} name="${file.name}" size=${file.size}B elapsed=${Math.round(performance.now() - started)}ms`
@@ -270,8 +265,8 @@ export const UploadNode = memo(({ id, data, selected, width, height }: UploadNod
   }, [id]);
 
   useEffect(() => {
-    return canvasEventBus.subscribe('upload-node/paste-image', ({ nodeId, file }) => {
-      if (nodeId !== id || !file.type.startsWith('image/')) {
+    return subscribeUploadNodePasteImage(id, (file) => {
+      if (!file.type.startsWith('image/')) {
         return;
       }
       void processFile(file);

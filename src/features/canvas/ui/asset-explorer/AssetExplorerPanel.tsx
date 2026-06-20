@@ -24,6 +24,8 @@ export const AssetExplorerPanel = memo(({ projectId, readOnly = false }: AssetEx
     selectedPaths,
     renamingPath,
     dropTargetPath,
+    flashPath,
+    revealPath,
     contextMenu,
     searchScope,
     deleteConfirm,
@@ -134,6 +136,8 @@ export const AssetExplorerPanel = memo(({ projectId, readOnly = false }: AssetEx
               onDragLeave={() => setDropTargetPath(null)}
               onDrop={handleDrop}
               onOpenPreview={openPreview}
+              revealPath={revealPath}
+              flashPath={flashPath}
             />
           ))
         ) : (
