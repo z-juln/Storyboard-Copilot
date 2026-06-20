@@ -63,9 +63,9 @@ pub fn resolve_app_data_dir(app: &AppHandle) -> Result<PathBuf, String> {
 }
 
 pub fn resolve_api_app_data_dir_standalone() -> PathBuf {
-    directories::ProjectDirs::from("com", "storyboard", "copilot")
+    directories::ProjectDirs::from("com", "video", "copilot")
         .map(|dirs| dirs.data_dir().to_path_buf())
-        .unwrap_or_else(|| std::env::temp_dir().join("storyboard-copilot"))
+        .unwrap_or_else(|| std::env::temp_dir().join("video-copilot"))
 }
 
 pub async fn start_http_server(app: AppHandle) -> Result<(), String> {

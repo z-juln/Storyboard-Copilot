@@ -1,6 +1,6 @@
 # 产品设计 TODO-LIST
 
-> 面向 Storyboard Copilot 的中长期产品路线图。P0 为当前阶段优先项；其余按依赖与价值排序。  
+> 面向 Video Copilot 的中长期产品路线图。P0 为当前阶段优先项；其余按依赖与价值排序。  
 > 实现时拆分到 `changes/<slug>.md` 做迭代验收。
 
 ## 优先级说明

@@ -20,7 +20,7 @@ const FILE_BASE_URL: &str = "https://kieai.redpandaai.co";
 const CREATE_TASK_PATH: &str = "/api/v1/jobs/createTask";
 const RECORD_INFO_PATH: &str = "/api/v1/jobs/recordInfo";
 const FILE_UPLOAD_PATH: &str = "/api/file-stream-upload";
-const UPLOAD_PATH: &str = "images/storyboard-copilot";
+const UPLOAD_PATH: &str = "images/video-copilot";
 const POLL_INTERVAL_MS: u64 = 2500;
 
 #[derive(Debug, Deserialize)]

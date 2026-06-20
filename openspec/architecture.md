@@ -4,7 +4,7 @@
 
 ## Product Shape
 
-Storyboard Copilot 是节点画布工作台：上传素材、AI 生成/编辑、工具处理、分镜与导出都通过节点和连线组织。
+Video Copilot 是节点画布工作台：上传素材、AI 生成/编辑、工具处理、分镜与导出都通过节点和连线组织。
 
 核心链路：
 

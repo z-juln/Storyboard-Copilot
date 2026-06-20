@@ -1,18 +1,18 @@
 [package]
-name = "storyboard-copilot"
+name = "video-copilot"
 version = "0.1.13"
 description = "Video-Copilot - AI图像生成与分镜工具"
 authors = ["you"]
 edition = "2021"
-default-run = "storyboard-copilot"
+default-run = "video-copilot"
 
 [lib]
-name = "storyboard_copilot_lib"
+name = "video_copilot_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [[bin]]
-name = "storyboard-api"
-path = "src/bin/storyboard_api.rs"
+name = "video-api"
+path = "src/bin/video_api.rs"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

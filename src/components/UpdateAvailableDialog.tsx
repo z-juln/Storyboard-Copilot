@@ -3,7 +3,7 @@ import { openUrl } from '@tauri-apps/plugin-opener';
 import { UiButton, UiModal, UiSelect } from '@/components/ui';
 
 const QUARK_DOWNLOAD_URL = 'https://pan.quark.cn/s/5b6733a8fc8e';
-const GITHUB_RELEASES_URL = 'https://github.com/henjicc/Storyboard-Copilot/releases';
+const GITHUB_RELEASES_URL = 'https://github.com/z-juln/Video-Copilot/releases';
 export type UpdateIgnoreMode = 'today-version' | 'forever-version' | 'forever-all';
 
 interface UpdateAvailableDialogProps {

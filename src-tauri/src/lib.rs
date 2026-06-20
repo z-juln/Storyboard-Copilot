@@ -24,10 +24,10 @@ fn resolve_log_dir() -> Option<PathBuf> {
 
     #[cfg(target_os = "macos")]
     if let Ok(home) = std::env::var("HOME") {
-        candidates.push(PathBuf::from(home).join("Library/Logs/storyboard-copilot"));
+        candidates.push(PathBuf::from(home).join("Library/Logs/video-copilot"));
     }
 
-    candidates.push(std::env::temp_dir().join("storyboard-copilot/logs"));
+    candidates.push(std::env::temp_dir().join("video-copilot/logs"));
 
     if let Ok(current_dir) = std::env::current_dir() {
         candidates.push(current_dir.join("logs"));
@@ -44,10 +44,10 @@ fn resolve_log_dir() -> Option<PathBuf> {
 
 fn setup_logging() {
     let env_filter = tracing_subscriber::EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| "info,storyboard_copilot=debug".into());
+        .unwrap_or_else(|_| "info,video_copilot=debug".into());
 
     if let Some(log_dir) = resolve_log_dir() {
-        let file_appender = tracing_appender::rolling::daily(log_dir, "storyboard.log");
+        let file_appender = tracing_appender::rolling::daily(log_dir, "video-copilot.log");
         let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
         std::mem::forget(_guard);
 
@@ -62,7 +62,7 @@ fn setup_logging() {
             .init();
     }
 
-    info!("Storyboard Copilot starting...");
+    info!("Video Copilot starting...");
 }
 
 fn show_main_window(app: &tauri::AppHandle) {

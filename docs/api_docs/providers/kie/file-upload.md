@@ -28,7 +28,7 @@ Content-Type: multipart/form-data
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | `file` | binary | 图片文件 |
-| `uploadPath` | string | 存储路径，项目默认 `images/storyboard-copilot` |
+| `uploadPath` | string | 存储路径，项目默认 `images/video-copilot` |
 | `fileName` | string | 文件名 |
 
 ### cURL 示例
@@ -37,7 +37,7 @@ Content-Type: multipart/form-data
 curl -X POST "https://kieai.redpandaai.co/api/file-stream-upload" \
   -H "Authorization: Bearer $KIE_API_KEY" \
   -F "file=@/path/to/ref.png" \
-  -F "uploadPath=images/storyboard-copilot" \
+  -F "uploadPath=images/video-copilot" \
   -F "fileName=ref-1.png"
 ```
 

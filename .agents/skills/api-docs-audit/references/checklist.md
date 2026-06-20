@@ -48,7 +48,7 @@
 
 - [ ] `POST https://kieai.redpandaai.co/api/file-stream-upload`
 - [ ] multipart：`file`、`uploadPath`、`fileName`
-- [ ] 项目 `uploadPath`：`images/storyboard-copilot`（对照 `kie/mod.rs`）
+- [ ] 项目 `uploadPath`：`images/video-copilot`（对照 `kie/mod.rs`）
 - [ ] 响应优先 `data.downloadUrl`，兼 `data.fileUrl`
 - [ ] 临时文件有效期不写死矛盾数字
 

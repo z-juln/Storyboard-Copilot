@@ -2,9 +2,9 @@ use reqwest::{header, redirect, Client, StatusCode};
 use serde::Deserialize;
 
 const GITHUB_RELEASES_LATEST_API: &str =
-    "https://api.github.com/repos/henjicc/Storyboard-Copilot/releases/latest";
+    "https://api.github.com/repos/z-juln/Video-Copilot/releases/latest";
 const GITHUB_RELEASES_LATEST_REDIRECT: &str =
-    "https://github.com/henjicc/Storyboard-Copilot/releases/latest";
+    "https://github.com/z-juln/Video-Copilot/releases/latest";
 
 #[derive(Debug, Deserialize)]
 struct GithubLatestReleaseResponse {
@@ -48,7 +48,7 @@ async fn fetch_latest_release_tag() -> Result<String, String> {
         .get(GITHUB_RELEASES_LATEST_API)
         .header(header::ACCEPT, "application/vnd.github+json")
         .header("X-GitHub-Api-Version", "2022-11-28")
-        .header(header::USER_AGENT, "Storyboard-Copilot-Updater")
+        .header(header::USER_AGENT, "Video-Copilot-Updater")
         .send()
         .await
         .map_err(|error| format!("github api request failed: {error}"))?;
@@ -67,7 +67,7 @@ async fn fetch_latest_release_tag() -> Result<String, String> {
     let redirect_client = build_http_client(false)?;
     let redirect_response = redirect_client
         .get(GITHUB_RELEASES_LATEST_REDIRECT)
-        .header(header::USER_AGENT, "Storyboard-Copilot-Updater")
+        .header(header::USER_AGENT, "Video-Copilot-Updater")
         .send()
         .await
         .map_err(|error| format!("github releases redirect request failed: {error}"))?;

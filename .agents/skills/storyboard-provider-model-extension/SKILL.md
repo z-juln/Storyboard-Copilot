@@ -1,6 +1,6 @@
 ---
 name: storyboard-provider-model-extension
-description: 用于 Storyboard Copilot 中“新增 AI 供应商”或“在现有供应商下新增模型”的工程化实现与校验。 当需求涉及 `src/features/canvas/models/**`、`src/features/canvas/models/providers/**`、`src-tauri/src/ai/providers/**`、`build_default_providers()`、`resolveRequest`、`model_aliases`、`inventory::submit!`、设置页 API Key 适配、默认模型切换或模型别名兼容时触发此技能。
+description: 用于 Video Copilot 中“新增 AI 供应商”或“在现有供应商下新增模型”的工程化实现与校验。 当需求涉及 `src/features/canvas/models/**`、`src/features/canvas/models/providers/**`、`src-tauri/src/ai/providers/**`、`build_default_providers()`、`resolveRequest`、`model_aliases`、`inventory::submit!`、设置页 API Key 适配、默认模型切换或模型别名兼容时触发此技能。
 ---
 
 # 供应商与模型扩展技能

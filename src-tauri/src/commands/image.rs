@@ -18,7 +18,7 @@ use tracing::info;
 
 use crate::media::store::{self, normalize_extension, resolve_project_source_bytes, resolve_source_bytes};
 
-const STORYBOARD_METADATA_PNG_TEXT_KEY: &str = "StoryboardCopilotMetadata";
+const STORYBOARD_METADATA_PNG_TEXT_KEY: &str = "VideoCopilotMetadata";
 
 pub use crate::media::dto::{
     MergeStoryboardImagesPayload, MergeStoryboardImagesResult, StoryboardImageMetadata,
