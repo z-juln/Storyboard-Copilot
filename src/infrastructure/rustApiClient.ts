@@ -350,7 +350,7 @@ export function createRustApiClient(baseUrl = resolveBaseUrl()): RustApiClient {
       const response = await fetch(`${normalizedBaseUrl}/api/v1/projects/${projectId}/viewport`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ viewport }),
+        body: JSON.stringify({ viewportJson: JSON.stringify(viewport) }),
       });
       await readEmpty(response);
     },

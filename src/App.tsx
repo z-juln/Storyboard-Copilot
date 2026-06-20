@@ -105,6 +105,10 @@ function App() {
   }, []);
 
   useEffect(() => {
+    if (!isTauri()) {
+      return;
+    }
+
     let cancelled = false;
     let retryTimer: ReturnType<typeof window.setTimeout> | null = null;
 
@@ -115,13 +119,9 @@ function App() {
 
       try {
         await invoke('frontend_ready');
-      } catch (error) {
+      } catch {
         if (cancelled) {
           return;
-        }
-
-        if (attempt === 1 || attempt % 10 === 0) {
-          console.warn('failed to notify frontend readiness', error);
         }
 
         const retryDelayMs = Math.min(500, 80 * attempt);
@@ -131,9 +131,9 @@ function App() {
       }
     };
 
-    requestAnimationFrame(() => {
+    retryTimer = window.setTimeout(() => {
       void notifyFrontendReady();
-    });
+    }, 50);
 
     return () => {
       cancelled = true;
