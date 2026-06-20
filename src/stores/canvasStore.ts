@@ -88,7 +88,8 @@ interface CanvasState {
   addNode: (
     type: CanvasNodeType,
     position: { x: number; y: number },
-    data?: Partial<CanvasNodeData>
+    data?: Partial<CanvasNodeData>,
+    layout?: { width: number; height: number }
   ) => string;
   addEdge: (source: string, target: string) => string | null;
   findNodePosition: (sourceNodeId: string, newNodeWidth: number, newNodeHeight: number) => { x: number; y: number };
@@ -746,9 +747,17 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     }
   },
 
-  addNode: (type, position, data = {}) => {
+  addNode: (type, position, data = {}, layout) => {
     const state = get();
     const newNode = canvasNodeFactory.createNode(type, position, data);
+    if (layout) {
+      newNode.width = layout.width;
+      newNode.height = layout.height;
+      newNode.measured = {
+        width: layout.width,
+        height: layout.height,
+      };
+    }
     set({
       nodes: [...state.nodes, newNode],
       history: {

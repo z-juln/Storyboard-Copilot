@@ -26,6 +26,7 @@ const MENU_LABELS: Record<string, string> = {
   'node.menu.storyboard': '分镜节点',
   'node.menu.storyboardGen': '分镜生成',
   'node.menu.textAnnotation': '文本注释',
+  'node.menu.textAsset': '文本节点',
 };
 
 export function NodeSelectionMenu({

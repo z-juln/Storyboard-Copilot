@@ -43,11 +43,12 @@ import {
   PROJECT_ASSET_DRAG_MIME,
 } from '@/features/canvas/application/createUploadNodeFromProjectAsset';
 import { dropProjectAssetOnCanvas } from '@/features/canvas/application/dropProjectAssetOnCanvas';
-import { dropExternalImageOnCanvas } from '@/features/canvas/application/dropExternalImageOnCanvas';
+import { dropExternalFileOnCanvas } from '@/features/canvas/application/dropExternalFileOnCanvas';
+import { createTextNodeWithAssetOnCanvas } from '@/features/canvas/application/createTextNodeWithAssetOnCanvas';
 import {
-  hasExternalImageDrop,
-  resolveDroppedImageFile,
-} from '@/features/canvas/application/resolveDroppedImageFile';
+  hasExternalFileDrop,
+  resolveDroppedExternalFile,
+} from '@/features/canvas/application/resolveDroppedExternalFile';
 import { isTypingTarget, shouldHandleCanvasShortcut } from '@/features/canvas/application/canvasKeyboard';
 import {
   buildGenerationErrorReport,
@@ -314,6 +315,7 @@ export function Canvas() {
   const getCurrentProject = useProjectStore((state) => state.getCurrentProject);
   const currentProjectId = useProjectStore((state) => state.currentProjectId);
   const commitAssetManifest = useProjectStore((state) => state.commitAssetManifest);
+  const markAssetPathsAvailable = useProjectStore((state) => state.markAssetPathsAvailable);
   const saveCurrentProject = useProjectStore((state) => state.saveCurrentProject);
   const saveCurrentProjectViewport = useProjectStore((state) => state.saveCurrentProjectViewport);
   const cancelPendingViewportPersist = useProjectStore(
@@ -1038,38 +1040,75 @@ export function Canvas() {
 
   const handleNodeSelect = useCallback(
     (type: CanvasNodeType) => {
-      const newNodeId = addNode(type, flowPosition);
-      if (pendingConnectStart) {
-        if (pendingConnectStart.handleType === 'source') {
-          connectNodes({
-            source: pendingConnectStart.nodeId,
-            target: newNodeId,
-            sourceHandle: 'source',
-            targetHandle: 'target',
-          });
-        } else {
-          connectNodes({
-            source: newNodeId,
-            target: pendingConnectStart.nodeId,
-            sourceHandle: 'source',
-            targetHandle: 'target',
-          });
+      const finishNodeCreation = (newNodeId: string) => {
+        if (pendingConnectStart) {
+          if (pendingConnectStart.handleType === 'source') {
+            connectNodes({
+              source: pendingConnectStart.nodeId,
+              target: newNodeId,
+              sourceHandle: 'source',
+              targetHandle: 'target',
+            });
+          } else {
+            connectNodes({
+              source: newNodeId,
+              target: pendingConnectStart.nodeId,
+              sourceHandle: 'source',
+              targetHandle: 'target',
+            });
+          }
         }
+
+        scheduleCanvasPersist(0);
+        setShowNodeMenu(false);
+        setMenuAllowedTypes(undefined);
+        setPendingConnectStart(null);
+        setPreviewConnectionVisual(null);
+      };
+
+      if (type === CANVAS_NODE_TYPES.text) {
+        const project = getCurrentProject();
+        if (!currentProjectId || !project) {
+          return;
+        }
+
+        void (async () => {
+          try {
+            const newNodeId = await createTextNodeWithAssetOnCanvas({
+              projectId: currentProjectId,
+              position: flowPosition,
+              assetManifest: project.assetManifest,
+              commitAssetManifest,
+              markAssetPathsAvailable,
+              addNode,
+              setSelectedNode,
+            });
+            finishNodeCreation(newNodeId);
+          } catch (error) {
+            void showErrorDialog(
+              error instanceof Error ? error.message : '无法创建文本节点',
+              '创建文本节点失败'
+            );
+          }
+        })();
+        return;
       }
 
-      scheduleCanvasPersist(0);
-      setShowNodeMenu(false);
-      setMenuAllowedTypes(undefined);
-      setPendingConnectStart(null);
-      setPreviewConnectionVisual(null);
+      const newNodeId = addNode(type, flowPosition);
+      finishNodeCreation(newNodeId);
     },
     [
       addNode,
+      commitAssetManifest,
       connectNodes,
+      currentProjectId,
       flowPosition,
+      getCurrentProject,
+      markAssetPathsAvailable,
       pendingConnectStart,
       scheduleCanvasPersist,
       setPreviewConnectionVisual,
+      setSelectedNode,
     ]
   );
 
@@ -1634,8 +1673,8 @@ export function Canvas() {
 
   const handlePaneDragOver = useCallback((event: ReactDragEvent) => {
     const acceptsProjectAsset = event.dataTransfer.types.includes(PROJECT_ASSET_DRAG_MIME);
-    const acceptsExternalImage = hasExternalImageDrop(event);
-    if (!acceptsProjectAsset && !acceptsExternalImage) {
+    const acceptsExternalFile = hasExternalFileDrop(event);
+    if (!acceptsProjectAsset && !acceptsExternalFile) {
       return;
     }
     event.preventDefault();
@@ -1672,6 +1711,7 @@ export function Canvas() {
             position: flowPos,
             assetManifest: currentProject.assetManifest,
             commitAssetManifest,
+            markAssetPathsAvailable,
             addNode,
             setSelectedNode,
           });
@@ -1685,24 +1725,28 @@ export function Canvas() {
         return;
       }
 
-      const externalImageFile = resolveDroppedImageFile(event);
-      if (externalImageFile) {
+      const externalFile = resolveDroppedExternalFile(event);
+      if (externalFile) {
         event.preventDefault();
         event.stopPropagation();
         suppressNextPaneClickRef.current = true;
 
         try {
-          dropExternalImageOnCanvas({
-            file: externalImageFile,
+          await dropExternalFileOnCanvas({
+            projectId: currentProjectId,
+            file: externalFile,
             position: flowPos,
+            assetManifest: currentProject.assetManifest,
+            commitAssetManifest,
+            markAssetPathsAvailable,
             addNode,
             setSelectedNode,
           });
           scheduleCanvasPersist(0);
         } catch (error) {
           void showErrorDialog(
-            error instanceof Error ? error.message : '无法从拖放创建上传节点',
-            '添加图片失败'
+            error instanceof Error ? error.message : '无法从拖放创建节点',
+            externalFile.type.startsWith('image/') ? '添加图片失败' : '添加文本失败'
           );
         }
         return;
@@ -1711,6 +1755,7 @@ export function Canvas() {
     [
       addNode,
       commitAssetManifest,
+      markAssetPathsAvailable,
       currentProjectId,
       getCurrentProject,
       reactFlowInstance,

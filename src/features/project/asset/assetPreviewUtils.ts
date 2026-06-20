@@ -8,6 +8,16 @@ const AUDIO_PATTERN = /\.(mp3|wav|ogg|m4a|aac|flac|opus|weba)$/i;
 const TEXT_PATTERN =
   /\.(txt|md|markdown|json|jsonc|xml|html?|css|js|mjs|cjs|ts|tsx|jsx|yaml|yml|csv|log|rs|toml|ini|env|sh|bat|sql|graphql|glsl|wgsl|vue|svelte)$/i;
 
+const BINDABLE_TEXT_PATTERN = /\.(txt|md|markdown)$/i;
+
+export function isBindableTextAssetFileName(fileName: string): boolean {
+  return BINDABLE_TEXT_PATTERN.test(fileName.trim());
+}
+
+export function isMarkdownTextAssetFileName(fileName: string): boolean {
+  return /\.(md|markdown)$/i.test(fileName.trim());
+}
+
 export function resolveAssetPreviewKind(fileName: string): AssetPreviewKind | null {
   if (IMAGE_PATTERN.test(fileName)) {
     return 'image';

@@ -64,7 +64,15 @@ export const AssetExplorerPanel = memo(({ projectId, readOnly = false }: AssetEx
       data-asset-explorer-root
       className="min-h-[12rem] outline-none"
       onKeyDown={handleKeyDown}
-      onClick={() => containerRef.current?.focus()}
+      onClick={(event) => {
+        if (previewState) {
+          return;
+        }
+        if ((event.target as HTMLElement).closest('[data-ui-modal]')) {
+          return;
+        }
+        containerRef.current?.focus();
+      }}
       onDragOver={(event) => {
         if (readOnly || !hasExternalFileDrop(event)) {
           return;

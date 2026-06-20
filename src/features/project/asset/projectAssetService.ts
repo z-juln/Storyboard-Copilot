@@ -274,14 +274,15 @@ export async function importExternalFilesToDirectory(input: {
   targetDirPath: string;
   files: File[];
   manifest: AssetManifest;
-}): Promise<AssetManifest> {
+}): Promise<{ manifest: AssetManifest; importedPaths: string[] }> {
   if (input.files.length === 0) {
-    return input.manifest;
+    return { manifest: input.manifest, importedPaths: [] };
   }
 
   const targetDir = normalizeAssetPath(input.targetDirPath).replace(/\/+$/, '') || 'assets';
   let manifest = input.manifest;
   const existingPaths = listExistingManifestPaths(manifest);
+  const importedPaths: string[] = [];
 
   for (const file of input.files) {
     const baseName = file.name.trim();
@@ -291,9 +292,10 @@ export async function importExternalFilesToDirectory(input: {
 
     await rustApiClient.uploadProjectAssetAtPathInChunks(input.projectId, nextPath, file);
     manifest = registerFileAssetPath(manifest, nextPath).manifest;
+    importedPaths.push(nextPath);
   }
 
-  return manifest;
+  return { manifest, importedPaths };
 }
 
 export function removeMissingManifestEntries(manifest: AssetManifest, path: string): AssetManifest {

@@ -77,6 +77,7 @@ export function useAssetExplorerController({
   const nodes = useCanvasStore((state) => state.nodes);
   const assetManifest = useProjectStore((state) => state.currentProject?.assetManifest);
   const commitAssetManifest = useProjectStore((state) => state.commitAssetManifest);
+  const markAssetPathsAvailable = useProjectStore((state) => state.markAssetPathsAvailable);
   const refreshAvailableAssetPaths = useProjectStore((state) => state.refreshAvailableAssetPaths);
 
   const [tree, setTree] = useState<ProjectDirectoryEntry | null>(null);
@@ -444,6 +445,7 @@ export function useAssetExplorerController({
           manifest,
         });
         applyManifest(created.manifest);
+        markAssetPathsAvailable([created.path]);
         await loadTree();
         selectSingle(created.path);
         setRenamingPath(created.path);
@@ -451,7 +453,7 @@ export function useAssetExplorerController({
         setError(createError instanceof Error ? createError.message : '创建失败');
       }
     },
-    [applyManifest, collectSiblingNames, loadTree, manifest, projectId, readOnly, selectSingle]
+    [applyManifest, collectSiblingNames, loadTree, manifest, markAssetPathsAvailable, projectId, readOnly, selectSingle]
   );
 
   const handleMoveEntries = useCallback(
@@ -513,6 +515,10 @@ export function useAssetExplorerController({
 
   const handleKeyDown = useCallback(
     (event: ReactKeyboardEvent<HTMLDivElement>) => {
+      if (previewState) {
+        return;
+      }
+
       if (isTypingTarget(event.target)) {
         return;
       }
@@ -578,6 +584,7 @@ export function useAssetExplorerController({
       copySelectionToClipboard,
       handlePasteToDirectory,
       isAssetsRootPath,
+      previewState,
       readOnly,
       requestDeleteSelection,
       resolvePasteTargetDir,
@@ -623,7 +630,7 @@ export function useAssetExplorerController({
 
         const files = resolveExternalDropFiles(event);
         if (files.length > 0) {
-          const nextManifest = await importExternalFilesToDirectory({
+          const { manifest: nextManifest } = await importExternalFilesToDirectory({
             projectId,
             targetDirPath,
             files,

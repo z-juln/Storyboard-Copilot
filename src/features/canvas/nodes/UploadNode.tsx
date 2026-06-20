@@ -34,7 +34,7 @@ import {
 } from '@/features/canvas/domain/nodeDisplay';
 import { canvasEventBus } from '@/features/canvas/application/canvasServices';
 import { subscribeUploadNodePasteImage } from '@/features/canvas/application/uploadNodePasteBridge';
-import { resolveDroppedImageFile } from '@/features/canvas/application/resolveDroppedImageFile';
+import { resolveDroppedImageFile } from '@/features/canvas/application/resolveDroppedExternalFile';
 import { NodeHeader, NODE_HEADER_FLOATING_POSITION_CLASS } from '@/features/canvas/ui/NodeHeader';
 import { NodeResizeHandle } from '@/features/canvas/ui/NodeResizeHandle';
 import {

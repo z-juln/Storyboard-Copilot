@@ -81,7 +81,14 @@ export {
   resolveNewSiblingName,
 } from './projectAssetService';
 export {
+  fetchAssetTextContent,
   isAssetPreviewable,
+  isBindableTextAssetFileName,
+  isMarkdownTextAssetFileName,
   resolveAssetPreviewKind,
   type AssetPreviewKind,
 } from './assetPreviewUtils';
+export {
+  loadProjectAssetTextContent,
+  saveProjectAssetTextContent,
+} from './textAssetContent';

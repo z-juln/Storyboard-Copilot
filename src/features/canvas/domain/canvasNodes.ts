@@ -5,6 +5,7 @@ export const CANVAS_NODE_TYPES = {
   imageEdit: 'imageNode',
   exportImage: 'exportImageNode',
   textAnnotation: 'textAnnotationNode',
+  text: 'textNode',
   group: 'groupNode',
   storyboardSplit: 'storyboardNode',
   storyboardGen: 'storyboardGenNode',
@@ -70,6 +71,16 @@ export interface GroupNodeData extends NodeDisplayData {
 
 export interface TextAnnotationNodeData extends NodeDisplayData {
   content: string;
+  [key: string]: unknown;
+}
+
+export interface TextNodeData extends NodeDisplayData {
+  imageUrl: string | null;
+  fileAssetId?: string | null;
+  sourceFileName?: string | null;
+  textContent?: string | null;
+  /** manifest 中该文件最后一次同步到节点的 updatedAt */
+  textSyncedAt?: number | null;
   [key: string]: unknown;
 }
 
@@ -148,6 +159,7 @@ export type CanvasNodeData =
   | UploadImageNodeData
   | ExportImageNodeData
   | TextAnnotationNodeData
+  | TextNodeData
   | GroupNodeData
   | ImageEditNodeData
   | StoryboardSplitNodeData
@@ -210,6 +222,12 @@ export function isTextAnnotationNode(
   node: CanvasNode | null | undefined
 ): node is Node<TextAnnotationNodeData, typeof CANVAS_NODE_TYPES.textAnnotation> {
   return node?.type === CANVAS_NODE_TYPES.textAnnotation;
+}
+
+export function isTextNode(
+  node: CanvasNode | null | undefined
+): node is Node<TextNodeData, typeof CANVAS_NODE_TYPES.text> {
+  return node?.type === CANVAS_NODE_TYPES.text;
 }
 
 export function isStoryboardSplitNode(

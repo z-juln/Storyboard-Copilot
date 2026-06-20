@@ -89,6 +89,10 @@ export interface CanvasEventMap {
   'asset-explorer/reveal-asset': {
     path: string;
   };
+  'text-asset/updated': {
+    path: string;
+    updatedAt: number;
+  };
 }
 
 export interface CanvasEventBus {

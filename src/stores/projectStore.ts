@@ -342,6 +342,7 @@ interface ProjectState {
     contentHash?: string
   ) => { fileAssetId: string } | null;
   commitAssetManifest: (manifest: AssetManifest) => void;
+  markAssetPathsAvailable: (paths: string[]) => void;
   refreshAvailableAssetPaths: () => Promise<void>;
 }
 
@@ -720,6 +721,11 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       return;
     }
 
+    const previousManifest = currentProject.assetManifest ?? createEmptyAssetManifest();
+    const newlyRegisteredPaths = Object.entries(manifest)
+      .filter(([fileAssetId]) => !previousManifest[fileAssetId])
+      .map(([, record]) => normalizeAssetPath(record.path));
+
     const canvasState = useCanvasStore.getState();
     const syncedNodes = syncNodeAssetPathsFromManifest(canvasState.nodes, manifest);
     if (syncedNodes !== canvasState.nodes) {
@@ -733,8 +739,51 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       edges: canvasState.edges,
       updatedAt: Date.now(),
     };
-    set({ currentProject: nextProject });
+
+    set((state) => {
+      const pathsToMark = newlyRegisteredPaths;
+      if (pathsToMark.length === 0) {
+        return { currentProject: nextProject };
+      }
+
+      const nextAvailable = state.availableAssetPaths
+        ? new Set(state.availableAssetPaths)
+        : new Set<string>();
+      for (const path of pathsToMark) {
+        nextAvailable.add(path);
+      }
+      return {
+        currentProject: nextProject,
+        availableAssetPaths: nextAvailable,
+      };
+    });
     persistProject(nextProject);
+  },
+
+  markAssetPathsAvailable: (paths) => {
+    const normalizedPaths = paths
+      .map((path) => normalizeAssetPath(path))
+      .filter((path) => path.length > 0);
+    if (normalizedPaths.length === 0) {
+      return;
+    }
+
+    set((state) => {
+      const nextAvailable = state.availableAssetPaths
+        ? new Set(state.availableAssetPaths)
+        : new Set<string>();
+      let changed = false;
+      for (const path of normalizedPaths) {
+        if (!nextAvailable.has(path)) {
+          nextAvailable.add(path);
+          changed = true;
+        }
+      }
+      if (!changed && state.availableAssetPaths) {
+        return state;
+      }
+      return { availableAssetPaths: nextAvailable };
+    });
   },
 
   refreshAvailableAssetPaths: async () => {
