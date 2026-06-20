@@ -14,6 +14,7 @@ import {
   BackgroundVariant,
   SelectionMode,
   useReactFlow,
+  useStoreApi,
   type Connection,
   type EdgeChange,
   type FinalConnectionState,
@@ -41,6 +42,7 @@ import {
   PROJECT_ASSET_DRAG_MIME,
 } from '@/features/canvas/application/createUploadNodeFromProjectAsset';
 import { dropProjectAssetOnCanvas } from '@/features/canvas/application/dropProjectAssetOnCanvas';
+import { isTypingTarget, shouldHandleCanvasShortcut } from '@/features/canvas/application/canvasKeyboard';
 import {
   buildGenerationErrorReport,
   CURRENT_RUNTIME_SESSION_ID,
@@ -147,15 +149,6 @@ function cloneNodeData<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
-function isTypingTarget(target: EventTarget | null): boolean {
-  const element = target as HTMLElement | null;
-  if (!element) {
-    return false;
-  }
-  const tagName = element.tagName.toLowerCase();
-  return tagName === 'input' || tagName === 'textarea' || element.isContentEditable;
-}
-
 function resolveClipboardImageFile(event: ClipboardEvent): File | null {
   const clipboardItems = event.clipboardData?.items;
   if (!clipboardItems) {
@@ -239,6 +232,7 @@ interface PreviewConnectionLine {
 
 export function Canvas() {
   const reactFlowInstance = useReactFlow();
+  const storeApi = useStoreApi();
   const wrapperRef = useRef<HTMLDivElement>(null);
   const suppressNextPaneClickRef = useRef(false);
   const suppressNextEdgeClickRef = useRef(false);
@@ -862,7 +856,7 @@ export function Canvas() {
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (isTypingTarget(event.target)) {
+      if (!shouldHandleCanvasShortcut(event.target)) {
         return;
       }
 
@@ -870,9 +864,24 @@ export function Canvas() {
       const key = event.key.toLowerCase();
       const isUndo = commandPressed && key === 'z' && !event.shiftKey;
       const isRedo = commandPressed && (key === 'y' || (key === 'z' && event.shiftKey));
+      const isSelectAll = commandPressed && key === 'a';
       const isGroup = commandPressed && key === 'g';
       const isCopy = commandPressed && key === 'c' && !event.shiftKey;
       const isPaste = commandPressed && key === 'v' && !event.shiftKey;
+
+      if (isSelectAll) {
+        if (nodes.length === 0) {
+          return;
+        }
+        event.preventDefault();
+        storeApi.getState().addSelectedNodes(nodes.map((node) => node.id));
+        storeApi.setState({
+          nodesSelectionActive: true,
+          userSelectionActive: false,
+          userSelectionRect: null,
+        });
+        return;
+      }
 
       if (isCopy) {
         if (selectedNodeIds.length === 0) {
@@ -970,6 +979,7 @@ export function Canvas() {
     deleteNode,
     deleteNodes,
     groupNodes,
+    storeApi,
     undo,
     redo,
     scheduleCanvasPersist,

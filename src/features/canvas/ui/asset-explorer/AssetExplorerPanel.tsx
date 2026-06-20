@@ -58,6 +58,7 @@ export const AssetExplorerPanel = memo(({ projectId, readOnly = false }: AssetEx
     <div
       ref={containerRef}
       tabIndex={0}
+      data-asset-explorer-root
       className="min-h-[12rem] outline-none"
       onKeyDown={handleKeyDown}
       onClick={() => containerRef.current?.focus()}

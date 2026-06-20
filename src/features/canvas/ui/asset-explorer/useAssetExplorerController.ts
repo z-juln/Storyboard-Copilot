@@ -45,6 +45,7 @@ import {
   serializeProjectAssetDragPayload,
 } from '@/features/canvas/application/createUploadNodeFromProjectAsset';
 import { rustApiClient } from '@/infrastructure/rustApiClient';
+import { isTypingTarget } from '@/features/canvas/application/canvasKeyboard';
 import { useCanvasStore } from '@/stores/canvasStore';
 import { useProjectStore } from '@/stores/projectStore';
 
@@ -401,11 +402,7 @@ export function useAssetExplorerController({
 
   const handleKeyDown = useCallback(
     (event: ReactKeyboardEvent<HTMLDivElement>) => {
-      const target = event.target as HTMLElement | null;
-      if (
-        target
-        && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)
-      ) {
+      if (isTypingTarget(event.target)) {
         return;
       }
 
@@ -417,6 +414,7 @@ export function useAssetExplorerController({
           return;
         }
         event.preventDefault();
+        event.stopPropagation();
         requestDeleteSelection();
         return;
       }
@@ -429,6 +427,7 @@ export function useAssetExplorerController({
           return;
         }
         event.preventDefault();
+        event.stopPropagation();
         setRenamingPath(anchorEntry.path);
         return;
       }
@@ -441,21 +440,25 @@ export function useAssetExplorerController({
       const key = event.key.toLowerCase();
       if (key === 'a') {
         event.preventDefault();
+        event.stopPropagation();
         selectSiblingAll();
         return;
       }
       if (key === 'c') {
         event.preventDefault();
+        event.stopPropagation();
         copySelectionToClipboard('copy');
         return;
       }
       if (key === 'x') {
         event.preventDefault();
+        event.stopPropagation();
         copySelectionToClipboard('cut');
         return;
       }
       if (key === 'v') {
         event.preventDefault();
+        event.stopPropagation();
         void handlePasteToDirectory(resolvePasteTargetDir());
       }
     },

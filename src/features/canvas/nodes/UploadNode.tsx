@@ -358,13 +358,15 @@ export const UploadNode = memo(({ id, data, selected, width, height }: UploadNod
     updateNodeInternals(id);
   }, [id, resolvedHeight, resolvedWidth, updateNodeInternals]);
 
+  const shellClassName = selected
+    ? 'border-2 border-accent p-1.5 shadow-[0_0_0_2px_rgba(59,130,246,0.62),0_0_0_4px_rgba(8,12,22,0.96),0_0_24px_rgba(59,130,246,0.34)]'
+    : 'border border-[rgba(15,23,42,0.22)] p-0 hover:border-[rgba(15,23,42,0.34)] dark:border-[rgba(255,255,255,0.22)] dark:hover:border-[rgba(255,255,255,0.34)]';
+
   return (
     <div
       className={`
-        group relative overflow-visible rounded-[var(--node-radius)] border bg-surface-dark/85 p-0 transition-colors duration-150
-        ${selected
-          ? 'border-accent shadow-[0_0_0_1px_rgba(59,130,246,0.32)]'
-          : 'border-[rgba(15,23,42,0.22)] hover:border-[rgba(15,23,42,0.34)] dark:border-[rgba(255,255,255,0.22)] dark:hover:border-[rgba(255,255,255,0.34)]'}
+        group relative overflow-visible rounded-[var(--node-radius)] bg-surface-dark/85 transition-[border-color,box-shadow,padding] duration-150
+        ${shellClassName}
       `}
       style={{ width: resolvedWidth, height: resolvedHeight }}
       onClick={handleNodeClick}

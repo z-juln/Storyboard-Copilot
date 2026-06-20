@@ -238,6 +238,11 @@ html[data-platform='macos'][data-shell='tauri'] #root {
   pointer-events: all !important;
 }
 
+.react-flow {
+  --xy-selection-background-color: rgba(59, 130, 246, 0.08);
+  --xy-selection-border: 1px dotted rgba(96, 165, 250, 0.88);
+}
+
 .canvas-minimap .react-flow__minimap-mask {
   cursor: grab;
   stroke: rgba(160, 160, 160, 0.92);
