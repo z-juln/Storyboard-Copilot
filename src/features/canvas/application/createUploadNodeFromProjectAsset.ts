@@ -74,9 +74,7 @@ export async function buildUploadNodeDataFromProjectAsset(input: {
 
   const nodeData: Partial<UploadImageNodeData> = {
     imageUrl: input.path,
-    previewImageUrl: input.mediaKind === 'image' ? input.path : null,
     fileAssetId,
-    previewFileAssetId: input.mediaKind === 'image' ? fileAssetId : null,
     sourceFileName: input.name,
     displayName: input.name,
     mediaKind: input.mediaKind,

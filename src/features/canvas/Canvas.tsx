@@ -494,14 +494,9 @@ export function Canvas() {
                   return prepared.imageUrl;
                 });
               }
-              const previewWithMetadata = prepared.previewImageUrl === prepared.imageUrl
-                ? imageWithMetadata
-                : prepared.previewImageUrl;
-
               updateNodeData(pendingNode.id, {
                 ...toPreparedNodeImageFields(prepared),
                 imageUrl: imageWithMetadata,
-                previewImageUrl: previewWithMetadata,
                 isGenerating: false,
                 generationStartedAt: null,
                 generationJobId: null,

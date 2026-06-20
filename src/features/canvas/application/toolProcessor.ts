@@ -268,7 +268,6 @@ export class CanvasToolProcessor implements ToolProcessor {
     const frames: StoryboardFrameItem[] = persistedFrameImages.map((imageUrl, index) => ({
       id: this.idGenerator.next(),
       imageUrl,
-      previewImageUrl: imageUrl,
       aspectRatio: resolvedFrameAspectRatio,
       note: typeof frameNotes?.[index] === 'string' ? frameNotes[index].trim() : '',
       order: index,

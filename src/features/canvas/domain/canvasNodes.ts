@@ -39,9 +39,7 @@ export interface NodeDisplayData {
 
 export interface NodeImageData extends NodeDisplayData {
   imageUrl: string | null;
-  previewImageUrl?: string | null;
   fileAssetId?: string | null;
-  previewFileAssetId?: string | null;
   aspectRatio: string;
   isSizeManuallyAdjusted?: boolean;
   [key: string]: unknown;
@@ -89,9 +87,7 @@ export interface ImageEditNodeData extends NodeImageData {
 export interface StoryboardFrameItem {
   id: string;
   imageUrl: string | null;
-  previewImageUrl?: string | null;
   fileAssetId?: string | null;
-  previewFileAssetId?: string | null;
   aspectRatio?: string;
   note: string;
   order: number;
@@ -140,9 +136,7 @@ export interface StoryboardGenNodeData {
   requestAspectRatio: string;
   extraParams?: Record<string, unknown>;
   imageUrl: string | null;
-  previewImageUrl?: string | null;
   fileAssetId?: string | null;
-  previewFileAssetId?: string | null;
   aspectRatio: string;
   isGenerating?: boolean;
   generationStartedAt?: number | null;

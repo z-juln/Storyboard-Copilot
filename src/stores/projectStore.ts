@@ -34,7 +34,7 @@ import {
 import {
   createEmptyAssetManifest,
   reconcileProjectAssets,
-  registerPreparedAssetPaths,
+  registerPreparedAssetPath,
   syncNodeAssetPathsFromManifest,
   type AssetManifest,
 } from '@/features/project/asset';
@@ -331,8 +331,8 @@ interface ProjectState {
   cancelPendingViewportPersist: () => void;
   registerPreparedFileAssets: (
     imagePath: string,
-    previewImagePath: string
-  ) => { fileAssetId: string; previewFileAssetId: string } | null;
+    contentHash?: string
+  ) => { fileAssetId: string } | null;
   commitAssetManifest: (manifest: AssetManifest) => void;
 }
 
@@ -670,16 +670,16 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     clearQueuedViewportUpsert(currentProjectId);
   },
 
-  registerPreparedFileAssets: (imagePath, previewImagePath) => {
+  registerPreparedFileAssets: (imagePath, contentHash) => {
     const { currentProjectId, currentProject } = get();
     if (!currentProjectId || !currentProject || currentProject.id !== currentProjectId) {
       return null;
     }
 
-    const registered = registerPreparedAssetPaths(
+    const registered = registerPreparedAssetPath(
       currentProject.assetManifest ?? createEmptyAssetManifest(),
       imagePath,
-      previewImagePath
+      contentHash
     );
     const nextProject: Project = {
       ...currentProject,
@@ -691,7 +691,6 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     persistProject(nextProject);
     return {
       fileAssetId: registered.fileAssetId,
-      previewFileAssetId: registered.previewFileAssetId,
     };
   },
 

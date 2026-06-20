@@ -48,6 +48,7 @@ import {
   persistImageLocally,
   reduceAspectRatio,
   resolveImageDisplayUrl,
+  resolveNodeImageDisplayUrl,
   shouldUseOriginalImageByZoom,
   toPreparedNodeImageFields,
 } from '@/features/canvas/application/imageData';
@@ -284,7 +285,6 @@ interface FrameCardProps {
 
 interface IncomingImageItem {
   imageUrl: string;
-  previewImageUrl: string | null;
   displayUrl: string;
   label: string;
 }
@@ -313,16 +313,19 @@ const FrameCard = memo(
     const { zoom } = useViewport();
 
     const imageSource = useMemo(() => {
-      const preferOriginal = shouldUseOriginalImageByZoom(zoom);
-      const picked = preferOriginal
-        ? frame.imageUrl || frame.previewImageUrl
-        : frame.previewImageUrl || frame.imageUrl;
-      return picked ? resolveImageDisplayUrl(picked) : null;
-    }, [frame.imageUrl, frame.previewImageUrl, zoom]);
+      return resolveNodeImageDisplayUrl({
+        imageUrl: frame.imageUrl,
+        fileAssetId: frame.fileAssetId,
+        preferOriginal: shouldUseOriginalImageByZoom(zoom),
+      });
+    }, [frame.fileAssetId, frame.imageUrl, zoom]);
     const viewerSource = useMemo(() => {
-      const picked = frame.imageUrl || frame.previewImageUrl;
-      return picked ? resolveImageDisplayUrl(picked) : null;
-    }, [frame.imageUrl, frame.previewImageUrl]);
+      return resolveNodeImageDisplayUrl({
+        imageUrl: frame.imageUrl,
+        fileAssetId: frame.fileAssetId,
+        preferOriginal: true,
+      });
+    }, [frame.fileAssetId, frame.imageUrl]);
 
     const dragging = draggedFrameId === frame.id;
     const asDropTarget = dropTargetFrameId === frame.id && !dragging;
@@ -496,7 +499,7 @@ export const StoryboardNode = memo(({ id, data, selected, width, height }: Story
       .filter((edge) => edge.target === id)
       .map((edge) => edge.source);
 
-    const dedupedByImageUrl = new Map<string, { imageUrl: string; previewImageUrl: string | null }>();
+    const dedupedByImageUrl = new Map<string, { imageUrl: string }>();
     for (const sourceNodeId of sourceNodeIds) {
       const sourceNode = nodeById.get(sourceNodeId) as CanvasNode | undefined;
       if (!sourceNode) {
@@ -510,10 +513,7 @@ export const StoryboardNode = memo(({ id, data, selected, width, height }: Story
         continue;
       }
       if (!dedupedByImageUrl.has(imageUrl)) {
-        dedupedByImageUrl.set(imageUrl, {
-          imageUrl,
-          previewImageUrl: sourceNode.data.previewImageUrl ?? null,
-        });
+        dedupedByImageUrl.set(imageUrl, { imageUrl });
       }
     }
 
@@ -524,8 +524,7 @@ export const StoryboardNode = memo(({ id, data, selected, width, height }: Story
     () =>
       incomingImageRefs.map((item, index) => ({
         imageUrl: item.imageUrl,
-        previewImageUrl: item.previewImageUrl,
-        displayUrl: resolveImageDisplayUrl(item.previewImageUrl || item.imageUrl),
+        displayUrl: resolveImageDisplayUrl(item.imageUrl, { preferPreview: true }),
         label: `图${index + 1}`,
       })),
     [incomingImageRefs]
@@ -533,10 +532,13 @@ export const StoryboardNode = memo(({ id, data, selected, width, height }: Story
   const frameViewerImageList = useMemo(
     () =>
       orderedFrames
-        .map((frame) => {
-          const source = frame.imageUrl || frame.previewImageUrl;
-          return source ? resolveImageDisplayUrl(source) : null;
-        })
+        .map((frame) =>
+          resolveNodeImageDisplayUrl({
+            imageUrl: frame.imageUrl,
+            fileAssetId: frame.fileAssetId,
+            preferOriginal: true,
+          })
+        )
         .filter((item): item is string => Boolean(item)),
     [orderedFrames]
   );
@@ -673,7 +675,7 @@ export const StoryboardNode = memo(({ id, data, selected, width, height }: Story
   const handleEditFrame = useCallback(
     async (frame: StoryboardFrameItem) => {
       try {
-        const sourceImage = frame.imageUrl ?? frame.previewImageUrl;
+        const sourceImage = frame.imageUrl;
         if (!sourceImage) {
           setExportError('该分镜没有可编辑图片');
           return;
@@ -689,12 +691,10 @@ export const StoryboardNode = memo(({ id, data, selected, width, height }: Story
           id,
           imageFields.imageUrl,
           imageFields.aspectRatio,
-          imageFields.previewImageUrl,
           {
             defaultTitle: frameTitle,
             resultKind: 'storyboardFrameEdit',
             fileAssetId: imageFields.fileAssetId,
-            previewFileAssetId: imageFields.previewFileAssetId,
           }
         );
 
@@ -728,9 +728,7 @@ export const StoryboardNode = memo(({ id, data, selected, width, height }: Story
 
     try {
       const stageFrameStart = performance.now();
-      const frameSources = orderedFrames.map(
-        (frame) => frame.imageUrl ?? frame.previewImageUrl ?? ''
-      );
+      const frameSources = orderedFrames.map((frame) => frame.imageUrl ?? '');
       if (frameSources.every((source) => !source)) {
         throw new Error('没有可导出的图片');
       }
@@ -803,7 +801,6 @@ export const StoryboardNode = memo(({ id, data, selected, width, height }: Story
       const aspectRatio = reduceAspectRatio(mergeResult.canvasWidth, mergeResult.canvasHeight);
       const needsOverlay = (options.showFrameIndex || options.showFrameNote) && !mergeResult.textOverlayApplied;
       let finalImagePath = mergeResult.imagePath;
-      let finalPreviewPath = mergeResult.imagePath;
 
       if (needsOverlay) {
         const overlayStart = performance.now();
@@ -822,7 +819,6 @@ export const StoryboardNode = memo(({ id, data, selected, width, height }: Story
         });
         const persistStart = performance.now();
         finalImagePath = await persistImageLocally(mergedBlob);
-        finalPreviewPath = finalImagePath;
         console.info(`${EXPORT_TRACE_PREFIX} overlay-persisted`, {
           traceId,
           elapsedMs: Math.round(performance.now() - persistStart),
@@ -841,7 +837,6 @@ export const StoryboardNode = memo(({ id, data, selected, width, height }: Story
         return finalImagePath;
       });
       finalImagePath = imagePathWithMetadata;
-      finalPreviewPath = imagePathWithMetadata;
       console.info(`${EXPORT_TRACE_PREFIX} metadata-embedded`, {
         traceId,
         elapsedMs: Math.round(performance.now() - metadataStart),
@@ -853,7 +848,6 @@ export const StoryboardNode = memo(({ id, data, selected, width, height }: Story
         id,
         finalImagePath,
         aspectRatio,
-        finalPreviewPath,
         {
           defaultTitle: EXPORT_RESULT_DISPLAY_NAME.storyboardSplitExport,
           resultKind: 'storyboardSplitExport',
@@ -922,7 +916,7 @@ export const StoryboardNode = memo(({ id, data, selected, width, height }: Story
     try {
       const frameEntries = orderedFrames
         .map((frame, index) => ({
-          source: frame.imageUrl ?? frame.previewImageUrl ?? '',
+          source: frame.imageUrl ?? '',
           index,
           note: frame.note ?? '',
         }))
@@ -1011,7 +1005,6 @@ export const StoryboardNode = memo(({ id, data, selected, width, height }: Story
       const matched = incomingImageItems.find((item) => item.imageUrl === imageUrl);
       updateStoryboardFrame(id, frameId, {
         imageUrl: matched?.imageUrl ?? imageUrl,
-        previewImageUrl: matched?.previewImageUrl ?? matched?.imageUrl ?? imageUrl,
       });
       setPickerState(null);
     },

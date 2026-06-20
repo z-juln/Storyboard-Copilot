@@ -3,7 +3,12 @@ import {
   rustApiClient,
   type PrepareNodeImageResult,
 } from '@/infrastructure/rustApiClient';
-import { isProjectRelativeAssetPath, resolveProjectImageDisplayUrl } from '@/features/project/projectPaths';
+import {
+  buildProjectAssetPreviewUrl,
+  DEFAULT_PREVIEW_MAX_DIMENSION,
+  isProjectRelativeAssetPath,
+  resolveProjectImageDisplayUrl,
+} from '@/features/project/projectPaths';
 import { resolveFileAssetDisplayUrl } from '@/features/project/asset';
 import { useProjectStore } from '@/stores/projectStore';
 
@@ -46,15 +51,15 @@ function greatestCommonDivisor(a: number, b: number): number {
   return x || 1;
 }
 
-const DEFAULT_PREVIEW_MAX_DIMENSION = 512;
+export { DEFAULT_PREVIEW_MAX_DIMENSION };
+
 const LOCAL_PATH_PREFIX_PATTERN = /^(?:[A-Za-z]:[\\/]|\\\\|\/)/;
 
 export interface PreparedNodeImage {
   imageUrl: string;
-  previewImageUrl: string;
   fileAssetId: string;
-  previewFileAssetId: string;
   aspectRatio: string;
+  contentHash: string;
 }
 
 interface ErrorWithDetails extends Error {
@@ -123,7 +128,7 @@ export function isLikelyLocalImagePath(imageUrl: string): boolean {
 
 export function resolveImageDisplayUrl(
   imageUrl: string,
-  options?: { fileAssetId?: string | null; previewFileAssetId?: string | null; preferPreview?: boolean }
+  options?: { fileAssetId?: string | null; preferPreview?: boolean; maxPreviewDimension?: number }
 ): string {
   const projectId = useProjectStore.getState().currentProjectId;
   const assetManifest = useProjectStore.getState().currentProject?.assetManifest;
@@ -135,6 +140,8 @@ export function resolveImageDisplayUrl(
       imageUrl,
       assetManifest,
       resolveAbsolutePath: buildLocalImageUrl,
+      preferPreview: options?.preferPreview,
+      maxPreviewDimension: options?.maxPreviewDimension,
     });
   }
 
@@ -143,35 +150,33 @@ export function resolveImageDisplayUrl(
 
 export function resolveNodeImageDisplayUrl(input: {
   imageUrl?: string | null;
-  previewImageUrl?: string | null;
   fileAssetId?: string | null;
-  previewFileAssetId?: string | null;
   preferOriginal?: boolean;
+  maxPreviewDimension?: number;
 }): string | null {
+  const projectId = useProjectStore.getState().currentProjectId;
+  const assetManifest = useProjectStore.getState().currentProject?.assetManifest;
   const preferOriginal = input.preferOriginal ?? true;
-  const pickedUrl = preferOriginal
-    ? input.imageUrl || input.previewImageUrl
-    : input.previewImageUrl || input.imageUrl;
-  if (!pickedUrl) {
+  const imageUrl = typeof input.imageUrl === 'string' ? input.imageUrl.trim() : '';
+  if (!imageUrl && !input.fileAssetId) {
     return null;
   }
 
-  const pickedFileAssetId =
-    pickedUrl === input.previewImageUrl
-      ? input.previewFileAssetId
-      : pickedUrl === input.imageUrl
-        ? input.fileAssetId
-        : input.fileAssetId ?? input.previewFileAssetId;
-
-  return resolveImageDisplayUrl(pickedUrl, { fileAssetId: pickedFileAssetId });
+  return resolveFileAssetDisplayUrl({
+    projectId,
+    fileAssetId: input.fileAssetId,
+    imageUrl: imageUrl || null,
+    assetManifest,
+    resolveAbsolutePath: buildLocalImageUrl,
+    preferPreview: !preferOriginal,
+    maxPreviewDimension: input.maxPreviewDimension,
+  });
 }
 
 export function toPreparedNodeImageFields(prepared: PreparedNodeImage) {
   return {
     imageUrl: prepared.imageUrl,
-    previewImageUrl: prepared.previewImageUrl,
     fileAssetId: prepared.fileAssetId,
-    previewFileAssetId: prepared.previewFileAssetId,
     aspectRatio: prepared.aspectRatio,
   };
 }
@@ -179,7 +184,7 @@ export function toPreparedNodeImageFields(prepared: PreparedNodeImage) {
 function attachPreparedFileAssetRefs(prepared: PreparedNodeImage): PreparedNodeImage {
   const refs = useProjectStore.getState().registerPreparedFileAssets(
     prepared.imageUrl,
-    prepared.previewImageUrl
+    prepared.contentHash
   );
   if (!refs) {
     return prepared;
@@ -187,17 +192,15 @@ function attachPreparedFileAssetRefs(prepared: PreparedNodeImage): PreparedNodeI
   return {
     ...prepared,
     fileAssetId: refs.fileAssetId,
-    previewFileAssetId: refs.previewFileAssetId,
   };
 }
 
 function mapPreparedResult(prepared: PrepareNodeImageResult): PreparedNodeImage {
   return attachPreparedFileAssetRefs({
     imageUrl: prepared.imagePath,
-    previewImageUrl: prepared.previewImagePath,
     fileAssetId: '',
-    previewFileAssetId: '',
     aspectRatio: prepared.aspectRatio,
+    contentHash: prepared.contentHash,
   });
 }
 
@@ -287,7 +290,7 @@ export async function imageUrlToDataUrl(imageUrl: string): Promise<string> {
   }
 
   if (isLikelyLocalImagePath(imageUrl)) {
-    const localResponse = await fetch(resolveImageDisplayUrl(imageUrl));
+    const localResponse = await fetch(resolveImageDisplayUrl(imageUrl, { preferPreview: false }));
     if (!localResponse.ok) {
       throw createImagePipelineError(
         '无法读取本地图片数据',
@@ -483,3 +486,5 @@ export async function prepareNodeImage(
     );
   }
 }
+
+export { buildProjectAssetPreviewUrl };

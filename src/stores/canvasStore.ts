@@ -95,14 +95,12 @@ interface CanvasState {
   addDerivedUploadNode: (
     sourceNodeId: string,
     imageUrl: string,
-    aspectRatio: string,
-    previewImageUrl?: string
+    aspectRatio: string
   ) => string | null;
   addDerivedExportNode: (
     sourceNodeId: string,
     imageUrl: string,
     aspectRatio: string,
-    previewImageUrl?: string,
     options?: {
       defaultTitle?: string;
       resultKind?: ExportImageNodeResultKind;
@@ -110,7 +108,6 @@ interface CanvasState {
       sizeStrategy?: 'generated' | 'autoMinEdge' | 'matchSource';
       matchSourceNodeSize?: boolean;
       fileAssetId?: string | null;
-      previewFileAssetId?: string | null;
     }
   ) => string | null;
   addStoryboardSplitNode: (
@@ -216,7 +213,7 @@ function normalizeNodes(rawNodes: CanvasNode[]): CanvasNode[] {
         (mergedData as { frames: StoryboardFrameItem[] }).frames = frames.map((frame, index) => ({
           id: frame.id,
           imageUrl: frame.imageUrl ?? null,
-          previewImageUrl: frame.previewImageUrl ?? null,
+          fileAssetId: frame.fileAssetId ?? null,
           aspectRatio:
             typeof frame.aspectRatio === 'string'
               ? frame.aspectRatio
@@ -426,7 +423,7 @@ function maybeApplyImageAutoResize(node: CanvasNode, patch: Partial<CanvasNodeDa
     isSizeManuallyAdjusted?: boolean;
   };
 
-  const hasImageRelatedChange = 'imageUrl' in patchData || 'previewImageUrl' in patchData || 'aspectRatio' in patchData;
+  const hasImageRelatedChange = 'imageUrl' in patchData || 'aspectRatio' in patchData;
   if (!hasImageRelatedChange) {
     return node;
   }
@@ -941,14 +938,13 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     return { x: anchorX + 2 * stepX, y: anchorY };
   },
 
-  addDerivedUploadNode: (sourceNodeId, imageUrl, aspectRatio, previewImageUrl) => {
+  addDerivedUploadNode: (sourceNodeId, imageUrl, aspectRatio) => {
     const state = get();
     const position = getDerivedNodePosition(state.nodes, sourceNodeId);
     const sourceNode = state.nodes.find((node) => node.id === sourceNodeId);
     const resolvedAspectRatio = resolveDerivedAspectRatio(sourceNode, aspectRatio);
     const node = canvasNodeFactory.createNode(CANVAS_NODE_TYPES.upload, position, {
       imageUrl,
-      previewImageUrl: previewImageUrl ?? null,
       aspectRatio: resolvedAspectRatio,
     });
     const derivedSize = resolveGeneratedImageNodeDimensions(resolvedAspectRatio);
@@ -974,7 +970,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     return node.id;
   },
 
-  addDerivedExportNode: (sourceNodeId, imageUrl, aspectRatio, previewImageUrl, options) => {
+  addDerivedExportNode: (sourceNodeId, imageUrl, aspectRatio, options) => {
     const state = get();
     const sourceNode = state.nodes.find((node) => node.id === sourceNodeId);
     const aspectRatioStrategy = options?.aspectRatioStrategy ?? 'provided';
@@ -1008,15 +1004,10 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     );
     const exportNodeData: Partial<CanvasNodeData> = {
       imageUrl,
-      previewImageUrl: previewImageUrl ?? null,
       aspectRatio: resolvedAspectRatio,
     };
     if (options?.fileAssetId) {
       (exportNodeData as { fileAssetId?: string }).fileAssetId = options.fileAssetId;
-    }
-    if (options?.previewFileAssetId) {
-      (exportNodeData as { previewFileAssetId?: string }).previewFileAssetId =
-        options.previewFileAssetId;
     }
     if (options?.defaultTitle) {
       (exportNodeData as { displayName?: string }).displayName = options.defaultTitle;

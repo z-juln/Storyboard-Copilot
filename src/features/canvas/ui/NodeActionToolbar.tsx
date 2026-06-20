@@ -74,7 +74,7 @@ export const NodeActionToolbar = memo(({ node }: NodeActionToolbarProps) => {
   const downloadMenuCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const imageSource = useMemo(() => {
     if (isUploadNode(node) || isImageEditNode(node) || isExportImageNode(node)) {
-      return node.data.imageUrl || node.data.previewImageUrl || null;
+      return node.data.imageUrl || null;
     }
     return null;
   }, [node]);

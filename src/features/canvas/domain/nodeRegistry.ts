@@ -62,7 +62,6 @@ const uploadNodeDefinition: CanvasNodeDefinition<UploadImageNodeData> = {
   createDefaultData: () => ({
     displayName: DEFAULT_NODE_DISPLAY_NAME[CANVAS_NODE_TYPES.upload],
     imageUrl: null,
-    previewImageUrl: null,
     aspectRatio: '1:1',
     isSizeManuallyAdjusted: false,
     sourceFileName: null,
@@ -89,7 +88,6 @@ const imageEditNodeDefinition: CanvasNodeDefinition<ImageEditNodeData> = {
   createDefaultData: () => ({
     displayName: DEFAULT_NODE_DISPLAY_NAME[CANVAS_NODE_TYPES.imageEdit],
     imageUrl: null,
-    previewImageUrl: null,
     aspectRatio: DEFAULT_ASPECT_RATIO,
     isSizeManuallyAdjusted: false,
     requestAspectRatio: AUTO_REQUEST_ASPECT_RATIO,
@@ -123,7 +121,6 @@ const exportImageNodeDefinition: CanvasNodeDefinition<ExportImageNodeData> = {
   createDefaultData: () => ({
     displayName: DEFAULT_NODE_DISPLAY_NAME[CANVAS_NODE_TYPES.exportImage],
     imageUrl: null,
-    previewImageUrl: null,
     aspectRatio: DEFAULT_ASPECT_RATIO,
     isSizeManuallyAdjusted: false,
     resultKind: 'generic',
@@ -243,7 +240,6 @@ const storyboardGenNodeDefinition: CanvasNodeDefinition<StoryboardGenNodeData> =
     requestAspectRatio: AUTO_REQUEST_ASPECT_RATIO,
     extraParams: {},
     imageUrl: null,
-    previewImageUrl: null,
     aspectRatio: DEFAULT_ASPECT_RATIO,
     isGenerating: false,
     generationStartedAt: null,

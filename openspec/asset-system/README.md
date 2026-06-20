@@ -20,7 +20,8 @@
 |------|------|
 | `assetManifest` + `projectCodec` | 已实现 |
 | 打开项目 `reconcileProjectAssets` | 已实现 |
-| 节点 `fileAssetId` / `previewFileAssetId` | 已实现 |
+| 节点 `fileAssetId` + path 缓存 | 已实现 |
+| 预览 `.cache/previews/{hash}_{max}.png` | 已实现 |
 | HTTP assets CRUD + tree | 已实现 |
 | `AssetExplorerPanel` IDE 式目录 | 已实现 |
 | 双击 / 右键预览 | 已实现 |
@@ -33,4 +34,4 @@
 
 - 前端：`src/features/project/asset/`、`AssetManagerPanel.tsx`、`AssetExplorerPanel.tsx`
 - 画布绑定：`createUploadNodeFromProjectAsset.ts`、`Canvas.tsx`
-- 后端：`src-tauri/src/project/file_store.rs`、`src-tauri/src/http/mod.rs`
+- 后端：`src-tauri/src/project/file_store.rs`、`src-tauri/src/media/preview_cache.rs`、`src-tauri/src/http/mod.rs`

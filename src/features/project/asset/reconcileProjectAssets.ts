@@ -92,26 +92,17 @@ export async function reconcileProjectAssets(input: {
   };
 }
 
-export function registerPreparedAssetPaths(
+export function registerPreparedAssetPath(
   manifest: AssetManifest,
   imagePath: string,
-  previewImagePath: string
+  contentHash?: string
 ): {
   manifest: AssetManifest;
   fileAssetId: string;
-  previewFileAssetId: string;
 } {
-  let nextManifest = manifest;
-  const image = registerFileAssetPath(nextManifest, imagePath);
-  nextManifest = image.manifest;
-  const preview =
-    normalizeAssetPath(previewImagePath) === normalizeAssetPath(imagePath)
-      ? { manifest: nextManifest, fileAssetId: image.fileAssetId, created: false }
-      : registerFileAssetPath(nextManifest, previewImagePath);
-  nextManifest = preview.manifest;
+  const registered = registerFileAssetPath(manifest, imagePath, contentHash ? { contentHash } : undefined);
   return {
-    manifest: nextManifest,
-    fileAssetId: image.fileAssetId,
-    previewFileAssetId: preview.fileAssetId,
+    manifest: registered.manifest,
+    fileAssetId: registered.fileAssetId,
   };
 }

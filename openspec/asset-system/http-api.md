@@ -9,7 +9,8 @@
 | `PUT` | `/projects/:id/assets?path=` | 嵌套路径写文件（query 传 path） |
 | `PATCH` | `/projects/:id/assets` | `{ from, to }` move/rename |
 | `DELETE` | `/projects/:id/assets?path=` | 删除文件或空目录 |
-| `GET` | `/projects/:id/assets?path=&v=` | 读文件（`v` 为 cache bust） |
+| `GET` | `/projects/:id/assets?path=&v=` | 读原图（`v` 为 cache bust） |
+| `GET` | `/projects/:id/assets/preview?path=&max=` | 读缩略图（按内容 hash 缓存于 `.cache/previews/`） |
 
 ## 约束
 

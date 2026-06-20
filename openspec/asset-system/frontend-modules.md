@@ -8,7 +8,8 @@
 | `reconcileProjectAssets.ts` | 打开时对账与迁移 |
 | `assetRefIndex.ts` | 扫描 nodes 引用了哪些 fileAssetId |
 | `projectAssetService.ts` | CRUD 编排 + manifest 增量 |
-| `resolveAssetDisplayUrl.ts` | fileAssetId → HTTP URL |
+| `resolveAssetDisplayUrl.ts` | fileAssetId → 原图或 preview HTTP URL |
+| `projectPaths.ts` | `buildProjectAssetUrl` / `buildProjectAssetPreviewUrl` |
 | `assetExplorerPathUtils.ts` | 路径 join / `findEntryInTree` / `getSiblingEntries` |
 | `assetExplorerSelection.ts` | 选区纯函数：顶层去重、路径解析、clipboard items |
 | `assetExplorerClipboard.ts` | 复制 / 剪切 / 粘贴 |
@@ -31,8 +32,10 @@ assetManifest ◄──────────  assets/**
         │ reconcile（打开 + 增量）
 projectStore / canvasStore
         │
-nodes[].data.fileAssetId ──► manifest ──► 展示 URL
+nodes[].data.fileAssetId ──► manifest ──► 展示 URL（原图或 `/assets/preview`）
 ```
+
+预览由 Rust `preview_cache.rs` 写入 `{project}/.cache/previews/{contentHash}_{max}.png`；`imageData.resolveNodeImageDisplayUrl` 按缩放选择原图或 preview API。
 
 ## Store 接口
 

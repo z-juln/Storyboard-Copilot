@@ -298,17 +298,13 @@ export const UploadNode = memo(({ id, data, selected, width, height }: UploadNod
     }
     return resolveNodeImageDisplayUrl({
       imageUrl: data.imageUrl,
-      previewImageUrl: data.previewImageUrl,
       fileAssetId: data.fileAssetId,
-      previewFileAssetId: data.previewFileAssetId,
       preferOriginal: shouldUseOriginalImageByZoom(zoom),
     });
   }, [
     assetManifest,
     data.fileAssetId,
     data.imageUrl,
-    data.previewFileAssetId,
-    data.previewImageUrl,
     transientPreviewUrl,
     zoom,
   ]);
@@ -388,7 +384,6 @@ export const UploadNode = memo(({ id, data, selected, width, height }: UploadNod
           imageSource={imageSource}
           imageViewerSourceUrl={resolveNodeImageDisplayUrl({
             imageUrl: data.imageUrl,
-            previewImageUrl: null,
             fileAssetId: data.fileAssetId,
             preferOriginal: true,
           })}

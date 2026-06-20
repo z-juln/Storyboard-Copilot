@@ -136,17 +136,13 @@ export const ImageNode = memo(({ id, data, selected, type, width, height }: Imag
   const imageSource = useMemo(() => {
     return resolveNodeImageDisplayUrl({
       imageUrl: data.imageUrl,
-      previewImageUrl: data.previewImageUrl,
       fileAssetId: data.fileAssetId,
-      previewFileAssetId: data.previewFileAssetId,
       preferOriginal: shouldUseOriginalImageByZoom(zoom),
     });
   }, [
     assetManifest,
     data.fileAssetId,
     data.imageUrl,
-    data.previewFileAssetId,
-    data.previewImageUrl,
     zoom,
   ]);
 
@@ -156,7 +152,6 @@ export const ImageNode = memo(({ id, data, selected, type, width, height }: Imag
     }
     return resolveNodeImageDisplayUrl({
       imageUrl: data.imageUrl,
-      previewImageUrl: null,
       fileAssetId: data.fileAssetId,
       preferOriginal: true,
     });

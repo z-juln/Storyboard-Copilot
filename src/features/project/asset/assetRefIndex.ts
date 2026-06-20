@@ -29,22 +29,10 @@ export function scanNodeAssetPathFields(nodes: CanvasNode[]): Array<{
     if (imageUrl && isProjectRelativeAssetPath(imageUrl)) {
       results.push({ nodeId: node.id, field: 'imageUrl', path: normalizeAssetPath(imageUrl) });
     }
-    const previewImageUrl = readOptionalString(data.previewImageUrl);
-    if (previewImageUrl && isProjectRelativeAssetPath(previewImageUrl)) {
-      results.push({
-        nodeId: node.id,
-        field: 'previewImageUrl',
-        path: normalizeAssetPath(previewImageUrl),
-      });
-    }
 
     const fileAssetId = readOptionalString(data.fileAssetId);
     if (fileAssetId) {
       results.push({ nodeId: node.id, field: 'fileAssetId', fileAssetId });
-    }
-    const previewFileAssetId = readOptionalString(data.previewFileAssetId);
-    if (previewFileAssetId) {
-      results.push({ nodeId: node.id, field: 'previewFileAssetId', fileAssetId: previewFileAssetId });
     }
 
     if (Array.isArray(data.frames)) {
@@ -59,14 +47,6 @@ export function scanNodeAssetPathFields(nodes: CanvasNode[]): Array<{
             nodeId: node.id,
             field: `frames/${index}/imageUrl`,
             path: normalizeAssetPath(frameImageUrl),
-          });
-        }
-        const framePreview = readOptionalString(frameRecord.previewImageUrl);
-        if (framePreview && isProjectRelativeAssetPath(framePreview)) {
-          results.push({
-            nodeId: node.id,
-            field: `frames/${index}/previewImageUrl`,
-            path: normalizeAssetPath(framePreview),
           });
         }
         const frameFileAssetId = readOptionalString(frameRecord.fileAssetId);
@@ -86,17 +66,25 @@ export function scanNodeAssetPathFields(nodes: CanvasNode[]): Array<{
 
 export function listAssetRefs(manifest: AssetManifest, nodes: CanvasNode[]): AssetRef[] {
   const refs: AssetRef[] = [];
+  const seen = new Set<string>();
+
   for (const item of scanNodeAssetPathFields(nodes)) {
+    let fileAssetId: string | null = null;
     if (item.fileAssetId && manifest[item.fileAssetId]) {
-      refs.push({ nodeId: item.nodeId, field: item.field, fileAssetId: item.fileAssetId });
+      fileAssetId = item.fileAssetId;
+    } else if (item.path) {
+      fileAssetId = findFileAssetIdByPath(manifest, item.path);
+    }
+    if (!fileAssetId) {
       continue;
     }
-    if (item.path) {
-      const fileAssetId = findFileAssetIdByPath(manifest, item.path);
-      if (fileAssetId) {
-        refs.push({ nodeId: item.nodeId, field: item.field, fileAssetId });
-      }
+
+    const dedupeKey = `${item.nodeId}:${fileAssetId}`;
+    if (seen.has(dedupeKey)) {
+      continue;
     }
+    seen.add(dedupeKey);
+    refs.push({ nodeId: item.nodeId, field: item.field, fileAssetId });
   }
   return refs;
 }
@@ -107,37 +95,6 @@ export function countRefsForFileAssetId(
   fileAssetId: string
 ): number {
   return listAssetRefs(manifest, nodes).filter((ref) => ref.fileAssetId === fileAssetId).length;
-}
-
-function setNestedField(target: Record<string, unknown>, field: string, value: string): void {
-  const segments = field.split('/');
-  let cursor: Record<string, unknown> = target;
-  for (let index = 0; index < segments.length - 1; index += 1) {
-    const segment = segments[index] ?? '';
-    const nextSegment = segments[index + 1] ?? '';
-    const nextIsIndex = /^\d+$/.test(nextSegment);
-    if (nextIsIndex) {
-      const arrayValue = Array.isArray(cursor[segment]) ? [...(cursor[segment] as unknown[])] : [];
-      const arrayIndex = Number(nextSegment);
-      const currentItem = arrayValue[arrayIndex];
-      const nextItem =
-        currentItem && typeof currentItem === 'object'
-          ? { ...(currentItem as Record<string, unknown>) }
-          : {};
-      arrayValue[arrayIndex] = nextItem;
-      cursor[segment] = arrayValue;
-      cursor = nextItem;
-      index += 1;
-      continue;
-    }
-    const nextObject =
-      cursor[segment] && typeof cursor[segment] === 'object'
-        ? { ...(cursor[segment] as Record<string, unknown>) }
-        : {};
-    cursor[segment] = nextObject;
-    cursor = nextObject;
-  }
-  cursor[segments[segments.length - 1] ?? ''] = value;
 }
 
 function syncPathField(
@@ -176,9 +133,7 @@ function syncFramePathFields(
       return frame;
     }
     const frameRecord = { ...(frame as Record<string, unknown>) };
-    const frameChanged =
-      syncPathField(frameRecord, 'imageUrl', 'fileAssetId', manifest)
-      || syncPathField(frameRecord, 'previewImageUrl', 'previewFileAssetId', manifest);
+    const frameChanged = syncPathField(frameRecord, 'imageUrl', 'fileAssetId', manifest);
     if (frameChanged) {
       changed = true;
       return frameRecord;
@@ -206,9 +161,6 @@ export function syncNodeAssetPathsFromManifest(
     if (syncPathField(nextData, 'imageUrl', 'fileAssetId', manifest)) {
       nodeChanged = true;
     }
-    if (syncPathField(nextData, 'previewImageUrl', 'previewFileAssetId', manifest)) {
-      nodeChanged = true;
-    }
     if (syncFramePathFields(nextData, manifest)) {
       nodeChanged = true;
     }
@@ -222,6 +174,37 @@ export function syncNodeAssetPathsFromManifest(
   });
 
   return anyChanged ? nextNodes : nodes;
+}
+
+function setNestedField(target: Record<string, unknown>, field: string, value: string): void {
+  const segments = field.split('/');
+  let cursor: Record<string, unknown> = target;
+  for (let index = 0; index < segments.length - 1; index += 1) {
+    const segment = segments[index] ?? '';
+    const nextSegment = segments[index + 1] ?? '';
+    const nextIsIndex = /^\d+$/.test(nextSegment);
+    if (nextIsIndex) {
+      const arrayValue = Array.isArray(cursor[segment]) ? [...(cursor[segment] as unknown[])] : [];
+      const arrayIndex = Number(nextSegment);
+      const currentItem = arrayValue[arrayIndex];
+      const nextItem =
+        currentItem && typeof currentItem === 'object'
+          ? { ...(currentItem as Record<string, unknown>) }
+          : {};
+      arrayValue[arrayIndex] = nextItem;
+      cursor[segment] = arrayValue;
+      cursor = nextItem;
+      index += 1;
+      continue;
+    }
+    const nextObject =
+      cursor[segment] && typeof cursor[segment] === 'object'
+        ? { ...(cursor[segment] as Record<string, unknown>) }
+        : {};
+    cursor[segment] = nextObject;
+    cursor = nextObject;
+  }
+  cursor[segments[segments.length - 1] ?? ''] = value;
 }
 
 export function applyFileAssetIdToNodes(
@@ -245,24 +228,66 @@ export function applyFileAssetIdToNodes(
     }
     const nextData = { ...(node.data as Record<string, unknown>) };
     for (const [field, fileAssetId] of nodeBindings.entries()) {
-      if (field === 'fileAssetId' || field === 'previewFileAssetId') {
-        nextData[field] = fileAssetId;
+      if (field === 'fileAssetId') {
+        nextData.fileAssetId = fileAssetId;
       } else if (field.endsWith('/fileAssetId')) {
         setNestedField(nextData, field, fileAssetId);
       } else if (field === 'imageUrl') {
         nextData.fileAssetId = fileAssetId;
-      } else if (field === 'previewImageUrl') {
-        nextData.previewFileAssetId = fileAssetId;
       } else if (field.endsWith('/imageUrl')) {
         setNestedField(nextData, field.replace(/\/imageUrl$/, '/fileAssetId'), fileAssetId);
-      } else if (field.endsWith('/previewImageUrl')) {
-        setNestedField(
-          nextData,
-          field.replace(/\/previewImageUrl$/, '/previewFileAssetId'),
-          fileAssetId
-        );
       }
     }
     return { ...node, data: nextData as CanvasNode['data'] };
   });
+}
+
+const LEGACY_PREVIEW_FIELDS = ['previewImageUrl', 'previewFileAssetId'] as const;
+
+export function stripLegacyPreviewFieldsFromNodeData(data: Record<string, unknown>): Record<string, unknown> {
+  let changed = false;
+  const nextData = { ...data };
+  for (const field of LEGACY_PREVIEW_FIELDS) {
+    if (field in nextData) {
+      delete nextData[field];
+      changed = true;
+    }
+  }
+
+  if (Array.isArray(nextData.frames)) {
+    const currentFrames = nextData.frames as unknown[];
+    const nextFrames = currentFrames.map((frame) => {
+      if (!frame || typeof frame !== 'object') {
+        return frame;
+      }
+      const frameRecord = { ...(frame as Record<string, unknown>) };
+      let frameChanged = false;
+      for (const field of LEGACY_PREVIEW_FIELDS) {
+        if (field in frameRecord) {
+          delete frameRecord[field];
+          frameChanged = true;
+        }
+      }
+      return frameChanged ? frameRecord : frame;
+    });
+    if (nextFrames.some((frame, index) => frame !== currentFrames[index])) {
+      nextData.frames = nextFrames;
+      changed = true;
+    }
+  }
+
+  return changed ? nextData : data;
+}
+
+export function stripLegacyPreviewFieldsFromNodes(nodes: CanvasNode[]): CanvasNode[] {
+  let anyChanged = false;
+  const nextNodes = nodes.map((node) => {
+    const nextData = stripLegacyPreviewFieldsFromNodeData(node.data as Record<string, unknown>);
+    if (nextData === node.data) {
+      return node;
+    }
+    anyChanged = true;
+    return { ...node, data: nextData as CanvasNode['data'] };
+  });
+  return anyChanged ? nextNodes : nodes;
 }

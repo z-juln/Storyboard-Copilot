@@ -20,12 +20,13 @@ export {
   countRefsForFileAssetId,
   listAssetRefs,
   scanNodeAssetPathFields,
+  stripLegacyPreviewFieldsFromNodes,
   syncNodeAssetPathsFromManifest,
 } from './assetRefIndex';
 export {
   listProjectAssetFilePaths,
   reconcileProjectAssets,
-  registerPreparedAssetPaths,
+  registerPreparedAssetPath,
   type ReconcileProjectAssetsResult,
 } from './reconcileProjectAssets';
 export { resolveFileAssetDisplayUrl } from './resolveAssetDisplayUrl';

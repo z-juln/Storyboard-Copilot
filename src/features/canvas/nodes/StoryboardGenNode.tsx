@@ -1028,7 +1028,6 @@ export const StoryboardGenNode = memo(({ id, data, selected, width, height }: St
           displayName: '网格预览',
           resultKind: 'storyboardGenOutput',
           imageUrl: gridImageDataUrl,
-          previewImageUrl: gridImageDataUrl,
           aspectRatio: resolvedRequestAspectRatio,
           isGenerating: false,
           generationStartedAt: null,

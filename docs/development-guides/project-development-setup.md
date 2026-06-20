@@ -120,7 +120,7 @@ npm run build
 
 - 节点拖拽中禁止重计算和重持久化。
 - 视口持久化走轻量命令，不回退整项目写入。
-- 大图场景优先 `previewImageUrl` 渲染，处理链路使用原图 `imageUrl`。
+- 大图场景画布展示走 `/assets/preview`（`.cache/previews/{contentHash}_{max}.png`）；AI/工具/导出使用原图 `imageUrl`。
 
 ## 6.4 i18n 约束
 

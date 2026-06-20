@@ -148,7 +148,7 @@ function buildComponentDocNodes(): CanvasNode[] {
       '',
       '- 菜单可见；仅 **Source** Handle',
       '- 点击 / 拖拽 / 重新上传；落盘走 HTTP 分片',
-      '- 字段：`imageUrl` `previewImageUrl` `aspectRatio` `sourceFileName`',
+      '- 字段：`imageUrl` `fileAssetId` `aspectRatio` `sourceFileName`',
     ].join('\n'),
     { width: 400, height: 160 }
   );
@@ -166,7 +166,6 @@ function buildComponentDocNodes(): CanvasNode[] {
       {
         ...uploadDefaults,
         imageUrl: DOC_SAMPLE_IMAGE,
-        previewImageUrl: DOC_SAMPLE_IMAGE,
         aspectRatio: '16:9',
         sourceFileName: 'sample.png',
         displayName: '已上传示例',
@@ -207,7 +206,6 @@ function buildComponentDocNodes(): CanvasNode[] {
       {
         ...imageEditDefaults,
         imageUrl: DOC_SAMPLE_IMAGE,
-        previewImageUrl: DOC_SAMPLE_IMAGE,
         aspectRatio: '16:9',
         prompt: '示例 prompt：赛博朋克雨夜街道',
         model: DEFAULT_DOC_IMAGE_MODEL_ID,
@@ -225,7 +223,6 @@ function buildComponentDocNodes(): CanvasNode[] {
       {
         ...exportDefaults,
         imageUrl: DOC_SAMPLE_IMAGE,
-        previewImageUrl: DOC_SAMPLE_IMAGE,
         aspectRatio: '16:9',
         resultKind: 'generic',
       }
@@ -262,7 +259,6 @@ function buildComponentDocNodes(): CanvasNode[] {
           {
             id: 'doc-frame-1',
             imageUrl: DOC_SAMPLE_IMAGE,
-            previewImageUrl: DOC_PLACEHOLDER_IMAGE,
             aspectRatio: '16:9',
             note: '帧 1',
             order: 0,
@@ -270,7 +266,6 @@ function buildComponentDocNodes(): CanvasNode[] {
           {
             id: 'doc-frame-2',
             imageUrl: DOC_PLACEHOLDER_IMAGE,
-            previewImageUrl: DOC_PLACEHOLDER_IMAGE,
             aspectRatio: '16:9',
             note: '',
             order: 1,
@@ -278,7 +273,6 @@ function buildComponentDocNodes(): CanvasNode[] {
           {
             id: 'doc-frame-3',
             imageUrl: DOC_PLACEHOLDER_IMAGE,
-            previewImageUrl: DOC_PLACEHOLDER_IMAGE,
             aspectRatio: '16:9',
             note: '',
             order: 2,
@@ -286,7 +280,6 @@ function buildComponentDocNodes(): CanvasNode[] {
           {
             id: 'doc-frame-4',
             imageUrl: DOC_PLACEHOLDER_IMAGE,
-            previewImageUrl: DOC_PLACEHOLDER_IMAGE,
             aspectRatio: '16:9',
             note: '帧 4',
             order: 3,

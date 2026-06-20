@@ -27,6 +27,7 @@ use crate::media::dto::{
     MergeStoryboardImagesPayload, PrepareFromSourceRequestDto,
 };
 use crate::media::read_local_image;
+use crate::media::preview_cache::resolve_asset_preview_file;
 use crate::media::store::prepare_from_source;
 use crate::media::upload::{
     cleanup_stale_upload_sessions, complete_upload_session, create_upload_session,
@@ -53,6 +54,12 @@ struct ImagePathQuery {
 #[derive(Debug, Deserialize)]
 struct ProjectAssetQuery {
     path: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct ProjectAssetPreviewQuery {
+    path: String,
+    max: Option<u32>,
 }
 
 pub fn resolve_app_data_dir(app: &AppHandle) -> Result<PathBuf, String> {
@@ -153,6 +160,10 @@ pub async fn start_http_server_with_app_data(app_data_dir: PathBuf) -> Result<()
                 .put(put_project_asset_by_query)
                 .patch(move_project_asset)
                 .delete(delete_project_asset),
+        )
+        .route(
+            "/api/v1/projects/:project_id/assets/preview",
+            get(serve_project_asset_preview),
         )
         .route(
             "/api/v1/projects/:project_id/images/upload-sessions",
@@ -528,6 +539,31 @@ async fn put_project_asset_by_query(
     {
         Ok(path) => Json(json!({ "path": path })).into_response(),
         Err(err) => api_error(StatusCode::BAD_REQUEST, err),
+    }
+}
+
+async fn serve_project_asset_preview(
+    State(state): State<HttpState>,
+    Path(project_id): Path<String>,
+    Query(query): Query<ProjectAssetPreviewQuery>,
+) -> Response {
+    let max_dimension = query.max.unwrap_or(512);
+    match resolve_asset_preview_file(
+        &state.app_data_dir,
+        &project_id,
+        &query.path,
+        max_dimension,
+    ) {
+        Ok(path) => match read_local_image(&state.app_data_dir, &path.to_string_lossy()) {
+            Ok((bytes, mime)) => (
+                StatusCode::OK,
+                [(header::CONTENT_TYPE, mime)],
+                bytes,
+            )
+                .into_response(),
+            Err(err) => api_error(StatusCode::NOT_FOUND, err),
+        },
+        Err(err) => api_error(StatusCode::NOT_FOUND, err),
     }
 }
 

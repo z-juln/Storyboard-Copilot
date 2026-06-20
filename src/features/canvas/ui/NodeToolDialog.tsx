@@ -226,14 +226,12 @@ export function NodeToolDialog() {
           sourceNode.id,
           imageFields.imageUrl,
           imageFields.aspectRatio,
-          imageFields.previewImageUrl,
           {
             defaultTitle: resolveResultNodeTitle(activeToolDialog.toolType),
             resultKind: 'generic',
             aspectRatioStrategy: 'provided',
             sizeStrategy: 'autoMinEdge',
             fileAssetId: imageFields.fileAssetId,
-            previewFileAssetId: imageFields.previewFileAssetId,
           }
         );
         if (createdNodeId) {

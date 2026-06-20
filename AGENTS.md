@@ -48,7 +48,7 @@
 - 拖拽中不写盘，不做重计算；拖拽结束后保存。
 - 项目快照使用防抖 + idle 调度。
 - 视口保存走独立轻量 HTTP 通道 `PUT /api/v1/projects/:id/viewport`，不要回退到整项目 upsert。
-- 大图渲染优先 preview；展示：**fileAssetId → assetManifest.path → HTTP**（`v=updatedAt`）；迁移期可读 `imageUrl` path 缓存。
+- 大图渲染走 `/assets/preview`（`.cache/previews/{contentHash}_{max}.png`）；AI/工具用原图。展示：**fileAssetId → assetManifest.path → HTTP**（`v=updatedAt`）；迁移期可读 `imageUrl` path 缓存。节点不持久化 preview 字段。
 - **`fileAssetId` 是 `assets/` 下文件的稳定 id（manifest 键），不是画布 nodeId。**
 - 节点通过 `fileAssetId` **引用**文件；manifest 存 id→path。打开项目必须 reconcile；upload 落盘 register 新 fileAssetId。
 - 文件 move/rename 只改 manifest 中该 fileAssetId 的 path；禁止只改磁盘不改 manifest。

@@ -4,8 +4,8 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "camelCase")]
 pub struct PrepareNodeImageResponseDto {
     pub image_path: String,
-    pub preview_image_path: String,
     pub aspect_ratio: String,
+    pub content_hash: String,
 }
 
 #[derive(Debug, Deserialize)]

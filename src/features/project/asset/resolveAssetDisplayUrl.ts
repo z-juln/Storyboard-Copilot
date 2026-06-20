@@ -1,5 +1,7 @@
 import {
+  buildProjectAssetPreviewUrl,
   buildProjectAssetUrl,
+  DEFAULT_PREVIEW_MAX_DIMENSION,
   isProjectRelativeAssetPath,
   isRemoteImageUrl,
 } from '@/features/project/projectPaths';
@@ -13,8 +15,18 @@ export function resolveFileAssetDisplayUrl(input: {
   imageUrl?: string | null;
   assetManifest?: AssetManifest | null;
   resolveAbsolutePath?: (absolutePath: string) => string;
+  preferPreview?: boolean;
+  maxPreviewDimension?: number;
 }): string {
-  const { projectId, fileAssetId, imageUrl, assetManifest, resolveAbsolutePath } = input;
+  const {
+    projectId,
+    fileAssetId,
+    imageUrl,
+    assetManifest,
+    resolveAbsolutePath,
+    preferPreview = false,
+    maxPreviewDimension = DEFAULT_PREVIEW_MAX_DIMENSION,
+  } = input;
 
   if (typeof imageUrl === 'string' && isRemoteImageUrl(imageUrl)) {
     return imageUrl;
@@ -27,6 +39,9 @@ export function resolveFileAssetDisplayUrl(input: {
   }
 
   if (projectId && isProjectRelativeAssetPath(path)) {
+    if (preferPreview) {
+      return buildProjectAssetPreviewUrl(projectId, path, maxPreviewDimension);
+    }
     const record = fileAssetId ? assetManifest?.[fileAssetId] : undefined;
     const base = buildProjectAssetUrl(projectId, path);
     if (record?.updatedAt) {

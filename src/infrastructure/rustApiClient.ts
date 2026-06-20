@@ -27,8 +27,8 @@ export function buildLocalImageUrl(filePath: string): string {
 
 export interface PrepareNodeImageResult {
   imagePath: string;
-  previewImagePath: string;
   aspectRatio: string;
+  contentHash: string;
 }
 
 export interface MergeStoryboardImagesPayload {

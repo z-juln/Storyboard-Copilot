@@ -23,6 +23,18 @@ export function buildProjectAssetUrl(projectId: string, relativePath: string): s
   return `${resolveRustApiBaseUrl()}/api/v1/projects/${encodeURIComponent(projectId)}/assets?path=${encodeURIComponent(normalized)}`;
 }
 
+export const DEFAULT_PREVIEW_MAX_DIMENSION = 512;
+
+export function buildProjectAssetPreviewUrl(
+  projectId: string,
+  relativePath: string,
+  maxDimension = DEFAULT_PREVIEW_MAX_DIMENSION
+): string {
+  const normalized = relativePath.trim().replace(/^\/+/, '');
+  const safeMax = Math.max(64, Math.min(4096, Math.floor(maxDimension)));
+  return `${resolveRustApiBaseUrl()}/api/v1/projects/${encodeURIComponent(projectId)}/assets/preview?path=${encodeURIComponent(normalized)}&max=${safeMax}`;
+}
+
 export function resolveProjectImageDisplayUrl(
   projectId: string | null | undefined,
   imageUrl: string | null | undefined,

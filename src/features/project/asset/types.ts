@@ -9,10 +9,9 @@ export type AssetManifest = Record<string, FileAssetRecord>;
 
 export interface PreparedFileAssetRefs {
   imageUrl: string;
-  previewImageUrl: string;
   fileAssetId: string;
-  previewFileAssetId: string;
   aspectRatio: string;
+  contentHash?: string;
 }
 
 export interface AssetRef {

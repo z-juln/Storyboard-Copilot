@@ -101,7 +101,7 @@
       },
       "data": {
         "displayName": "说明",
-        "content": "## uploadNode · `UploadNode.tsx`\n\n- 菜单可见；仅 **Source** Handle\n- 点击 / 拖拽 / 重新上传；落盘走 HTTP 分片\n- 字段：`imageUrl` `previewImageUrl` `aspectRatio` `sourceFileName`"
+        "content": "## uploadNode · `UploadNode.tsx`\n\n- 菜单可见；仅 **Source** Handle\n- 点击 / 拖拽 / 重新上传；落盘走 HTTP 分片\n- 字段：`imageUrl` `aspectRatio` `sourceFileName`"
       },
       "parentId": "doc-group-input",
       "extent": "parent",
@@ -120,7 +120,6 @@
       "data": {
         "displayName": "上传图片",
         "imageUrl": null,
-        "previewImageUrl": null,
         "aspectRatio": "1:1",
         "isSizeManuallyAdjusted": false,
         "sourceFileName": null
@@ -142,7 +141,6 @@
       "data": {
         "displayName": "已上传示例",
         "imageUrl": "assets/sample.png",
-        "previewImageUrl": "assets/sample.png",
         "aspectRatio": "16:9",
         "isSizeManuallyAdjusted": false,
         "sourceFileName": "sample.png"
@@ -182,7 +180,6 @@
       "data": {
         "displayName": "AI 图片",
         "imageUrl": null,
-        "previewImageUrl": null,
         "aspectRatio": "1:1",
         "isSizeManuallyAdjusted": false,
         "requestAspectRatio": "auto",
@@ -211,7 +208,6 @@
       "data": {
         "displayName": "AI 图片 · 示例",
         "imageUrl": "assets/sample.png",
-        "previewImageUrl": "assets/sample.png",
         "aspectRatio": "16:9",
         "isSizeManuallyAdjusted": false,
         "requestAspectRatio": "auto",
@@ -240,7 +236,6 @@
       "data": {
         "displayName": "结果图片",
         "imageUrl": "assets/sample.png",
-        "previewImageUrl": "assets/sample.png",
         "aspectRatio": "16:9",
         "isSizeManuallyAdjusted": false,
         "resultKind": "generic"
@@ -287,7 +282,6 @@
           {
             "id": "doc-frame-1",
             "imageUrl": "assets/sample.png",
-            "previewImageUrl": "assets/placeholder.png",
             "aspectRatio": "16:9",
             "note": "帧 1",
             "order": 0
@@ -295,7 +289,6 @@
           {
             "id": "doc-frame-2",
             "imageUrl": "assets/placeholder.png",
-            "previewImageUrl": "assets/placeholder.png",
             "aspectRatio": "16:9",
             "note": "",
             "order": 1
@@ -303,7 +296,6 @@
           {
             "id": "doc-frame-3",
             "imageUrl": "assets/placeholder.png",
-            "previewImageUrl": "assets/placeholder.png",
             "aspectRatio": "16:9",
             "note": "",
             "order": 2
@@ -311,7 +303,6 @@
           {
             "id": "doc-frame-4",
             "imageUrl": "assets/placeholder.png",
-            "previewImageUrl": "assets/placeholder.png",
             "aspectRatio": "16:9",
             "note": "帧 4",
             "order": 3
@@ -376,7 +367,6 @@
         "requestAspectRatio": "auto",
         "extraParams": {},
         "imageUrl": null,
-        "previewImageUrl": null,
         "aspectRatio": "1:1",
         "isGenerating": false,
         "generationStartedAt": null,

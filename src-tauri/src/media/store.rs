@@ -9,9 +9,9 @@ use image::{DynamicImage, ImageReader, RgbaImage};
 use tracing::info;
 
 use crate::media::dto::PrepareNodeImageResponseDto;
-
-const FAST_PREVIEW_BYPASS_MAX_BYTES: usize = 2_000_000;
-const FAST_PREVIEW_BYPASS_MAX_DIMENSION: u32 = 2048;
+use crate::media::preview_cache::{
+    content_hash_hex, ensure_preview_cache_for_bytes, should_bypass_preview,
+};
 
 fn resolve_images_dir(app_data_dir: &Path) -> Result<PathBuf, String> {
     let images_dir = app_data_dir.join("images");
@@ -121,7 +121,7 @@ fn reduce_aspect_ratio(width: u32, height: u32) -> String {
     format!("{}:{}", safe_width / gcd, safe_height / gcd)
 }
 
-fn resize_image_fast(source: &DynamicImage, target_width: u32, target_height: u32) -> Result<RgbaImage, String> {
+pub fn resize_image_fast(source: &DynamicImage, target_width: u32, target_height: u32) -> Result<RgbaImage, String> {
     let source_rgba = source.to_rgba8();
     let source_width = source_rgba.width().max(1);
     let source_height = source_rgba.height().max(1);
@@ -292,76 +292,38 @@ fn prepare_node_image_from_bytes(
     let width = raw_width.max(1);
     let height = raw_height.max(1);
 
+    let content_hash = content_hash_hex(bytes);
     let persist_started = Instant::now();
     let image_path = persist_image_bytes(app_data_dir, project_id, bytes, extension)?;
     let persist_elapsed = persist_started.elapsed().as_millis();
-    let longest_side = width.max(height);
-    let bypass_preview = longest_side <= safe_max_dimension
-        || (bytes.len() <= FAST_PREVIEW_BYPASS_MAX_BYTES
-            && longest_side <= FAST_PREVIEW_BYPASS_MAX_DIMENSION);
-    if bypass_preview {
-        info!(
-            "prepare_node_image done [{}]: bytes={}, ext={}, size={}x{}, max_preview={}, probe={}ms, decode=0ms, persist_original={}ms, resize=0ms, bypass_preview=true, total={}ms",
-            trace_tag,
-            bytes.len(),
-            extension,
-            width,
-            height,
-            safe_max_dimension,
-            probe_elapsed,
-            persist_elapsed,
-            started.elapsed().as_millis()
-        );
-        return Ok(PrepareNodeImageResponseDto {
-            image_path: image_path.clone(),
-            preview_image_path: image_path,
-            aspect_ratio: reduce_aspect_ratio(width, height),
-        });
+    let bypass_preview = should_bypass_preview(width, height, bytes.len(), safe_max_dimension);
+
+    let cache_started = Instant::now();
+    if !bypass_preview {
+        let _ = ensure_preview_cache_for_bytes(app_data_dir, project_id, bytes, safe_max_dimension)?;
     }
-
-    let decode_started = Instant::now();
-    let image = image::load_from_memory(bytes)
-        .map_err(|e| format!("Failed to decode image source: {}", e))?;
-    let decode_elapsed = decode_started.elapsed().as_millis();
-
-    let resize_started = Instant::now();
-    let scale = safe_max_dimension as f64 / longest_side as f64;
-    let target_width = ((width as f64) * scale).round().max(1.0) as u32;
-    let target_height = ((height as f64) * scale).round().max(1.0) as u32;
-    let resized_rgba = resize_image_fast(&image, target_width, target_height)
-        .unwrap_or_else(|_| {
-            image
-                .resize(target_width, target_height, image::imageops::FilterType::Triangle)
-                .to_rgba8()
-        });
-    let resized = DynamicImage::ImageRgba8(resized_rgba);
-
-    let mut preview_buffer = Cursor::new(Vec::new());
-    resized
-        .write_to(&mut preview_buffer, image::ImageFormat::Png)
-        .map_err(|e| format!("Failed to encode preview image: {}", e))?;
-    let preview_image_path = persist_image_bytes(app_data_dir, project_id, preview_buffer.get_ref(), "png")?;
-    let resize_elapsed = resize_started.elapsed().as_millis();
+    let cache_elapsed = cache_started.elapsed().as_millis();
 
     info!(
-        "prepare_node_image done [{}]: bytes={}, ext={}, size={}x{}, max_preview={}, probe={}ms, decode={}ms, persist_original={}ms, resize={}ms, total={}ms",
+        "prepare_node_image done [{}]: bytes={}, ext={}, size={}x{}, hash={}, max_preview={}, probe={}ms, persist_original={}ms, preview_cache={}ms, bypass_preview={}, total={}ms",
         trace_tag,
         bytes.len(),
         extension,
         width,
         height,
+        content_hash,
         safe_max_dimension,
         probe_elapsed,
-        decode_elapsed,
         persist_elapsed,
-        resize_elapsed,
+        cache_elapsed,
+        bypass_preview,
         started.elapsed().as_millis()
     );
 
     Ok(PrepareNodeImageResponseDto {
         image_path,
-        preview_image_path,
         aspect_ratio: reduce_aspect_ratio(width, height),
+        content_hash,
     })
 }
 
