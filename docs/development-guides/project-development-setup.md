@@ -68,7 +68,8 @@ npm run tauri dev
 
 说明：
 
-- 涉及图片处理、SQLite 持久化、AI 命令调用时，优先使用 `npm run tauri dev` 验证。
+- 涉及 Project Bundle 持久化、分片上传、本地 HTTP API 或 Tauri 桌面能力时，优先使用 `npm run tauri dev` 验证。
+- 纯 Web 调试（`npm run dev`）需另启 `cd src-tauri && cargo run --bin video-api`，且部分能力（AI 生图、图片切割/导出等）仍依赖 Tauri。
 - 仅改 UI 样式可先用 `npm run dev`。
 
 ## 4. 日常验证命令
@@ -96,8 +97,9 @@ npm run build
 - 前端入口与状态：`src/App.tsx`、`src/stores/*`
 - 画布与节点：`src/features/canvas/**`
 - 模型与供应商：`src/features/canvas/models/**`
-- Tauri 命令：`src/commands/*`、`src-tauri/src/commands/*`
-- SQLite 持久化：`src/commands/projectState.ts`、`src-tauri/src/commands/project_state.rs`
+- HTTP 命令层：`src/commands/*`、`src/infrastructure/rustApiClient.ts`
+- 项目 Bundle：`src-tauri/src/project/file_store.rs`、`src-tauri/src/http/mod.rs`
+- Tauri invoke：`src-tauri/src/commands/*`（图片处理、AI 生图、系统等）
 
 ## 6. 开发注意事项
 
@@ -130,7 +132,7 @@ npm run build
 
 - 小步修改，小步验证。
 - 不要跨模块偷改状态。
-- 改动涉及持久化结构时，必须考虑 SQLite 自愈迁移逻辑。
+- 改动涉及 `project.json` 结构时，需兼顾已有项目的读取兼容。
 
 ## 7. 常见问题
 

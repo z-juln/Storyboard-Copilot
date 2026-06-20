@@ -17,7 +17,7 @@
 - **无本地 Rust 服务**时的 AI / 持久化 / 文件能力（纯静态托管不可用）
 - 用 WebView bridge（invoke）作为 AI 与模型调用的主通道
 
-## 产品形态
+## 产品形态（目标）
 
 - **Web 端 + 本地 Rust HTTP API = 完整应用**（与 Tauri 窗口共用同一前端、同一 `:1421` API）
-- Tauri 桌面壳：窗口与系统集成；业务 API 仍走本地网络请求，不走 bridge
+- Tauri 桌面壳：窗口与系统集成；业务 API 逐步全部走本地网络请求，不走 bridge

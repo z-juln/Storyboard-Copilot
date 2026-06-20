@@ -6,7 +6,7 @@
 
 - 产品：节点画布工作台，支持图片上传、AI 生成/编辑、裁剪/标注/分镜、导出。
 - 前端：React + TypeScript + Zustand + @xyflow/react + TailwindCSS。
-- 后端：Tauri 2 + Rust；项目画布持久化为目录 Bundle（`project.json` + `assets/`），SQLite 仅作旧数据迁移来源。
+- 后端：Tauri 2 + Rust；本地 HTTP API（`:1421`）承载项目 Bundle、图片上传与 Adapter 调用；SQLite（`projects.db`）仅存供应商 API Key
 - 原则：解耦、可扩展、可回归验证、自动持久化、交互性能优先。
 
 ## 优先阅读
@@ -44,7 +44,7 @@
 
 - 拖拽中不写盘，不做重计算；拖拽结束后保存。
 - 项目快照使用防抖 + idle 调度。
-- 视口保存走独立轻量通道 `update_project_viewport_record`，不要回退到整项目 upsert。
+- 视口保存走独立轻量 HTTP 通道 `PUT /api/v1/projects/:id/viewport`，不要回退到整项目 upsert。
 - 大图渲染优先用 `previewImageUrl`，模型/工具处理使用原图 `imageUrl`。
 - 项目资源写入 `projects/<id>/assets/`；JSON 存 `assets/...` 相对路径或网络 URL。
 

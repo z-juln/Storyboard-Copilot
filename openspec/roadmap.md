@@ -14,9 +14,10 @@
 ## 现状基线（2026-06）
 
 - 已有：节点画布、上传/AI 出图/裁剪标注/分镜切割与生成、多供应商 API Key 配置（kie / ppio / fal / grsai）、模型参数控件。
-- **运行形态**：前端为同一套 React 应用；AI 等能力目前经 Tauri WebView bridge（`invoke`）调 Rust，**浏览器单独打开时无法完整使用**。
-- **目标形态**：Web 端 + 本地 Rust HTTP 服务 = **完整应用**；浏览器与 Tauri 窗口共用同一前端，**一律走本地网络请求**（`fetch → 127.0.0.1:1421`），**不用 WebView bridge 传 AI/业务 API**。
-- 缺口：本地 HTTP 服务层、内置 AI 模型库（对话/生图/视频）、全局 prompt 预设、目录可视化、VR/3D 组件、配置导入导出、工作流模板与 Agent。
+- **已走 HTTP（`:1421`）**：Project Bundle 持久化、图片分片上传/prepare、分镜合并/embed metadata、内置 Adapter 调用、API Key 读写。
+- **仍走 Tauri `invoke`**：画布 AI 生图、图片切割/裁剪/导出/剪贴板等；仅 `npm run dev` 无法完整使用。
+- **目标形态**：Web 端 + 本地 Rust HTTP 服务 = **完整应用**；浏览器与 Tauri 窗口共用同一前端，**业务 API 一律走本地网络请求**（`fetch → 127.0.0.1:1421`），**不用 WebView bridge 传 AI/业务 API**。
+- 缺口：invoke 能力迁移至 HTTP、内置 AI 模型库（对话/生图/视频）、全局 prompt 预设、目录可视化、VR/3D 组件、配置导入导出、工作流模板与 Agent。
 
 ---
 
@@ -39,7 +40,7 @@ Tauri 壳：窗口 / 文件 / 部分持久化（非 AI 主通道，逐步也迁 
 | 场景 | 前端 | Rust API | 说明 |
 |------|------|----------|------|
 | 全链路开发 | `npm run tauri dev` → `:1420` | Tauri 进程内启动 `:1421` | 桌面窗口 + 浏览器均可访问同一前端 |
-| Web 调试 | `npm run dev` → `:1420` | 单独启动 Rust API（如 `storyboard-api`） | 浏览器即完整 AI 调试环境 |
+| Web 调试 | `npm run dev` → `:1420` | 单独启动 `cargo run --bin video-api` | 浏览器可调试 HTTP 能力；AI 生图等待 invoke 迁移 |
 
 **硬约束**：
 
@@ -260,7 +261,7 @@ Tauri 壳：窗口 / 文件 / 部分持久化（非 AI 主通道，逐步也迁 
 
 - [ ] 新节点类型：导入全景媒体，画布内可交互预览（拖拽环视）
 - [ ] 支持导出当前视角截图到下游图像节点
-- [ ] 持久化与 `imagePool` 编码规范一致
+- [ ] 持久化遵循 Project Bundle（`assets/` 相对路径）
 
 **优先级**：P0
 

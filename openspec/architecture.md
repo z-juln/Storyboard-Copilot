@@ -38,11 +38,29 @@ Source Node -> Process Node / Tool / AI -> Derived Output Node
 | 持久化 | `projectStore.ts`, `features/project/projectCodec.ts`, `projectState.ts`, `src-tauri/src/project/file_store.rs` |
 | 文案 | `src/i18n/locales/zh.json`, `src/i18n/locales/en.json` |
 
+## Runtime & Channels
+
+本地 Rust HTTP 服务默认 `127.0.0.1:1421`（Tauri 启动时内嵌拉起，或于 `src-tauri` 执行 `cargo run --bin video-api`）。
+
+| 能力 | 通道 | 说明 |
+|------|------|------|
+| 项目 CRUD / 视口 | HTTP `rustApiClient` | Project Bundle 落盘 |
+| 图片分片上传 / prepare | HTTP | 写入 `projects/<id>/assets/` |
+| 分镜合并 / metadata 写入 | HTTP | 需 `projectId` |
+| 内置 Adapter 模型 | HTTP | `/api/v1/adapters/*` |
+| 画布节点 AI 生图 | Tauri `invoke` | 仍走 bridge，Web 未完整 |
+| 图片切割 / 裁剪 / 导出 / 剪贴板 | Tauri `invoke` | 桌面能力，Web 未完整 |
+| 供应商 API Key | HTTP + SQLite | 存 `{app_data}/projects.db` |
+| 窗口 / 更新检查 | Tauri `invoke` | 仅桌面壳 |
+
+Web 与 Tauri 共用同一套 React 前端；完整体验需本地 `:1421` API，部分桌面能力仍需 Tauri。
+
 ## Invariants
 
 - 节点注册以 `domain/nodeRegistry.ts` 和 `domain/canvasNodes.ts` 为单一真相源。
 - UI 不直接调用外部 AI/API；通过应用层、命令层或本地 `:1421` HTTP 服务中转。
-- Web 与 Tauri WebView 共用同一套 `rustApiClient`；图片落盘与读取不走 WebView `invoke`。
+- 项目持久化、图片上传/prepare、分镜合并/embed 与内置 Adapter：**必须**走 `rustApiClient`（HTTP），不走 WebView `invoke`。
+- 画布 AI 生图与部分图片处理（切割、裁剪、导出、剪贴板）**当前仍走** Tauri `invoke`，迁移中见 `roadmap.md`。
 - 本地文件上传走分片二进制 PUT（默认 4MB/片），禁止 JSON base64 整包上传；data URL 同样先转 Blob 再分片。
 - 工具产物走“生成新节点”链路。
 - 拖拽中不做重持久化；结束后防抖保存。
