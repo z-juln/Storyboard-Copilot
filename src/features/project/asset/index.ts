@@ -33,11 +33,19 @@ export {
   collectFilePathsFromEntry,
   filterTreeByQuery,
   findEntryByPath,
+  findEntryInTree,
   getAssetBaseName,
   getAssetParentPath,
+  getSiblingEntries,
   isDescendantAssetPath,
   joinAssetPath,
 } from './assetExplorerPathUtils';
+export {
+  entriesToClipboardItems,
+  filterTopLevelSelectedPaths,
+  resolveEntriesForPaths,
+  resolveTopLevelSelectedEntries,
+} from './assetExplorerSelection';
 export {
   getAssetExplorerClipboard,
   setAssetExplorerClipboard,
@@ -52,7 +60,9 @@ export {
   createProjectAssetFile,
   createProjectAssetFolder,
   deleteProjectAssetEntry,
+  deleteProjectAssetEntries,
   moveProjectAssetEntry,
+  moveProjectAssetEntries,
   pasteAssetExplorerClipboard,
   renameProjectAssetEntry,
   resolveNewSiblingName,

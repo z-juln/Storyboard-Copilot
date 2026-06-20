@@ -73,6 +73,26 @@ export function findEntryInTree(
   return findEntryByPath([root], path);
 }
 
+export function getSiblingEntries(
+  root: ProjectDirectoryEntry,
+  path: string
+): ProjectDirectoryEntry[] {
+  const normalized = normalizeAssetPath(path);
+  const rootPath = normalizeAssetPath(root.path);
+
+  if (normalized === rootPath) {
+    return root.children ?? [];
+  }
+
+  const parentPath = getAssetParentPath(normalized);
+  const parent = findEntryInTree(root, parentPath);
+  if (!parent || parent.kind !== 'directory') {
+    return [];
+  }
+
+  return parent.children ?? [];
+}
+
 export function filterTreeByQuery(
   entry: ProjectDirectoryEntry,
   scopePath: string,

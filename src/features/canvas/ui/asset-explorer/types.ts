@@ -8,7 +8,7 @@ export interface AssetExplorerPanelProps {
 }
 
 export interface DeleteConfirmState {
-  entry: ProjectDirectoryEntry;
+  entries: ProjectDirectoryEntry[];
   refCount: number;
 }
 

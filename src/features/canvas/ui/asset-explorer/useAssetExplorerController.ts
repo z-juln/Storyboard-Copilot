@@ -23,13 +23,17 @@ import {
   isDescendantAssetPath,
   joinAssetPath,
 } from '@/features/project/asset/assetExplorerPathUtils';
+import {
+  entriesToClipboardItems,
+  resolveTopLevelSelectedEntries,
+} from '@/features/project/asset/assetExplorerSelection';
 import { normalizeAssetPath } from '@/features/project/asset/assetManifest';
 import {
   countAssetPathRefs,
   createProjectAssetFile,
   createProjectAssetFolder,
-  deleteProjectAssetEntry,
-  moveProjectAssetEntry,
+  deleteProjectAssetEntries,
+  moveProjectAssetEntries,
   pasteAssetExplorerClipboard,
   renameProjectAssetEntry,
   resolveNewSiblingName,
@@ -45,6 +49,7 @@ import { useCanvasStore } from '@/stores/canvasStore';
 import { useProjectStore } from '@/stores/projectStore';
 
 import type { AssetPreviewState, ContextMenuState, DeleteConfirmState } from './types';
+import { useAssetExplorerSelection } from './useAssetExplorerSelection';
 
 interface UseAssetExplorerControllerOptions {
   projectId: string;
@@ -62,16 +67,25 @@ export function useAssetExplorerController({
   const [tree, setTree] = useState<ProjectDirectoryEntry | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [renamingPath, setRenamingPath] = useState<string | null>(null);
   const [dropTargetPath, setDropTargetPath] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [searchScope, setSearchScope] = useState<{ path: string; query: string } | null>(null);
-  const [dragSourcePath, setDragSourcePath] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<DeleteConfirmState | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [previewState, setPreviewState] = useState<AssetPreviewState | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const dragSourcePathsRef = useRef<string[]>([]);
+
+  const {
+    selectedPaths,
+    anchorPath,
+    selectSingle,
+    togglePath,
+    selectSiblingAll,
+    removePaths,
+    replacePaths,
+  } = useAssetExplorerSelection(tree);
 
   const manifest: AssetManifest = assetManifest ?? createEmptyAssetManifest();
 
@@ -102,12 +116,19 @@ export function useAssetExplorerController({
     return filterTreeByQuery(tree, searchScope.path, searchScope.query);
   }, [searchScope, tree]);
 
-  const selectedEntry = useMemo(() => {
-    if (!tree || !selectedPath) {
+  const getEffectiveSelectedEntries = useCallback((): ProjectDirectoryEntry[] => {
+    if (!tree || selectedPaths.size === 0) {
+      return [];
+    }
+    return resolveTopLevelSelectedEntries(tree, selectedPaths);
+  }, [selectedPaths, tree]);
+
+  const anchorEntry = useMemo(() => {
+    if (!tree || !anchorPath) {
       return null;
     }
-    return findEntryInTree(tree, selectedPath);
-  }, [selectedPath, tree]);
+    return findEntryInTree(tree, anchorPath);
+  }, [anchorPath, tree]);
 
   const canPaste = Boolean(getAssetExplorerClipboard()?.items.length);
 
@@ -118,19 +139,19 @@ export function useAssetExplorerController({
     [commitAssetManifest]
   );
 
-  const setClipboardForEntry = useCallback(
-    (entry: ProjectDirectoryEntry, mode: 'copy' | 'cut') => {
-      if (readOnly) {
+  const isAssetsRootPath = useCallback(
+    (path: string) => tree && normalizeAssetPath(path) === normalizeAssetPath(tree.path),
+    [tree]
+  );
+
+  const setClipboardForEntries = useCallback(
+    (entries: ProjectDirectoryEntry[], mode: 'copy' | 'cut') => {
+      if (readOnly || entries.length === 0) {
         return;
       }
       setAssetExplorerClipboard({
         mode,
-        items: [
-          {
-            path: entry.path,
-            kind: entry.kind === 'directory' ? 'directory' : 'file',
-          },
-        ],
+        items: entriesToClipboardItems(entries),
       });
     },
     [readOnly]
@@ -138,12 +159,13 @@ export function useAssetExplorerController({
 
   const copySelectionToClipboard = useCallback(
     (mode: 'copy' | 'cut') => {
-      if (!selectedEntry) {
+      const entries = getEffectiveSelectedEntries();
+      if (entries.length === 0) {
         return;
       }
-      setClipboardForEntry(selectedEntry, mode);
+      setClipboardForEntries(entries, mode);
     },
-    [selectedEntry, setClipboardForEntry]
+    [getEffectiveSelectedEntries, setClipboardForEntries]
   );
 
   const handlePasteToDirectory = useCallback(
@@ -187,35 +209,50 @@ export function useAssetExplorerController({
     setPreviewState({ entry, kind });
   }, []);
 
-  const requestDelete = useCallback(
-    (entry: ProjectDirectoryEntry) => {
-      if (readOnly) {
+  const requestDeleteEntries = useCallback(
+    (entries: ProjectDirectoryEntry[]) => {
+      if (readOnly || entries.length === 0) {
         return;
       }
-      const filePaths = collectFilePathsFromEntry(entry);
+      const deletable = entries.filter((entry) => !isAssetsRootPath(entry.path));
+      if (deletable.length === 0) {
+        return;
+      }
+      const filePaths = deletable.flatMap((entry) => collectFilePathsFromEntry(entry));
       const refCount = countAssetPathRefs(manifest, nodes, filePaths);
-      setDeleteConfirm({ entry, refCount });
+      setDeleteConfirm({ entries: deletable, refCount });
     },
-    [manifest, nodes, readOnly]
+    [isAssetsRootPath, manifest, nodes, readOnly]
   );
+
+  const requestDeleteSelection = useCallback(() => {
+    requestDeleteEntries(getEffectiveSelectedEntries());
+  }, [getEffectiveSelectedEntries, requestDeleteEntries]);
 
   const confirmDelete = useCallback(async () => {
     if (!deleteConfirm || isDeleting) {
       return;
     }
 
-    const { entry } = deleteConfirm;
+    const { entries } = deleteConfirm;
     setIsDeleting(true);
     try {
-      const nextManifest = await deleteProjectAssetEntry({
+      const nextManifest = await deleteProjectAssetEntries({
         projectId,
-        entry,
+        entries,
         manifest,
       });
       applyManifest(nextManifest);
-      if (selectedPath && isDescendantAssetPath(entry.path, selectedPath)) {
-        setSelectedPath(null);
+      const pathsToRemove: string[] = [];
+      for (const entry of entries) {
+        pathsToRemove.push(entry.path);
+        for (const path of selectedPaths) {
+          if (isDescendantAssetPath(entry.path, path)) {
+            pathsToRemove.push(path);
+          }
+        }
       }
+      removePaths(pathsToRemove);
       setDeleteConfirm(null);
       await loadTree();
     } catch (deleteError) {
@@ -230,7 +267,8 @@ export function useAssetExplorerController({
     loadTree,
     manifest,
     projectId,
-    selectedPath,
+    removePaths,
+    selectedPaths,
   ]);
 
   const handleRenameCommit = useCallback(
@@ -249,13 +287,13 @@ export function useAssetExplorerController({
         });
         applyManifest(nextManifest);
         const nextPath = joinAssetPath(getAssetParentPath(entry.path), nextName);
-        setSelectedPath(nextPath);
+        selectSingle(nextPath);
         await loadTree();
       } catch (renameError) {
         setError(renameError instanceof Error ? renameError.message : '重命名失败');
       }
     },
-    [applyManifest, loadTree, manifest, projectId, readOnly]
+    [applyManifest, loadTree, manifest, projectId, readOnly, selectSingle]
   );
 
   const collectSiblingNames = useCallback((dirEntry: ProjectDirectoryEntry): string[] => {
@@ -283,7 +321,7 @@ export function useAssetExplorerController({
             name,
           });
           await loadTree();
-          setSelectedPath(path);
+          selectSingle(path);
           setRenamingPath(path);
           return;
         }
@@ -296,48 +334,70 @@ export function useAssetExplorerController({
         });
         applyManifest(created.manifest);
         await loadTree();
-        setSelectedPath(created.path);
+        selectSingle(created.path);
         setRenamingPath(created.path);
       } catch (createError) {
         setError(createError instanceof Error ? createError.message : '创建失败');
       }
     },
-    [applyManifest, collectSiblingNames, loadTree, manifest, projectId, readOnly]
+    [applyManifest, collectSiblingNames, loadTree, manifest, projectId, readOnly, selectSingle]
   );
 
-  const handleMoveEntry = useCallback(
-    async (sourcePath: string, targetDirPath: string) => {
-      if (readOnly) {
-        return;
-      }
-      const sourceNormalized = normalizeAssetPath(sourcePath);
-      const targetDir = normalizeAssetPath(targetDirPath).replace(/\/+$/, '') || 'assets';
-      if (isDescendantAssetPath(sourceNormalized, targetDir)) {
+  const handleMoveEntries = useCallback(
+    async (sourcePaths: string[], targetDirPath: string) => {
+      if (readOnly || sourcePaths.length === 0) {
         return;
       }
 
-      const baseName = getAssetBaseName(sourceNormalized);
-      const nextPath = joinAssetPath(targetDir, baseName);
-      if (normalizeAssetPath(nextPath) === sourceNormalized) {
+      const targetDir = normalizeAssetPath(targetDirPath).replace(/\/+$/, '') || 'assets';
+      const moves: Array<{ fromPath: string; toPath: string }> = [];
+      const pathMap = new Map<string, string>();
+
+      for (const sourcePath of sourcePaths) {
+        const sourceNormalized = normalizeAssetPath(sourcePath);
+        if (isDescendantAssetPath(sourceNormalized, targetDir)) {
+          continue;
+        }
+
+        const baseName = getAssetBaseName(sourceNormalized);
+        const nextPath = joinAssetPath(targetDir, baseName);
+        if (normalizeAssetPath(nextPath) === sourceNormalized) {
+          continue;
+        }
+
+        moves.push({ fromPath: sourceNormalized, toPath: nextPath });
+        pathMap.set(sourceNormalized, nextPath);
+      }
+
+      if (moves.length === 0) {
         return;
       }
 
       try {
-        const nextManifest = await moveProjectAssetEntry({
+        const nextManifest = await moveProjectAssetEntries({
           projectId,
-          fromPath: sourceNormalized,
-          toPath: nextPath,
+          moves,
           manifest,
         });
         applyManifest(nextManifest);
-        setSelectedPath(nextPath);
+        replacePaths(pathMap);
         await loadTree();
       } catch (moveError) {
         setError(moveError instanceof Error ? moveError.message : '移动失败');
       }
     },
-    [applyManifest, loadTree, manifest, projectId, readOnly]
+    [applyManifest, loadTree, manifest, projectId, readOnly, replacePaths]
   );
+
+  const resolvePasteTargetDir = useCallback((): string => {
+    if (anchorEntry?.kind === 'directory') {
+      return anchorEntry.path;
+    }
+    if (anchorEntry) {
+      return getAssetParentPath(anchorEntry.path);
+    }
+    return 'assets';
+  }, [anchorEntry]);
 
   const handleKeyDown = useCallback(
     (event: ReactKeyboardEvent<HTMLDivElement>) => {
@@ -353,26 +413,23 @@ export function useAssetExplorerController({
         event.key === 'Delete' || (event.metaKey && event.key === 'Backspace');
 
       if (isDeleteShortcut) {
-        if (readOnly || !selectedEntry || !tree) {
-          return;
-        }
-        if (normalizeAssetPath(selectedEntry.path) === normalizeAssetPath(tree.path)) {
+        if (readOnly || !tree || selectedPaths.size === 0) {
           return;
         }
         event.preventDefault();
-        requestDelete(selectedEntry);
+        requestDeleteSelection();
         return;
       }
 
       if (event.key === 'Enter') {
-        if (readOnly || !selectedEntry || !tree) {
+        if (readOnly || !tree || selectedPaths.size !== 1 || !anchorEntry) {
           return;
         }
-        if (normalizeAssetPath(selectedEntry.path) === normalizeAssetPath(tree.path)) {
+        if (isAssetsRootPath(anchorEntry.path)) {
           return;
         }
         event.preventDefault();
-        setRenamingPath(selectedEntry.path);
+        setRenamingPath(anchorEntry.path);
         return;
       }
 
@@ -382,6 +439,11 @@ export function useAssetExplorerController({
       }
 
       const key = event.key.toLowerCase();
+      if (key === 'a') {
+        event.preventDefault();
+        selectSiblingAll();
+        return;
+      }
       if (key === 'c') {
         event.preventDefault();
         copySelectionToClipboard('copy');
@@ -394,22 +456,33 @@ export function useAssetExplorerController({
       }
       if (key === 'v') {
         event.preventDefault();
-        const pasteTarget = selectedEntry?.kind === 'directory'
-          ? selectedEntry.path
-          : selectedEntry
-            ? getAssetParentPath(selectedEntry.path)
-            : 'assets';
-        void handlePasteToDirectory(pasteTarget);
+        void handlePasteToDirectory(resolvePasteTargetDir());
       }
     },
     [
+      anchorEntry,
       copySelectionToClipboard,
       handlePasteToDirectory,
+      isAssetsRootPath,
       readOnly,
-      requestDelete,
-      selectedEntry,
+      requestDeleteSelection,
+      resolvePasteTargetDir,
+      selectSiblingAll,
+      selectedPaths.size,
       tree,
     ]
+  );
+
+  const handleSelect = useCallback(
+    (path: string, event: MouseEvent) => {
+      const normalized = normalizeAssetPath(path);
+      if (event.metaKey || event.ctrlKey) {
+        togglePath(normalized);
+        return;
+      }
+      selectSingle(normalized);
+    },
+    [selectSingle, togglePath]
   );
 
   const handleDragStart = useCallback(
@@ -418,8 +491,22 @@ export function useAssetExplorerController({
         event.preventDefault();
         return;
       }
-      setDragSourcePath(entry.path);
-      setSelectedPath(entry.path);
+
+      const normalizedEntryPath = normalizeAssetPath(entry.path);
+      const isMultiDrag =
+        tree
+        && selectedPaths.has(normalizedEntryPath)
+        && selectedPaths.size > 1;
+      const sourcePaths = isMultiDrag
+        ? resolveTopLevelSelectedEntries(tree, selectedPaths).map((item) => item.path)
+        : [entry.path];
+
+      dragSourcePathsRef.current = sourcePaths;
+
+      if (!selectedPaths.has(normalizedEntryPath)) {
+        selectSingle(normalizedEntryPath);
+      }
+
       event.dataTransfer.setData('text/plain', entry.path);
 
       if (entry.kind === 'file') {
@@ -438,7 +525,7 @@ export function useAssetExplorerController({
 
       event.dataTransfer.effectAllowed = 'copyMove';
     },
-    [readOnly]
+    [readOnly, selectSingle, selectedPaths, tree]
   );
 
   const handleDragOver = useCallback(
@@ -460,14 +547,22 @@ export function useAssetExplorerController({
       if (readOnly || entry.kind !== 'directory') {
         return;
       }
-      const sourcePath = dragSourcePath ?? event.dataTransfer.getData('text/plain');
-      if (!sourcePath) {
+
+      const fallbackPath = event.dataTransfer.getData('text/plain');
+      const sourcePaths = dragSourcePathsRef.current.length > 0
+        ? dragSourcePathsRef.current
+        : fallbackPath
+          ? [fallbackPath]
+          : [];
+
+      if (sourcePaths.length === 0) {
         return;
       }
-      void handleMoveEntry(sourcePath, entry.path);
-      setDragSourcePath(null);
+
+      void handleMoveEntries(sourcePaths, entry.path);
+      dragSourcePathsRef.current = [];
     },
-    [dragSourcePath, handleMoveEntry, readOnly]
+    [handleMoveEntries, readOnly]
   );
 
   const handleAssetsRootContextMenu = useCallback(
@@ -476,7 +571,7 @@ export function useAssetExplorerController({
         return;
       }
       event.preventDefault();
-      setSelectedPath(tree.path);
+      selectSingle(tree.path);
       setContextMenu({
         x: event.clientX,
         y: event.clientY,
@@ -484,7 +579,7 @@ export function useAssetExplorerController({
         isAssetsRoot: true,
       });
     },
-    [tree]
+    [selectSingle, tree]
   );
 
   const handleAssetsRootDragOver = useCallback(
@@ -509,10 +604,45 @@ export function useAssetExplorerController({
     [handleDrop, tree]
   );
 
-  const handleTreeContextMenu = useCallback((event: MouseEvent, item: ProjectDirectoryEntry) => {
-    setSelectedPath(item.path);
-    setContextMenu({ x: event.clientX, y: event.clientY, entry: item });
-  }, []);
+  const handleTreeContextMenu = useCallback(
+    (event: MouseEvent, item: ProjectDirectoryEntry) => {
+      const normalized = normalizeAssetPath(item.path);
+      if (!selectedPaths.has(normalized)) {
+        selectSingle(normalized);
+      }
+      setContextMenu({ x: event.clientX, y: event.clientY, entry: item });
+    },
+    [selectSingle, selectedPaths]
+  );
+
+  const copyContextMenuSelection = useCallback(
+    (mode: 'copy' | 'cut') => {
+      if (!tree) {
+        return;
+      }
+      const normalized = normalizeAssetPath(contextMenu?.entry.path ?? '');
+      const entries = selectedPaths.has(normalized)
+        ? resolveTopLevelSelectedEntries(tree, selectedPaths)
+        : contextMenu?.entry
+          ? [contextMenu.entry]
+          : [];
+      setClipboardForEntries(entries, mode);
+    },
+    [contextMenu, selectedPaths, setClipboardForEntries, tree]
+  );
+
+  const deleteContextMenuSelection = useCallback(() => {
+    if (!tree) {
+      return;
+    }
+    const normalized = normalizeAssetPath(contextMenu?.entry.path ?? '');
+    const entries = selectedPaths.has(normalized)
+      ? resolveTopLevelSelectedEntries(tree, selectedPaths)
+      : contextMenu?.entry
+        ? [contextMenu.entry]
+        : [];
+    requestDeleteEntries(entries);
+  }, [contextMenu, requestDeleteEntries, selectedPaths, tree]);
 
   return {
     containerRef,
@@ -520,7 +650,7 @@ export function useAssetExplorerController({
     loading,
     error,
     displayTree,
-    selectedPath,
+    selectedPaths,
     renamingPath,
     dropTargetPath,
     contextMenu,
@@ -529,7 +659,7 @@ export function useAssetExplorerController({
     isDeleting,
     previewState,
     canPaste,
-    setSelectedPath,
+    selectSingle,
     setRenamingPath,
     setDropTargetPath,
     setContextMenu,
@@ -537,6 +667,7 @@ export function useAssetExplorerController({
     setPreviewState,
     setDeleteConfirm,
     handleKeyDown,
+    handleSelect,
     handleDragStart,
     handleDragOver,
     handleDrop,
@@ -546,10 +677,11 @@ export function useAssetExplorerController({
     handleTreeContextMenu,
     handleRenameCommit,
     openPreview,
-    requestDelete,
+    requestDeleteSelection,
     confirmDelete,
     handleCreateInDirectory,
     handlePasteToDirectory,
-    setClipboardForEntry,
+    copyContextMenuSelection,
+    deleteContextMenuSelection,
   };
 }

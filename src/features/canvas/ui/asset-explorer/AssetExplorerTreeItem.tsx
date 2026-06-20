@@ -1,19 +1,20 @@
 import { useEffect, useRef, useState, type DragEvent, type MouseEvent } from 'react';
-import { ChevronDown, ChevronRight, File, Folder, FolderOpen, Image as ImageIcon } from 'lucide-react';
+import { ChevronDown, ChevronRight, File, Image as ImageIcon } from 'lucide-react';
 
 import type { ProjectDirectoryEntry } from '@/features/project/types';
 import { isDescendantAssetPath } from '@/features/project/asset/assetExplorerPathUtils';
+import { normalizeAssetPath } from '@/features/project/asset/assetManifest';
 
 import { formatBytes, focusRenameInput, isImageFileName } from './formatBytes';
 
 export interface AssetExplorerTreeItemProps {
   entry: ProjectDirectoryEntry;
   depth: number;
-  selectedPath: string | null;
+  selectedPaths: Set<string>;
   dropTargetPath: string | null;
   renamingPath: string | null;
   readOnly: boolean;
-  onSelect: (path: string) => void;
+  onSelect: (path: string, event: MouseEvent) => void;
   onContextMenu: (event: MouseEvent, entry: ProjectDirectoryEntry) => void;
   onRenameCommit: (entry: ProjectDirectoryEntry, nextName: string) => void;
   onRenameCancel: () => void;
@@ -22,12 +23,14 @@ export interface AssetExplorerTreeItemProps {
   onDragLeave: (entry: ProjectDirectoryEntry) => void;
   onDrop: (event: DragEvent, entry: ProjectDirectoryEntry) => void;
   onOpenPreview: (entry: ProjectDirectoryEntry) => void;
+  /** 选中且展开的祖先目录下，当前可见子项也应显示激活态 */
+  activeDescendantOfSelection?: boolean;
 }
 
 export function AssetExplorerTreeItem({
   entry,
   depth,
-  selectedPath,
+  selectedPaths,
   dropTargetPath,
   renamingPath,
   readOnly,
@@ -40,6 +43,7 @@ export function AssetExplorerTreeItem({
   onDragLeave,
   onDrop,
   onOpenPreview,
+  activeDescendantOfSelection = false,
 }: AssetExplorerTreeItemProps) {
   const isDirectory = entry.kind === 'directory';
   const hasChildren = Boolean(entry.children?.length);
@@ -54,7 +58,10 @@ export function AssetExplorerTreeItem({
     }
   }, [entry.kind, entry.path, renamingPath]);
 
-  const isSelected = selectedPath === entry.path;
+  const isSelected = selectedPaths.has(normalizeAssetPath(entry.path));
+  const isActive = isSelected || activeDescendantOfSelection;
+  const childActiveDescendantOfSelection =
+    (isSelected || activeDescendantOfSelection) && isDirectory && expanded;
   const isDropTarget = dropTargetPath === entry.path && isDirectory;
   const isRenaming = renamingPath === entry.path;
   const renameInputRef = useRef<HTMLInputElement>(null);
@@ -65,25 +72,46 @@ export function AssetExplorerTreeItem({
     }
   }, [entry.kind, entry.name, isRenaming]);
 
-  const icon = isDirectory
-    ? expanded
-      ? <FolderOpen className="h-3.5 w-3.5 shrink-0 text-accent/80" />
-      : <Folder className="h-3.5 w-3.5 shrink-0 text-accent/80" />
-    : isImageFileName(entry.name)
-      ? <ImageIcon className="h-3.5 w-3.5 shrink-0 text-text-muted" />
-      : <File className="h-3.5 w-3.5 shrink-0 text-text-muted" />;
+  const leadingIconClass = 'inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center';
+
+  const leadingSlot = isDirectory && hasChildren ? (
+    <button
+      type="button"
+      className={leadingIconClass}
+      onClick={(event) => {
+        event.stopPropagation();
+        setExpanded((value) => !value);
+      }}
+    >
+      {expanded ? (
+        <ChevronDown className="h-3 w-3 text-text-muted" />
+      ) : (
+        <ChevronRight className="h-3 w-3 text-text-muted" />
+      )}
+    </button>
+  ) : isDirectory ? (
+    <span className={leadingIconClass} aria-hidden />
+  ) : isImageFileName(entry.name) ? (
+    <span className={leadingIconClass}>
+      <ImageIcon className="h-3.5 w-3.5 text-text-muted" />
+    </span>
+  ) : (
+    <span className={leadingIconClass}>
+      <File className="h-3.5 w-3.5 text-text-muted" />
+    </span>
+  );
 
   return (
     <div>
       <div
         role="treeitem"
-        aria-selected={isSelected}
+        aria-selected={isActive}
         draggable={!readOnly && !isRenaming}
         className={`flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-xs ${
-          isSelected ? 'bg-accent/15 text-accent' : 'text-text-dark hover:bg-bg-dark/70'
+          isActive ? 'bg-accent/15 text-accent' : 'text-text-dark hover:bg-bg-dark/70'
         } ${isDropTarget ? 'ring-1 ring-accent/60' : ''} ${isDirectory ? 'font-medium' : ''}`}
         style={{ paddingLeft: `${depth * 12 + 8}px` }}
-        onClick={() => onSelect(entry.path)}
+        onClick={(event) => onSelect(entry.path, event)}
         onDoubleClick={(event) => {
           event.stopPropagation();
           if (entry.kind === 'file') {
@@ -104,27 +132,7 @@ export function AssetExplorerTreeItem({
         onDragLeave={() => onDragLeave(entry)}
         onDrop={(event) => onDrop(event, entry)}
       >
-        <button
-          type="button"
-          className="inline-flex h-3 w-3 shrink-0 items-center justify-center"
-          onClick={(event) => {
-            event.stopPropagation();
-            if (hasChildren) {
-              setExpanded((value) => !value);
-            }
-          }}
-        >
-          {hasChildren ? (
-            expanded ? (
-              <ChevronDown className="h-3 w-3 text-text-muted" />
-            ) : (
-              <ChevronRight className="h-3 w-3 text-text-muted" />
-            )
-          ) : (
-            <span className="inline-block h-3 w-3" />
-          )}
-        </button>
-        {icon}
+        {leadingSlot}
         {isRenaming ? (
           <input
             ref={renameInputRef}
@@ -156,7 +164,7 @@ export function AssetExplorerTreeItem({
           key={child.path}
           entry={child}
           depth={depth + 1}
-          selectedPath={selectedPath}
+          selectedPaths={selectedPaths}
           dropTargetPath={dropTargetPath}
           renamingPath={renamingPath}
           readOnly={readOnly}
@@ -169,6 +177,7 @@ export function AssetExplorerTreeItem({
           onDragLeave={onDragLeave}
           onDrop={onDrop}
           onOpenPreview={onOpenPreview}
+          activeDescendantOfSelection={childActiveDescendantOfSelection}
         />
       ))}
     </div>

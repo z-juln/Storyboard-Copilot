@@ -9,12 +9,14 @@
 | `assetRefIndex.ts` | 扫描 nodes 引用了哪些 fileAssetId |
 | `projectAssetService.ts` | CRUD 编排 + manifest 增量 |
 | `resolveAssetDisplayUrl.ts` | fileAssetId → HTTP URL |
-| `assetExplorerPathUtils.ts` | 路径 join / `findEntryInTree` |
+| `assetExplorerPathUtils.ts` | 路径 join / `findEntryInTree` / `getSiblingEntries` |
+| `assetExplorerSelection.ts` | 选区纯函数：顶层去重、路径解析、clipboard items |
 | `assetExplorerClipboard.ts` | 复制 / 剪切 / 粘贴 |
 | `assetPreviewUtils.ts` | 预览类型、`fetchAssetTextContent` |
 | `createUploadNodeFromProjectAsset.ts` | drag payload + upload 节点 data |
 | `dropProjectAssetOnCanvas.ts` | 画布 drop 编排 |
-| `ui/asset-explorer/` | Explorer UI 拆分（hook + 子组件） |
+| `ui/asset-explorer/` | Explorer UI（controller + selection hook + 子组件） |
+| `ui/asset-explorer/useAssetExplorerSelection.ts` | 多选 state、同层全选、anchor |
 | `nodes/UploadNodeMediaBody.tsx` | upload 节点多媒体展示 |
 
 ## 数据流

@@ -122,6 +122,39 @@ export async function deleteProjectAssetEntry(input: {
   return removeManifestPaths(input.manifest, filePaths);
 }
 
+export async function deleteProjectAssetEntries(input: {
+  projectId: string;
+  entries: ProjectDirectoryEntry[];
+  manifest: AssetManifest;
+}): Promise<AssetManifest> {
+  let manifest = input.manifest;
+  for (const entry of input.entries) {
+    manifest = await deleteProjectAssetEntry({
+      projectId: input.projectId,
+      entry,
+      manifest,
+    });
+  }
+  return manifest;
+}
+
+export async function moveProjectAssetEntries(input: {
+  projectId: string;
+  moves: Array<{ fromPath: string; toPath: string }>;
+  manifest: AssetManifest;
+}): Promise<AssetManifest> {
+  let manifest = input.manifest;
+  for (const move of input.moves) {
+    manifest = await moveProjectAssetEntry({
+      projectId: input.projectId,
+      fromPath: move.fromPath,
+      toPath: move.toPath,
+      manifest,
+    });
+  }
+  return manifest;
+}
+
 export async function copyProjectAssetEntry(input: {
   projectId: string;
   entry: ProjectDirectoryEntry;

@@ -15,12 +15,14 @@ export function AssetExplorerDeleteDialog({
   onCancel,
   onConfirm,
 }: AssetExplorerDeleteDialogProps) {
-  const entry = state?.entry;
+  const entries = state?.entries ?? [];
   const refCount = state?.refCount ?? 0;
+  const isBatch = entries.length > 1;
+  const primaryName = entries[0]?.name ?? '';
 
   return (
     <UiModal
-      isOpen={Boolean(entry)}
+      isOpen={entries.length > 0}
       title="删除资产"
       onClose={onCancel}
       widthClassName="w-[420px]"
@@ -37,14 +39,27 @@ export function AssetExplorerDeleteDialog({
     >
       <p className="text-sm leading-relaxed text-text-dark">
         {refCount > 0 ? (
+          isBatch ? (
+            <>
+              选中的 <span className="font-medium">{entries.length}</span> 项资产被{' '}
+              <span className="font-medium text-accent">{refCount}</span> 处画布节点引用。
+              删除后这些引用将失效，确定要继续吗？
+            </>
+          ) : (
+            <>
+              「<span className="font-medium">{primaryName}</span>」被{' '}
+              <span className="font-medium text-accent">{refCount}</span> 处画布节点引用。
+              删除后这些引用将失效，确定要继续吗？
+            </>
+          )
+        ) : isBatch ? (
           <>
-            「<span className="font-medium">{entry?.name}</span>」被{' '}
-            <span className="font-medium text-accent">{refCount}</span> 处画布节点引用。
-            删除后这些引用将失效，确定要继续吗？
+            确定删除选中的 <span className="font-medium">{entries.length}</span> 项资产吗？
+            此操作不可撤销。
           </>
         ) : (
           <>
-            确定删除「<span className="font-medium">{entry?.name}</span>」吗？
+            确定删除「<span className="font-medium">{primaryName}</span>」吗？
             此操作不可撤销。
           </>
         )}

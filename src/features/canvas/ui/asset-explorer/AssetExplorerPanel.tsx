@@ -20,7 +20,7 @@ export const AssetExplorerPanel = memo(({ projectId, readOnly = false }: AssetEx
     loading,
     error,
     displayTree,
-    selectedPath,
+    selectedPaths,
     renamingPath,
     dropTargetPath,
     contextMenu,
@@ -29,7 +29,7 @@ export const AssetExplorerPanel = memo(({ projectId, readOnly = false }: AssetEx
     isDeleting,
     previewState,
     canPaste,
-    setSelectedPath,
+    selectSingle,
     setRenamingPath,
     setDropTargetPath,
     setContextMenu,
@@ -37,6 +37,7 @@ export const AssetExplorerPanel = memo(({ projectId, readOnly = false }: AssetEx
     setPreviewState,
     setDeleteConfirm,
     handleKeyDown,
+    handleSelect,
     handleDragStart,
     handleDragOver,
     handleDrop,
@@ -46,11 +47,11 @@ export const AssetExplorerPanel = memo(({ projectId, readOnly = false }: AssetEx
     handleTreeContextMenu,
     handleRenameCommit,
     openPreview,
-    requestDelete,
     confirmDelete,
     handleCreateInDirectory,
     handlePasteToDirectory,
-    setClipboardForEntry,
+    copyContextMenuSelection,
+    deleteContextMenuSelection,
   } = controller;
 
   return (
@@ -110,11 +111,11 @@ export const AssetExplorerPanel = memo(({ projectId, readOnly = false }: AssetEx
               key={entry.path}
               entry={entry}
               depth={0}
-              selectedPath={selectedPath}
+              selectedPaths={selectedPaths}
               dropTargetPath={dropTargetPath}
               renamingPath={renamingPath}
               readOnly={readOnly}
-              onSelect={setSelectedPath}
+              onSelect={handleSelect}
               onContextMenu={handleTreeContextMenu}
               onRenameCommit={handleRenameCommit}
               onRenameCancel={() => setRenamingPath(null)}
@@ -137,7 +138,7 @@ export const AssetExplorerPanel = memo(({ projectId, readOnly = false }: AssetEx
           aria-hidden
           onClick={() => {
             if (tree) {
-              setSelectedPath(tree.path);
+              selectSingle(tree.path);
             }
           }}
         />
@@ -155,8 +156,8 @@ export const AssetExplorerPanel = memo(({ projectId, readOnly = false }: AssetEx
           onNewFolder={() => {
             void handleCreateInDirectory(contextMenu.entry, 'directory');
           }}
-          onCopy={() => setClipboardForEntry(contextMenu.entry, 'copy')}
-          onCut={() => setClipboardForEntry(contextMenu.entry, 'cut')}
+          onCopy={() => copyContextMenuSelection('copy')}
+          onCut={() => copyContextMenuSelection('cut')}
           onPaste={() => {
             if (contextMenu.entry.kind === 'directory') {
               void handlePasteToDirectory(contextMenu.entry.path);
@@ -166,9 +167,7 @@ export const AssetExplorerPanel = memo(({ projectId, readOnly = false }: AssetEx
             openPreview(contextMenu.entry);
           }}
           onRename={() => setRenamingPath(contextMenu.entry.path)}
-          onDelete={() => {
-            requestDelete(contextMenu.entry);
-          }}
+          onDelete={() => deleteContextMenuSelection()}
           onFindInFolder={() => {
             if (contextMenu.entry.kind === 'directory') {
               setSearchScope({ path: contextMenu.entry.path, query: '' });
