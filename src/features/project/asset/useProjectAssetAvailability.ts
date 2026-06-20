@@ -19,7 +19,6 @@ function hasProjectAssetBinding(binding: ProjectAssetBinding): boolean {
 export function useProjectAssetAvailability(binding: ProjectAssetBinding): boolean {
   const assetManifest = useProjectStore((state) => state.currentProject?.assetManifest);
   const availableAssetPaths = useProjectStore((state) => state.availableAssetPaths);
-  useProjectStore((state) => state.assetResourceEpoch);
 
   return useMemo(() => {
     if (!hasProjectAssetBinding(binding)) {

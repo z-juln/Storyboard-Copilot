@@ -1,3 +1,4 @@
+/** 节点挂载前暂存待粘贴文件，避免 publish 早于 subscribe 的竞态。 */
 const pendingByNodeId = new Map<string, File>();
 const handlersByNodeId = new Map<string, Set<(file: File) => void>>();
 

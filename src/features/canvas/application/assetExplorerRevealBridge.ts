@@ -2,6 +2,7 @@ import { normalizeAssetPath } from '@/features/project/asset/assetManifest';
 
 import { canvasEventBus } from './canvasServices';
 
+/** Explorer 未挂载时暂存 reveal 请求，避免事件丢失。 */
 let pendingRevealPath: string | null = null;
 const handlers = new Set<(path: string) => void>();
 

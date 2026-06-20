@@ -5,7 +5,7 @@ import { NodeAssetUnavailableNotice } from '@/features/canvas/ui/NodeAssetUnavai
 import {
   useIsProjectAssetUnavailable,
   type ProjectAssetBinding,
-} from '@/features/project/asset/useProjectAssetAvailability';
+} from '@/features/project/asset';
 
 export interface CanvasNodeImageProps extends ImgHTMLAttributes<HTMLImageElement> {
   viewerSourceUrl?: string | null;

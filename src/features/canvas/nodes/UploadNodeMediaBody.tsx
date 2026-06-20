@@ -29,10 +29,11 @@ export const UploadNodeMediaBody = memo(({
   onImageLoad,
 }: UploadNodeMediaBodyProps) => {
   const isAssetUnavailable = useIsProjectAssetUnavailable(assetBinding);
+  const isNonImageMedia = mediaKind === 'video' || mediaKind === 'audio' || mediaKind === 'text';
 
   return (
     <div className="block h-full w-full overflow-hidden rounded-[var(--node-radius)] bg-bg-dark">
-      {isAssetUnavailable ? (
+      {isAssetUnavailable && isNonImageMedia ? (
         <NodeAssetUnavailableNotice message={PROJECT_ASSET_UNAVAILABLE_MESSAGE} />
       ) : mediaKind === 'video' && assetMediaUrl ? (
         <video

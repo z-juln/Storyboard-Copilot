@@ -86,10 +86,6 @@ export interface CanvasEventMap {
   'upload-node/reupload': {
     nodeId: string;
   };
-  'upload-node/paste-image': {
-    nodeId: string;
-    file: File;
-  };
   'asset-explorer/reveal-asset': {
     path: string;
   };

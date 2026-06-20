@@ -130,22 +130,22 @@ export function resolveImageDisplayUrl(
   imageUrl: string,
   options?: { fileAssetId?: string | null; preferPreview?: boolean; maxPreviewDimension?: number }
 ): string {
-  const projectId = useProjectStore.getState().currentProjectId;
-  const assetManifest = useProjectStore.getState().currentProject?.assetManifest;
+  const projectState = useProjectStore.getState();
 
-  if (projectId && (options?.fileAssetId || isProjectRelativeAssetPath(imageUrl))) {
+  if (projectState.currentProjectId && (options?.fileAssetId || isProjectRelativeAssetPath(imageUrl))) {
     return resolveFileAssetDisplayUrl({
-      projectId,
+      projectId: projectState.currentProjectId,
       fileAssetId: options?.fileAssetId,
       imageUrl,
-      assetManifest,
+      assetManifest: projectState.currentProject?.assetManifest,
+      availableDiskPaths: projectState.availableAssetPaths,
       resolveAbsolutePath: buildLocalImageUrl,
       preferPreview: options?.preferPreview,
       maxPreviewDimension: options?.maxPreviewDimension,
     });
   }
 
-  return resolveProjectImageDisplayUrl(projectId, imageUrl, buildLocalImageUrl);
+  return resolveProjectImageDisplayUrl(projectState.currentProjectId, imageUrl, buildLocalImageUrl);
 }
 
 export function resolveNodeImageDisplayUrl(input: {
@@ -154,8 +154,7 @@ export function resolveNodeImageDisplayUrl(input: {
   preferOriginal?: boolean;
   maxPreviewDimension?: number;
 }): string | null {
-  const projectId = useProjectStore.getState().currentProjectId;
-  const assetManifest = useProjectStore.getState().currentProject?.assetManifest;
+  const projectState = useProjectStore.getState();
   const preferOriginal = input.preferOriginal ?? true;
   const imageUrl = typeof input.imageUrl === 'string' ? input.imageUrl.trim() : '';
   if (!imageUrl && !input.fileAssetId) {
@@ -163,10 +162,11 @@ export function resolveNodeImageDisplayUrl(input: {
   }
 
   return resolveFileAssetDisplayUrl({
-    projectId,
+    projectId: projectState.currentProjectId,
     fileAssetId: input.fileAssetId,
     imageUrl: imageUrl || null,
-    assetManifest,
+    assetManifest: projectState.currentProject?.assetManifest,
+    availableDiskPaths: projectState.availableAssetPaths,
     resolveAbsolutePath: buildLocalImageUrl,
     preferPreview: !preferOriginal,
     maxPreviewDimension: input.maxPreviewDimension,

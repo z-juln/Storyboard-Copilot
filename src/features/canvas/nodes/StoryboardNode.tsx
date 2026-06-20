@@ -310,6 +310,8 @@ const FrameCard = memo(
     onEditFrame,
   }: FrameCardProps) => {
     const updateStoryboardFrame = useCanvasStore((state) => state.updateStoryboardFrame);
+    const assetManifest = useProjectStore((state) => state.currentProject?.assetManifest);
+    const availableAssetPaths = useProjectStore((state) => state.availableAssetPaths);
     const { zoom } = useViewport();
 
     const imageSource = useMemo(() => {
@@ -318,14 +320,14 @@ const FrameCard = memo(
         fileAssetId: frame.fileAssetId,
         preferOriginal: shouldUseOriginalImageByZoom(zoom),
       });
-    }, [frame.fileAssetId, frame.imageUrl, zoom]);
+    }, [assetManifest, availableAssetPaths, frame.fileAssetId, frame.imageUrl, zoom]);
     const viewerSource = useMemo(() => {
       return resolveNodeImageDisplayUrl({
         imageUrl: frame.imageUrl,
         fileAssetId: frame.fileAssetId,
         preferOriginal: true,
       });
-    }, [frame.fileAssetId, frame.imageUrl]);
+    }, [assetManifest, availableAssetPaths, frame.fileAssetId, frame.imageUrl]);
 
     const dragging = draggedFrameId === frame.id;
     const asDropTarget = dropTargetFrameId === frame.id && !dragging;

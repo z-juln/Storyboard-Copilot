@@ -50,6 +50,7 @@ export const ImageNode = memo(({ id, data, selected, type, width, height }: Imag
   const setSelectedNode = useCanvasStore((state) => state.setSelectedNode);
   const updateNodeData = useCanvasStore((state) => state.updateNodeData);
   const assetManifest = useProjectStore((state) => state.currentProject?.assetManifest);
+  const availableAssetPaths = useProjectStore((state) => state.availableAssetPaths);
   const { zoom } = useViewport();
   const [now, setNow] = useState(() => Date.now());
   const isExportResultNode = type === CANVAS_NODE_TYPES.exportImage;
@@ -141,6 +142,7 @@ export const ImageNode = memo(({ id, data, selected, type, width, height }: Imag
     });
   }, [
     assetManifest,
+    availableAssetPaths,
     data.fileAssetId,
     data.imageUrl,
     zoom,
@@ -155,7 +157,7 @@ export const ImageNode = memo(({ id, data, selected, type, width, height }: Imag
       fileAssetId: data.fileAssetId,
       preferOriginal: true,
     });
-  }, [assetManifest, data.fileAssetId, data.imageUrl]);
+  }, [assetManifest, availableAssetPaths, data.fileAssetId, data.imageUrl]);
 
   return (
     <div

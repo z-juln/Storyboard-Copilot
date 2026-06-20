@@ -319,7 +319,6 @@ interface ProjectState {
   currentProjectId: string | null;
   currentProject: Project | null;
   availableAssetPaths: ReadonlySet<string> | null;
-  assetResourceEpoch: number;
   isHydrated: boolean;
   isOpeningProject: boolean;
 
@@ -343,9 +342,6 @@ interface ProjectState {
     contentHash?: string
   ) => { fileAssetId: string } | null;
   commitAssetManifest: (manifest: AssetManifest) => void;
-  setAvailableAssetPaths: (paths: Iterable<string>) => void;
-  addAvailableAssetPaths: (paths: Iterable<string>) => void;
-  removeAvailableAssetPaths: (paths: Iterable<string>) => void;
   refreshAvailableAssetPaths: () => Promise<void>;
 }
 
@@ -354,7 +350,6 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   currentProjectId: null,
   currentProject: null,
   availableAssetPaths: null,
-  assetResourceEpoch: 0,
   isHydrated: false,
   isOpeningProject: false,
 
@@ -527,7 +522,6 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
           currentProjectId: id,
           currentProject: project,
           availableAssetPaths: toAvailableAssetPathSet(reconciled.diskPaths),
-          assetResourceEpoch: get().assetResourceEpoch + 1,
           isOpeningProject: false,
           projects: updateProjectSummary(state.projects, {
             id: project.id,
@@ -588,7 +582,6 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       currentProjectId: null,
       currentProject: null,
       availableAssetPaths: null,
-      assetResourceEpoch: 0,
       isOpeningProject: false,
     }));
   },
@@ -729,7 +722,9 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
     const canvasState = useCanvasStore.getState();
     const syncedNodes = syncNodeAssetPathsFromManifest(canvasState.nodes, manifest);
-    useCanvasStore.setState({ nodes: syncedNodes });
+    if (syncedNodes !== canvasState.nodes) {
+      useCanvasStore.setState({ nodes: syncedNodes });
+    }
 
     const nextProject: Project = {
       ...currentProject,
@@ -738,35 +733,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       edges: canvasState.edges,
       updatedAt: Date.now(),
     };
-    set({ currentProject: nextProject, assetResourceEpoch: get().assetResourceEpoch + 1 });
+    set({ currentProject: nextProject });
     persistProject(nextProject);
-  },
-
-  setAvailableAssetPaths: (paths) => {
-    set({ availableAssetPaths: toAvailableAssetPathSet(paths) });
-  },
-
-  addAvailableAssetPaths: (paths) => {
-    set((state) => {
-      const next = new Set(state.availableAssetPaths ?? []);
-      for (const path of paths) {
-        next.add(normalizeAssetPath(path));
-      }
-      return { availableAssetPaths: next };
-    });
-  },
-
-  removeAvailableAssetPaths: (paths) => {
-    set((state) => {
-      if (!state.availableAssetPaths) {
-        return state;
-      }
-      const next = new Set(state.availableAssetPaths);
-      for (const path of paths) {
-        next.delete(normalizeAssetPath(path));
-      }
-      return { availableAssetPaths: next };
-    });
   },
 
   refreshAvailableAssetPaths: async () => {
@@ -792,9 +760,6 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       get().commitAssetManifest(pruned.manifest);
     }
 
-    set({
-      availableAssetPaths: diskPathSet,
-      assetResourceEpoch: get().assetResourceEpoch + 1,
-    });
+    set({ availableAssetPaths: diskPathSet });
   },
 }));
