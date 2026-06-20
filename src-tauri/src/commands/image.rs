@@ -7,7 +7,7 @@ use fast_image_resize::images::Image as FirImage;
 use image::{DynamicImage, GenericImageView, Rgba, RgbaImage};
 use imageproc::drawing::{draw_text_mut, text_size};
 use png::{BitDepth, ColorType, Decoder, Encoder};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::borrow::Cow;
 use std::io::Cursor;
 use std::path::{Path, PathBuf};

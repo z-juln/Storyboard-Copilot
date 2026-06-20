@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
-import { invoke } from '@tauri-apps/api/core';
+import { invoke, isTauri } from '@tauri-apps/api/core';
 import { Canvas } from './features/canvas/Canvas';
 import { TitleBar } from './components/TitleBar';
 import { SettingsDialog } from './components/SettingsDialog';
@@ -75,6 +75,7 @@ function App() {
       typeof navigator !== 'undefined'
       && /(Mac|iPhone|iPad|iPod)/i.test(`${navigator.platform} ${navigator.userAgent}`);
     root.dataset.platform = isMac ? 'macos' : 'default';
+    root.dataset.shell = isTauri() ? 'tauri' : 'web';
   }, []);
 
   useEffect(() => {

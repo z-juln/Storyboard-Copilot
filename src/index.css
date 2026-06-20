@@ -124,8 +124,8 @@ body {
   font-family: var(--font-family-ui-default);
 }
 
-html[data-platform='macos'],
-html[data-platform='macos'] body {
+html[data-platform='macos'][data-shell='tauri'],
+html[data-platform='macos'][data-shell='tauri'] body {
   background: transparent;
 }
 
@@ -134,7 +134,7 @@ html[data-platform='macos'] #boot-screen {
   font-family: var(--font-family-ui-macos);
 }
 
-html[data-platform='macos'] #root {
+html[data-platform='macos'][data-shell='tauri'] #root {
   border-radius: 10px;
   overflow: hidden;
 }
