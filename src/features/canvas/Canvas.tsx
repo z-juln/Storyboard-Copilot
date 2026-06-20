@@ -248,7 +248,7 @@ export function Canvas() {
   );
   const [previewConnectionVisual, setPreviewConnectionVisual] =
     useState<PreviewConnectionVisual | null>(null);
-  const [showAssetManager, setShowAssetManager] = useState(false);
+  const [showAssetManager, setShowAssetManager] = useState(true);
 
   const isRestoringCanvasRef = useRef(true);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
