@@ -18,6 +18,12 @@ import {
   type ProjectRecord,
   type ProjectSummaryRecord,
 } from '@/commands/projectState';
+import {
+  buildComponentDocProject,
+  isComponentDocEnabled,
+  isComponentDocProjectId,
+  mergeComponentDocProjectSummaries,
+} from '@/features/canvas/component-doc';
 
 const DEFAULT_VIEWPORT: Viewport = {
   x: 0,
@@ -480,6 +486,9 @@ function queueProjectUpsert(project: Project, options?: PersistProjectOptions): 
 }
 
 function persistProject(project: Project, options?: PersistProjectOptions): void {
+  if (isComponentDocProjectId(project.id)) {
+    return;
+  }
   clearQueuedViewportUpsert(project.id);
   queueProjectUpsert(project, options);
 }
@@ -519,6 +528,9 @@ function queueViewportUpsert(
   viewport: Viewport,
   options?: PersistViewportOptions
 ): void {
+  if (isComponentDocProjectId(projectId)) {
+    return;
+  }
   deletingProjectIds.delete(projectId);
   queuedViewportUpserts.set(projectId, JSON.stringify(viewport));
 
@@ -620,7 +632,9 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       const records = await listProjectSummaries();
       const projects = records.map(toProjectSummary).sort((a, b) => b.updatedAt - a.updatedAt);
       set({
-        projects,
+        projects: isComponentDocEnabled()
+          ? mergeComponentDocProjectSummaries(projects)
+          : projects,
         currentProjectId: null,
         currentProject: null,
         isHydrated: true,
@@ -628,7 +642,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     } catch (error) {
       console.error('Failed to hydrate project summaries from SQLite', error);
       set({
-        projects: [],
+        projects: isComponentDocEnabled() ? mergeComponentDocProjectSummaries([]) : [],
         currentProjectId: null,
         currentProject: null,
         isHydrated: true,
@@ -662,6 +676,9 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   },
 
   deleteProject: (id) => {
+    if (isComponentDocProjectId(id)) {
+      return;
+    }
     set((state) => ({
       projects: state.projects.filter((project) => project.id !== id),
       currentProjectId: state.currentProjectId === id ? null : state.currentProjectId,
@@ -673,6 +690,9 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   },
 
   renameProject: (id, name) => {
+    if (isComponentDocProjectId(id)) {
+      return;
+    }
     const now = Date.now();
 
     set((state) => {
@@ -713,6 +733,18 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   openProject: (id) => {
     const reqSeq = ++openProjectRequestSeq;
     useCanvasStore.getState().closeImageViewer();
+
+    if (isComponentDocProjectId(id)) {
+      const project = buildComponentDocProject();
+      set({
+        currentProjectId: id,
+        currentProject: project,
+        isOpeningProject: false,
+        projects: mergeComponentDocProjectSummaries(get().projects),
+      });
+      return;
+    }
+
     set({ isOpeningProject: true });
 
     void (async () => {
@@ -756,25 +788,27 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     let persistedSummary: ProjectSummary | null = null;
 
     if (currentProjectId && currentProject && currentProject.id === currentProjectId) {
-      const canvasState = useCanvasStore.getState();
-      const nextProject: Project = {
-        ...currentProject,
-        nodes: canvasState.nodes,
-        edges: canvasState.edges,
-        viewport: canvasState.currentViewport ?? currentProject.viewport ?? DEFAULT_VIEWPORT,
-        history: canvasState.history ?? currentProject.history ?? createEmptyHistory(),
-        nodeCount: canvasState.nodes.length,
-        updatedAt: Date.now(),
-      };
+      if (!isComponentDocProjectId(currentProjectId)) {
+        const canvasState = useCanvasStore.getState();
+        const nextProject: Project = {
+          ...currentProject,
+          nodes: canvasState.nodes,
+          edges: canvasState.edges,
+          viewport: canvasState.currentViewport ?? currentProject.viewport ?? DEFAULT_VIEWPORT,
+          history: canvasState.history ?? currentProject.history ?? createEmptyHistory(),
+          nodeCount: canvasState.nodes.length,
+          updatedAt: Date.now(),
+        };
 
-      persistedSummary = {
-        id: nextProject.id,
-        name: nextProject.name,
-        createdAt: nextProject.createdAt,
-        updatedAt: nextProject.updatedAt,
-        nodeCount: nextProject.nodeCount,
-      };
-      persistProject(nextProject, { immediate: true });
+        persistedSummary = {
+          id: nextProject.id,
+          name: nextProject.name,
+          createdAt: nextProject.createdAt,
+          updatedAt: nextProject.updatedAt,
+          nodeCount: nextProject.nodeCount,
+        };
+        persistProject(nextProject, { immediate: true });
+      }
     }
 
     set((state) => ({
@@ -848,6 +882,15 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   saveCurrentProjectViewport: (viewport) => {
     const { currentProjectId, currentProject } = get();
     if (!currentProjectId || !currentProject || currentProject.id !== currentProjectId) {
+      return;
+    }
+    if (isComponentDocProjectId(currentProjectId)) {
+      set({
+        currentProject: {
+          ...currentProject,
+          viewport: normalizeViewport(viewport),
+        },
+      });
       return;
     }
 

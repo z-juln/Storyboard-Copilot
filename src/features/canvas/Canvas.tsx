@@ -303,6 +303,7 @@ export function Canvas() {
   );
 
   const getCurrentProject = useProjectStore((state) => state.getCurrentProject);
+  const currentProjectId = useProjectStore((state) => state.currentProjectId);
   const saveCurrentProject = useProjectStore((state) => state.saveCurrentProject);
   const saveCurrentProjectViewport = useProjectStore((state) => state.saveCurrentProjectViewport);
   const cancelPendingViewportPersist = useProjectStore(
@@ -385,6 +386,7 @@ export function Canvas() {
     };
   }, [
     closeImageViewer,
+    currentProjectId,
     getCurrentProject,
     persistCanvasSnapshot,
     reactFlowInstance,

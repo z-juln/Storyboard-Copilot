@@ -7,6 +7,7 @@ import { UiButton, UiSelect } from '@/components/ui/primitives';
 import { MissingApiKeyHint } from '@/features/settings/MissingApiKeyHint';
 import { listModelProviders } from '@/features/canvas/models';
 import { RenameDialog } from './RenameDialog';
+import { isComponentDocProjectId } from '@/features/canvas/component-doc';
 
 type ProjectSortField = 'name' | 'createdAt' | 'updatedAt';
 type SortDirection = 'asc' | 'desc';
@@ -116,7 +117,10 @@ export function ProjectManager() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {sortedProjects.map((project) => (
+            {sortedProjects.map((project) => {
+              const isComponentDoc = isComponentDocProjectId(project.id);
+
+              return (
               <div
                 key={project.id}
                 onClick={() => openProject(project.id)}
@@ -126,6 +130,7 @@ export function ProjectManager() {
                   <h3 className="font-semibold text-text-dark truncate flex-1">
                     {project.name}
                   </h3>
+                  {!isComponentDoc && (
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
                       type="button"
@@ -144,17 +149,25 @@ export function ProjectManager() {
                       <Trash2 className="w-4 h-4 text-text-muted hover:text-red-500" />
                     </button>
                   </div>
+                  )}
                 </div>
                 <div className="text-xs text-text-muted">
-                  <p>
-                    修改时间: {formatDate(project.updatedAt)}
-                  </p>
-                  <p>
-                    创建时间: {formatDate(project.createdAt)}
-                  </p>
+                  {isComponentDoc ? (
+                    <p>开发环境内置，节点组件说明与示例</p>
+                  ) : (
+                    <>
+                      <p>
+                        修改时间: {formatDate(project.updatedAt)}
+                      </p>
+                      <p>
+                        创建时间: {formatDate(project.createdAt)}
+                      </p>
+                    </>
+                  )}
                 </div>
               </div>
-            ))}
+            );
+            })}
           </div>
         )}
       </div>
@@ -170,6 +183,7 @@ export function ProjectManager() {
         onClose={() => setShowRenameDialog(false)}
         onConfirm={handleConfirm}
       />
+
     </div>
   );
 }
