@@ -2,7 +2,6 @@ import { useCallback, useMemo, useState } from 'react';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { UiButton, UiModal, UiSelect } from '@/components/ui';
 
-const QUARK_DOWNLOAD_URL = 'https://pan.quark.cn/s/5b6733a8fc8e';
 const GITHUB_RELEASES_URL = 'https://github.com/z-juln/Video-Copilot/releases';
 export type UpdateIgnoreMode = 'today-version' | 'forever-version' | 'forever-all';
 
@@ -32,10 +31,6 @@ export function UpdateAvailableDialog({
     []
   );
 
-  const handleOpenQuark = useCallback(() => {
-    void openUrl(QUARK_DOWNLOAD_URL);
-  }, []);
-
   const handleOpenGithub = useCallback(() => {
     void openUrl(GITHUB_RELEASES_URL);
   }, []);
@@ -54,9 +49,6 @@ export function UpdateAvailableDialog({
         <>
           <UiButton variant="muted" onClick={onClose}>
             取消
-          </UiButton>
-          <UiButton variant="muted" onClick={handleOpenQuark}>
-            前往网盘下载
           </UiButton>
           <UiButton variant="primary" onClick={handleOpenGithub}>
             去 GitHub 下载
