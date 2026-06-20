@@ -188,6 +188,7 @@ export const ImageNode = memo(({ id, data, selected, type, width, height }: Imag
       >
         {data.imageUrl ? (
           <CanvasNodeImage
+            assetBinding={{ imageUrl: data.imageUrl, fileAssetId: data.fileAssetId }}
             src={imageSource ?? ''}
             alt={isExportResultNode ? '结果图' : '生成图'}
             viewerSourceUrl={originalImageUrl}

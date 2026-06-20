@@ -77,6 +77,7 @@ export function useAssetExplorerController({
   const nodes = useCanvasStore((state) => state.nodes);
   const assetManifest = useProjectStore((state) => state.currentProject?.assetManifest);
   const commitAssetManifest = useProjectStore((state) => state.commitAssetManifest);
+  const refreshAvailableAssetPaths = useProjectStore((state) => state.refreshAvailableAssetPaths);
 
   const [tree, setTree] = useState<ProjectDirectoryEntry | null>(null);
   const [loading, setLoading] = useState(false);
@@ -350,6 +351,7 @@ export function useAssetExplorerController({
         manifest,
       });
       applyManifest(nextManifest);
+      await refreshAvailableAssetPaths();
       const pathsToRemove: string[] = [];
       for (const entry of entries) {
         pathsToRemove.push(entry.path);
@@ -374,6 +376,7 @@ export function useAssetExplorerController({
     loadTree,
     manifest,
     projectId,
+    refreshAvailableAssetPaths,
     removePaths,
     selectedPaths,
   ]);
@@ -393,6 +396,7 @@ export function useAssetExplorerController({
           manifest,
         });
         applyManifest(nextManifest);
+        await refreshAvailableAssetPaths();
         const nextPath = joinAssetPath(getAssetParentPath(entry.path), nextName);
         selectSingle(nextPath);
         await loadTree();
@@ -400,7 +404,7 @@ export function useAssetExplorerController({
         setError(renameError instanceof Error ? renameError.message : '重命名失败');
       }
     },
-    [applyManifest, loadTree, manifest, projectId, readOnly, selectSingle]
+    [applyManifest, loadTree, manifest, projectId, readOnly, refreshAvailableAssetPaths, selectSingle]
   );
 
   const collectSiblingNames = useCallback((dirEntry: ProjectDirectoryEntry): string[] => {
@@ -488,12 +492,13 @@ export function useAssetExplorerController({
         });
         applyManifest(nextManifest);
         replacePaths(pathMap);
+        await refreshAvailableAssetPaths();
         await loadTree();
       } catch (moveError) {
         setError(moveError instanceof Error ? moveError.message : '移动失败');
       }
     },
-    [applyManifest, loadTree, manifest, projectId, readOnly, replacePaths]
+    [applyManifest, loadTree, manifest, projectId, readOnly, refreshAvailableAssetPaths, replacePaths]
   );
 
   const resolvePasteTargetDir = useCallback((): string => {
@@ -612,6 +617,7 @@ export function useAssetExplorerController({
           });
           applyManifest(nextManifest);
           await loadTree();
+          await refreshAvailableAssetPaths();
           return;
         }
 
@@ -625,6 +631,7 @@ export function useAssetExplorerController({
           });
           applyManifest(nextManifest);
           await loadTree();
+          await refreshAvailableAssetPaths();
           return;
         }
 
@@ -633,7 +640,7 @@ export function useAssetExplorerController({
         setError(importError instanceof Error ? importError.message : '导入外部文件失败');
       }
     },
-    [applyManifest, loadTree, manifest, projectId, readOnly]
+    [applyManifest, loadTree, manifest, projectId, readOnly, refreshAvailableAssetPaths]
   );
 
   const handleDragStart = useCallback(

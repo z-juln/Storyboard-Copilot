@@ -5,8 +5,9 @@ import {
   isProjectRelativeAssetPath,
   isRemoteImageUrl,
 } from '@/features/project/projectPaths';
+import { useProjectStore } from '@/stores/projectStore';
 
-import { resolveManifestPath } from './assetManifest';
+import { resolveManifestPath, isProjectAssetAvailable } from './assetManifest';
 import type { AssetManifest } from './types';
 
 export function resolveFileAssetDisplayUrl(input: {
@@ -39,6 +40,10 @@ export function resolveFileAssetDisplayUrl(input: {
   }
 
   if (projectId && isProjectRelativeAssetPath(path)) {
+    const availableDiskPaths = useProjectStore.getState().availableAssetPaths;
+    if (!isProjectAssetAvailable(assetManifest ?? {}, { fileAssetId, imageUrl: path }, availableDiskPaths)) {
+      return '';
+    }
     if (preferPreview) {
       return buildProjectAssetPreviewUrl(projectId, path, maxPreviewDimension);
     }

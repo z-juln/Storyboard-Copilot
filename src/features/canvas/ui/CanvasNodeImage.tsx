@@ -1,11 +1,20 @@
 import { memo, useCallback, type ImgHTMLAttributes, type MouseEvent } from 'react';
 
 import { useCanvasStore } from '@/stores/canvasStore';
+import { NodeAssetUnavailableNotice } from '@/features/canvas/ui/NodeAssetUnavailableNotice';
+import {
+  useIsProjectAssetUnavailable,
+  type ProjectAssetBinding,
+} from '@/features/project/asset/useProjectAssetAvailability';
 
 export interface CanvasNodeImageProps extends ImgHTMLAttributes<HTMLImageElement> {
   viewerSourceUrl?: string | null;
   viewerImageList?: Array<string | null | undefined>;
   disableViewer?: boolean;
+  /** 绑定项目资产时，删除/缺失会自动展示不可用提示并随资源 epoch 刷新。 */
+  assetBinding?: ProjectAssetBinding | null;
+  unavailableMessage?: string;
+  unavailableCompact?: boolean;
 }
 
 function normalizeViewerList(
@@ -32,11 +41,16 @@ export const CanvasNodeImage = memo(({
   viewerSourceUrl,
   viewerImageList,
   disableViewer = false,
+  assetBinding = null,
+  unavailableMessage,
+  unavailableCompact = false,
   onDoubleClick,
   src,
+  className,
   ...props
 }: CanvasNodeImageProps) => {
   const openImageViewer = useCanvasStore((state) => state.openImageViewer);
+  const isAssetUnavailable = useIsProjectAssetUnavailable(assetBinding ?? {});
 
   const handleDoubleClick = useCallback((event: MouseEvent<HTMLImageElement>) => {
     onDoubleClick?.(event);
@@ -58,10 +72,21 @@ export const CanvasNodeImage = memo(({
     openImageViewer(resolvedSource, normalizeViewerList(viewerImageList, resolvedSource));
   }, [disableViewer, onDoubleClick, openImageViewer, src, viewerImageList, viewerSourceUrl]);
 
+  if (assetBinding && isAssetUnavailable) {
+    return (
+      <NodeAssetUnavailableNotice
+        message={unavailableMessage}
+        className={className}
+        compact={unavailableCompact}
+      />
+    );
+  }
+
   return (
     <img
       {...props}
       src={src}
+      className={className}
       data-viewer-src={
         typeof viewerSourceUrl === 'string' && viewerSourceUrl.trim().length > 0
           ? viewerSourceUrl.trim()

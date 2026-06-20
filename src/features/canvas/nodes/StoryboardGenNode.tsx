@@ -1582,11 +1582,13 @@ export const StoryboardGenNode = memo(({ id, data, selected, width, height }: St
                   }`}
               >
                 <CanvasNodeImage
+                  assetBinding={{ imageUrl: item.imageUrl }}
                   src={item.displayUrl}
                   alt={item.label}
                   viewerSourceUrl={resolveImageDisplayUrl(item.imageUrl)}
                   viewerImageList={incomingImageViewerList}
                   className="h-8 w-8 rounded object-cover"
+                  unavailableCompact
                 />
                 <span>{item.label}</span>
               </button>

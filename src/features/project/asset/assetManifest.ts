@@ -110,6 +110,54 @@ export function resolveManifestPath(
   return manifest[fileAssetId]?.path ?? null;
 }
 
+export function isProjectAssetAvailable(
+  manifest: AssetManifest,
+  input: {
+    fileAssetId?: string | null;
+    imageUrl?: string | null;
+  },
+  availableDiskPaths?: ReadonlySet<string> | null
+): boolean {
+  const normalizedFileAssetId =
+    typeof input.fileAssetId === 'string' && input.fileAssetId.trim().length > 0
+      ? input.fileAssetId.trim()
+      : null;
+  const normalizedImageUrl =
+    typeof input.imageUrl === 'string' && input.imageUrl.trim().length > 0
+      ? normalizeAssetPath(input.imageUrl.trim())
+      : null;
+
+  let resolvedPath: string | null = null;
+  if (normalizedFileAssetId && manifest[normalizedFileAssetId]) {
+    resolvedPath = normalizeAssetPath(manifest[normalizedFileAssetId].path);
+  } else if (normalizedImageUrl && isProjectRelativeAssetPath(normalizedImageUrl)) {
+    resolvedPath = normalizedImageUrl;
+  }
+
+  const hasProjectAssetBinding = Boolean(normalizedFileAssetId || resolvedPath);
+  if (!hasProjectAssetBinding) {
+    return true;
+  }
+
+  if (availableDiskPaths !== null && availableDiskPaths !== undefined) {
+    if (!resolvedPath) {
+      return false;
+    }
+    const inManifest = Boolean(findFileAssetIdByPath(manifest, resolvedPath));
+    return inManifest && availableDiskPaths.has(resolvedPath);
+  }
+
+  if (normalizedFileAssetId) {
+    return Boolean(manifest[normalizedFileAssetId]);
+  }
+
+  if (normalizedImageUrl && isProjectRelativeAssetPath(normalizedImageUrl)) {
+    return Boolean(findFileAssetIdByPath(manifest, normalizedImageUrl));
+  }
+
+  return true;
+}
+
 export function remapManifestPathPrefix(
   manifest: AssetManifest,
   fromPrefix: string,

@@ -33,6 +33,9 @@ import {
 } from '@/features/project';
 import {
   createEmptyAssetManifest,
+  listProjectAssetFilePaths,
+  normalizeAssetPath,
+  pruneManifestToAvailableDiskPaths,
   reconcileProjectAssets,
   registerPreparedAssetPath,
   syncNodeAssetPathsFromManifest,
@@ -307,10 +310,16 @@ function updateProjectSummary(
   return next;
 }
 
+function toAvailableAssetPathSet(paths: Iterable<string>): ReadonlySet<string> {
+  return new Set(Array.from(paths, (path) => normalizeAssetPath(path)));
+}
+
 interface ProjectState {
   projects: ProjectSummary[];
   currentProjectId: string | null;
   currentProject: Project | null;
+  availableAssetPaths: ReadonlySet<string> | null;
+  assetResourceEpoch: number;
   isHydrated: boolean;
   isOpeningProject: boolean;
 
@@ -334,12 +343,18 @@ interface ProjectState {
     contentHash?: string
   ) => { fileAssetId: string } | null;
   commitAssetManifest: (manifest: AssetManifest) => void;
+  setAvailableAssetPaths: (paths: Iterable<string>) => void;
+  addAvailableAssetPaths: (paths: Iterable<string>) => void;
+  removeAvailableAssetPaths: (paths: Iterable<string>) => void;
+  refreshAvailableAssetPaths: () => Promise<void>;
 }
 
 export const useProjectStore = create<ProjectState>((set, get) => ({
   projects: [],
   currentProjectId: null,
   currentProject: null,
+  availableAssetPaths: null,
+  assetResourceEpoch: 0,
   isHydrated: false,
   isOpeningProject: false,
 
@@ -511,6 +526,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         set((state) => ({
           currentProjectId: id,
           currentProject: project,
+          availableAssetPaths: toAvailableAssetPathSet(reconciled.diskPaths),
+          assetResourceEpoch: get().assetResourceEpoch + 1,
           isOpeningProject: false,
           projects: updateProjectSummary(state.projects, {
             id: project.id,
@@ -570,6 +587,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         : state.projects,
       currentProjectId: null,
       currentProject: null,
+      availableAssetPaths: null,
+      assetResourceEpoch: 0,
       isOpeningProject: false,
     }));
   },
@@ -687,7 +706,12 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       updatedAt: Date.now(),
     };
 
-    set({ currentProject: nextProject });
+    set((state) => ({
+      currentProject: nextProject,
+      availableAssetPaths: state.availableAssetPaths
+        ? new Set([...state.availableAssetPaths, normalizeAssetPath(imagePath)])
+        : new Set([normalizeAssetPath(imagePath)]),
+    }));
     persistProject(nextProject);
     return {
       fileAssetId: registered.fileAssetId,
@@ -705,9 +729,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
     const canvasState = useCanvasStore.getState();
     const syncedNodes = syncNodeAssetPathsFromManifest(canvasState.nodes, manifest);
-    if (syncedNodes !== canvasState.nodes) {
-      useCanvasStore.setState({ nodes: syncedNodes });
-    }
+    useCanvasStore.setState({ nodes: syncedNodes });
 
     const nextProject: Project = {
       ...currentProject,
@@ -716,7 +738,63 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       edges: canvasState.edges,
       updatedAt: Date.now(),
     };
-    set({ currentProject: nextProject });
+    set({ currentProject: nextProject, assetResourceEpoch: get().assetResourceEpoch + 1 });
     persistProject(nextProject);
+  },
+
+  setAvailableAssetPaths: (paths) => {
+    set({ availableAssetPaths: toAvailableAssetPathSet(paths) });
+  },
+
+  addAvailableAssetPaths: (paths) => {
+    set((state) => {
+      const next = new Set(state.availableAssetPaths ?? []);
+      for (const path of paths) {
+        next.add(normalizeAssetPath(path));
+      }
+      return { availableAssetPaths: next };
+    });
+  },
+
+  removeAvailableAssetPaths: (paths) => {
+    set((state) => {
+      if (!state.availableAssetPaths) {
+        return state;
+      }
+      const next = new Set(state.availableAssetPaths);
+      for (const path of paths) {
+        next.delete(normalizeAssetPath(path));
+      }
+      return { availableAssetPaths: next };
+    });
+  },
+
+  refreshAvailableAssetPaths: async () => {
+    const { currentProjectId, currentProject } = get();
+    if (!currentProjectId || !currentProject || isComponentDocProjectId(currentProjectId)) {
+      return;
+    }
+
+    const diskPaths = await listProjectAssetFilePaths(currentProjectId).catch((error) => {
+      console.warn('[asset] failed to refresh available asset paths', error);
+      return null;
+    });
+    if (diskPaths === null) {
+      return;
+    }
+
+    const diskPathSet = toAvailableAssetPathSet(diskPaths);
+    const pruned = pruneManifestToAvailableDiskPaths(
+      currentProject.assetManifest ?? createEmptyAssetManifest(),
+      diskPathSet
+    );
+    if (pruned.changed) {
+      get().commitAssetManifest(pruned.manifest);
+    }
+
+    set({
+      availableAssetPaths: diskPathSet,
+      assetResourceEpoch: get().assetResourceEpoch + 1,
+    });
   },
 }));

@@ -6,6 +6,7 @@ import {
   findFileAssetIdByPath,
   normalizeAssetPath,
   registerFileAssetPath,
+  removeFileAsset,
 } from './assetManifest';
 import { applyFileAssetIdToNodes, scanNodeAssetPathFields, syncNodeAssetPathsFromManifest } from './assetRefIndex';
 import type { AssetManifest } from './types';
@@ -31,7 +32,25 @@ export async function listProjectAssetFilePaths(projectId: string): Promise<stri
 export interface ReconcileProjectAssetsResult {
   assetManifest: AssetManifest;
   nodes: CanvasNode[];
+  diskPaths: string[];
   dirty: boolean;
+}
+
+export function pruneManifestToAvailableDiskPaths(
+  manifest: AssetManifest,
+  diskPathSet: ReadonlySet<string>
+): { manifest: AssetManifest; changed: boolean } {
+  let next = manifest;
+  let changed = false;
+
+  for (const [fileAssetId, record] of Object.entries(manifest)) {
+    if (!diskPathSet.has(normalizeAssetPath(record.path))) {
+      next = removeFileAsset(next, fileAssetId);
+      changed = true;
+    }
+  }
+
+  return { manifest: next, changed };
 }
 
 export async function reconcileProjectAssets(input: {
@@ -44,10 +63,21 @@ export async function reconcileProjectAssets(input: {
 
   const diskPaths = await listProjectAssetFilePaths(input.projectId).catch((error) => {
     console.warn('[asset] failed to list project asset files during reconcile', error);
-    return [] as string[];
+    return null;
   });
 
-  for (const path of diskPaths) {
+  if (diskPaths !== null) {
+    const diskPathSet = new Set(diskPaths.map((path) => normalizeAssetPath(path)));
+    const pruned = pruneManifestToAvailableDiskPaths(manifest, diskPathSet);
+    manifest = pruned.manifest;
+    if (pruned.changed) {
+      dirty = true;
+    }
+  }
+
+  const effectiveDiskPaths = diskPaths ?? [];
+
+  for (const path of effectiveDiskPaths) {
     const before = findFileAssetIdByPath(manifest, path);
     const registered = registerFileAssetPath(manifest, path);
     manifest = registered.manifest;
@@ -88,6 +118,7 @@ export async function reconcileProjectAssets(input: {
   return {
     assetManifest: manifest,
     nodes: nextNodes,
+    diskPaths: effectiveDiskPaths,
     dirty,
   };
 }

@@ -384,6 +384,7 @@ export function Canvas() {
       requestAnimationFrame(() => {
         reactFlowInstance.setViewport(project.viewport ?? DEFAULT_VIEWPORT, { duration: 0 });
       });
+      void useProjectStore.getState().refreshAvailableAssetPaths();
     } else {
       setViewportState(DEFAULT_VIEWPORT);
     }

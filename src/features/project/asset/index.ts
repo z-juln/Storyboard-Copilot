@@ -13,6 +13,7 @@ export {
   remapManifestPathPrefix,
   removeManifestPaths,
   resolveManifestPath,
+  isProjectAssetAvailable,
   updateFileAssetPath,
 } from './assetManifest';
 export {
@@ -28,8 +29,15 @@ export {
   reconcileProjectAssets,
   registerPreparedAssetPath,
   type ReconcileProjectAssetsResult,
+  pruneManifestToAvailableDiskPaths,
 } from './reconcileProjectAssets';
 export { resolveFileAssetDisplayUrl } from './resolveAssetDisplayUrl';
+export { PROJECT_ASSET_UNAVAILABLE_MESSAGE } from './assetUnavailableMessage';
+export {
+  useIsProjectAssetUnavailable,
+  useProjectAssetAvailability,
+  type ProjectAssetBinding,
+} from './useProjectAssetAvailability';
 export {
   collectFilePathsFromEntry,
   filterTreeByQuery,

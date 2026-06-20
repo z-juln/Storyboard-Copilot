@@ -362,6 +362,7 @@ const FrameCard = memo(
         >
           {frame.imageUrl ? (
             <CanvasNodeImage
+              assetBinding={{ imageUrl: frame.imageUrl, fileAssetId: frame.fileAssetId }}
               src={imageSource ?? ''}
               alt={`Frame ${index + 1}`}
               viewerSourceUrl={viewerSource}
@@ -1093,12 +1094,14 @@ export const StoryboardNode = memo(({ id, data, selected, width, height }: Story
                     title={item.label}
                   >
                     <CanvasNodeImage
+                      assetBinding={{ imageUrl: item.imageUrl }}
                       src={item.displayUrl}
                       alt={item.label}
                       viewerSourceUrl={resolveImageDisplayUrl(item.imageUrl)}
                       viewerImageList={incomingImageViewerList}
                       className="h-8 w-8 rounded object-cover"
                       draggable={false}
+                      unavailableCompact
                     />
                     <span className="truncate">{item.label}</span>
                   </button>

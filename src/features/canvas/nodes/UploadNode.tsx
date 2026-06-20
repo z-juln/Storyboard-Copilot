@@ -317,6 +317,14 @@ export const UploadNode = memo(({ id, data, selected, width, height }: UploadNod
     });
   }, [assetManifest, data.fileAssetId, data.imageUrl, projectId, resolvedMediaKind]);
 
+  const assetBinding = useMemo(
+    () => ({
+      imageUrl: data.imageUrl,
+      fileAssetId: data.fileAssetId,
+    }),
+    [data.fileAssetId, data.imageUrl]
+  );
+
   const hasMediaContent = Boolean(
     transientPreviewUrl
     || data.textContent
@@ -375,6 +383,7 @@ export const UploadNode = memo(({ id, data, selected, width, height }: UploadNod
       {hasMediaContent ? (
         <UploadNodeMediaBody
           mediaKind={resolvedMediaKind}
+          assetBinding={assetBinding}
           assetMediaUrl={assetMediaUrl}
           imageSource={imageSource}
           imageViewerSourceUrl={resolveNodeImageDisplayUrl({

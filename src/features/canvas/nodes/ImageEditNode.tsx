@@ -784,12 +784,14 @@ export const ImageEditNode = memo(({ id, data, selected, width, height }: ImageE
                     }`}
                 >
                   <CanvasNodeImage
+                    assetBinding={{ imageUrl: item.imageUrl }}
                     src={item.displayUrl}
                     alt={item.label}
                     viewerSourceUrl={resolveImageDisplayUrl(item.imageUrl)}
                     viewerImageList={incomingImageViewerList}
                     className="h-8 w-8 rounded object-cover"
                     draggable={false}
+                    unavailableCompact
                   />
                   <span>{item.label}</span>
                 </button>

@@ -104,6 +104,10 @@ function syncPathField(
   manifest: AssetManifest
 ): boolean {
   const fileAssetId = readOptionalString(data[fileAssetIdField]);
+  if (fileAssetId && !manifest[fileAssetId]) {
+    data[fileAssetIdField] = null;
+    return true;
+  }
   if (!fileAssetId) {
     return false;
   }
