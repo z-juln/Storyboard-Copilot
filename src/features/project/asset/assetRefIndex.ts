@@ -2,7 +2,7 @@ import type { CanvasNode } from '@/stores/canvasStore';
 import { isProjectRelativeAssetPath } from '@/features/project/projectPaths';
 
 import type { AssetManifest, AssetRef } from './types';
-import { findFileAssetIdByPath, normalizeAssetPath } from './assetManifest';
+import { findFileAssetIdByPath, normalizeAssetPath, resolveManifestPath } from './assetManifest';
 
 function readOptionalString(value: unknown): string | null {
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
@@ -138,6 +138,90 @@ function setNestedField(target: Record<string, unknown>, field: string, value: s
     cursor = nextObject;
   }
   cursor[segments[segments.length - 1] ?? ''] = value;
+}
+
+function syncPathField(
+  data: Record<string, unknown>,
+  urlField: string,
+  fileAssetIdField: string,
+  manifest: AssetManifest
+): boolean {
+  const fileAssetId = readOptionalString(data[fileAssetIdField]);
+  if (!fileAssetId) {
+    return false;
+  }
+  const manifestPath = resolveManifestPath(manifest, fileAssetId);
+  if (!manifestPath) {
+    return false;
+  }
+  const currentUrl = readOptionalString(data[urlField]);
+  if (currentUrl === manifestPath) {
+    return false;
+  }
+  data[urlField] = manifestPath;
+  return true;
+}
+
+function syncFramePathFields(
+  data: Record<string, unknown>,
+  manifest: AssetManifest
+): boolean {
+  if (!Array.isArray(data.frames)) {
+    return false;
+  }
+
+  let changed = false;
+  const nextFrames = data.frames.map((frame) => {
+    if (!frame || typeof frame !== 'object') {
+      return frame;
+    }
+    const frameRecord = { ...(frame as Record<string, unknown>) };
+    const frameChanged =
+      syncPathField(frameRecord, 'imageUrl', 'fileAssetId', manifest)
+      || syncPathField(frameRecord, 'previewImageUrl', 'previewFileAssetId', manifest);
+    if (frameChanged) {
+      changed = true;
+      return frameRecord;
+    }
+    return frame;
+  });
+
+  if (changed) {
+    data.frames = nextFrames;
+  }
+  return changed;
+}
+
+/** manifest 中 path 变更后，将节点 path 缓存与 fileAssetId 对齐。 */
+export function syncNodeAssetPathsFromManifest(
+  nodes: CanvasNode[],
+  manifest: AssetManifest
+): CanvasNode[] {
+  let anyChanged = false;
+
+  const nextNodes = nodes.map((node) => {
+    const nextData = { ...(node.data as Record<string, unknown>) };
+    let nodeChanged = false;
+
+    if (syncPathField(nextData, 'imageUrl', 'fileAssetId', manifest)) {
+      nodeChanged = true;
+    }
+    if (syncPathField(nextData, 'previewImageUrl', 'previewFileAssetId', manifest)) {
+      nodeChanged = true;
+    }
+    if (syncFramePathFields(nextData, manifest)) {
+      nodeChanged = true;
+    }
+
+    if (!nodeChanged) {
+      return node;
+    }
+
+    anyChanged = true;
+    return { ...node, data: nextData as CanvasNode['data'] };
+  });
+
+  return anyChanged ? nextNodes : nodes;
 }
 
 export function applyFileAssetIdToNodes(

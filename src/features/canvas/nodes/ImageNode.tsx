@@ -22,7 +22,7 @@ import {
   resolveResizeMinConstraintsByAspect,
 } from '@/features/canvas/application/imageNodeSizing';
 import {
-  resolveImageDisplayUrl,
+  resolveNodeImageDisplayUrl,
   shouldUseOriginalImageByZoom,
 } from '@/features/canvas/application/imageData';
 import { resolveNodeDisplayName } from '@/features/canvas/domain/nodeDisplay';
@@ -30,6 +30,7 @@ import { NodeHeader, NODE_HEADER_FLOATING_POSITION_CLASS } from '@/features/canv
 import { NodeResizeHandle } from '@/features/canvas/ui/NodeResizeHandle';
 import { CanvasNodeImage } from '@/features/canvas/ui/CanvasNodeImage';
 import { useCanvasStore } from '@/stores/canvasStore';
+import { useProjectStore } from '@/stores/projectStore';
 
 type ImageNodeProps = NodeProps & {
   id: string;
@@ -48,6 +49,7 @@ export const ImageNode = memo(({ id, data, selected, type, width, height }: Imag
   const updateNodeInternals = useUpdateNodeInternals();
   const setSelectedNode = useCanvasStore((state) => state.setSelectedNode);
   const updateNodeData = useCanvasStore((state) => state.updateNodeData);
+  const assetManifest = useProjectStore((state) => state.currentProject?.assetManifest);
   const { zoom } = useViewport();
   const [now, setNow] = useState(() => Date.now());
   const isExportResultNode = type === CANVAS_NODE_TYPES.exportImage;
@@ -132,18 +134,33 @@ export const ImageNode = memo(({ id, data, selected, type, width, height }: Imag
   }, [isExportResultNode, isGenerating, waitedMinutes]);
 
   const imageSource = useMemo(() => {
-    const preferOriginal = shouldUseOriginalImageByZoom(zoom);
-    const picked = preferOriginal
-      ? data.imageUrl || data.previewImageUrl
-      : data.previewImageUrl || data.imageUrl;
-    return picked ? resolveImageDisplayUrl(picked) : null;
-  }, [data.imageUrl, data.previewImageUrl, zoom]);
+    return resolveNodeImageDisplayUrl({
+      imageUrl: data.imageUrl,
+      previewImageUrl: data.previewImageUrl,
+      fileAssetId: data.fileAssetId,
+      previewFileAssetId: data.previewFileAssetId,
+      preferOriginal: shouldUseOriginalImageByZoom(zoom),
+    });
+  }, [
+    assetManifest,
+    data.fileAssetId,
+    data.imageUrl,
+    data.previewFileAssetId,
+    data.previewImageUrl,
+    zoom,
+  ]);
 
-  // 获取原图 URL 用于查看器
   const originalImageUrl = useMemo(() => {
-    if (!data.imageUrl) return null;
-    return resolveImageDisplayUrl(data.imageUrl);
-  }, [data.imageUrl]);
+    if (!data.imageUrl) {
+      return null;
+    }
+    return resolveNodeImageDisplayUrl({
+      imageUrl: data.imageUrl,
+      previewImageUrl: null,
+      fileAssetId: data.fileAssetId,
+      preferOriginal: true,
+    });
+  }, [assetManifest, data.fileAssetId, data.imageUrl]);
 
   return (
     <div

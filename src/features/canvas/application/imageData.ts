@@ -123,7 +123,7 @@ export function isLikelyLocalImagePath(imageUrl: string): boolean {
 
 export function resolveImageDisplayUrl(
   imageUrl: string,
-  options?: { fileAssetId?: string | null }
+  options?: { fileAssetId?: string | null; previewFileAssetId?: string | null; preferPreview?: boolean }
 ): string {
   const projectId = useProjectStore.getState().currentProjectId;
   const assetManifest = useProjectStore.getState().currentProject?.assetManifest;
@@ -139,6 +139,31 @@ export function resolveImageDisplayUrl(
   }
 
   return resolveProjectImageDisplayUrl(projectId, imageUrl, buildLocalImageUrl);
+}
+
+export function resolveNodeImageDisplayUrl(input: {
+  imageUrl?: string | null;
+  previewImageUrl?: string | null;
+  fileAssetId?: string | null;
+  previewFileAssetId?: string | null;
+  preferOriginal?: boolean;
+}): string | null {
+  const preferOriginal = input.preferOriginal ?? true;
+  const pickedUrl = preferOriginal
+    ? input.imageUrl || input.previewImageUrl
+    : input.previewImageUrl || input.imageUrl;
+  if (!pickedUrl) {
+    return null;
+  }
+
+  const pickedFileAssetId =
+    pickedUrl === input.previewImageUrl
+      ? input.previewFileAssetId
+      : pickedUrl === input.imageUrl
+        ? input.fileAssetId
+        : input.fileAssetId ?? input.previewFileAssetId;
+
+  return resolveImageDisplayUrl(pickedUrl, { fileAssetId: pickedFileAssetId });
 }
 
 export function toPreparedNodeImageFields(prepared: PreparedNodeImage) {

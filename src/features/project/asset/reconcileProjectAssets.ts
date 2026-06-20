@@ -7,7 +7,7 @@ import {
   normalizeAssetPath,
   registerFileAssetPath,
 } from './assetManifest';
-import { applyFileAssetIdToNodes, scanNodeAssetPathFields } from './assetRefIndex';
+import { applyFileAssetIdToNodes, scanNodeAssetPathFields, syncNodeAssetPathsFromManifest } from './assetRefIndex';
 import type { AssetManifest } from './types';
 
 function collectFilePathsFromDirectory(entry: ProjectDirectoryEntry, paths: string[]): void {
@@ -79,8 +79,9 @@ export async function reconcileProjectAssets(input: {
     }
   }
 
-  const nextNodes = applyFileAssetIdToNodes(input.nodes, pathBindings);
-  if (pathBindings.length > 0) {
+  const nodesWithFileAssetIds = applyFileAssetIdToNodes(input.nodes, pathBindings);
+  const nextNodes = syncNodeAssetPathsFromManifest(nodesWithFileAssetIds, manifest);
+  if (pathBindings.length > 0 || nextNodes !== nodesWithFileAssetIds) {
     dirty = true;
   }
 

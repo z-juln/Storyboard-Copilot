@@ -4,7 +4,7 @@ import { ChevronDown, ChevronRight, File, Folder, FolderOpen, Image as ImageIcon
 import type { ProjectDirectoryEntry } from '@/features/project/types';
 import { isDescendantAssetPath } from '@/features/project/asset/assetExplorerPathUtils';
 
-import { formatBytes, isImageFileName } from './formatBytes';
+import { formatBytes, focusRenameInput, isImageFileName } from './formatBytes';
 
 export interface AssetExplorerTreeItemProps {
   entry: ProjectDirectoryEntry;
@@ -60,11 +60,10 @@ export function AssetExplorerTreeItem({
   const renameInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (isRenaming) {
-      renameInputRef.current?.focus();
-      renameInputRef.current?.select();
+    if (isRenaming && renameInputRef.current) {
+      focusRenameInput(renameInputRef.current, entry.name, entry.kind);
     }
-  }, [isRenaming]);
+  }, [entry.kind, entry.name, isRenaming]);
 
   const icon = isDirectory
     ? expanded

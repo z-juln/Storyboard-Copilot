@@ -35,6 +35,7 @@ import {
   createEmptyAssetManifest,
   reconcileProjectAssets,
   registerPreparedAssetPaths,
+  syncNodeAssetPathsFromManifest,
   type AssetManifest,
 } from '@/features/project/asset';
 
@@ -703,9 +704,17 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       return;
     }
 
+    const canvasState = useCanvasStore.getState();
+    const syncedNodes = syncNodeAssetPathsFromManifest(canvasState.nodes, manifest);
+    if (syncedNodes !== canvasState.nodes) {
+      useCanvasStore.setState({ nodes: syncedNodes });
+    }
+
     const nextProject: Project = {
       ...currentProject,
       assetManifest: manifest,
+      nodes: syncedNodes,
+      edges: canvasState.edges,
       updatedAt: Date.now(),
     };
     set({ currentProject: nextProject });

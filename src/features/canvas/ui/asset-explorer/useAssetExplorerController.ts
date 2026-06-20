@@ -364,6 +364,18 @@ export function useAssetExplorerController({
         return;
       }
 
+      if (event.key === 'Enter') {
+        if (readOnly || !selectedEntry || !tree) {
+          return;
+        }
+        if (normalizeAssetPath(selectedEntry.path) === normalizeAssetPath(tree.path)) {
+          return;
+        }
+        event.preventDefault();
+        setRenamingPath(selectedEntry.path);
+        return;
+      }
+
       const hasModifier = event.metaKey || event.ctrlKey;
       if (!hasModifier) {
         return;

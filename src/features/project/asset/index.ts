@@ -20,6 +20,7 @@ export {
   countRefsForFileAssetId,
   listAssetRefs,
   scanNodeAssetPathFields,
+  syncNodeAssetPathsFromManifest,
 } from './assetRefIndex';
 export {
   listProjectAssetFilePaths,

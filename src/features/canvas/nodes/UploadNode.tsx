@@ -37,7 +37,7 @@ import { NodeHeader, NODE_HEADER_FLOATING_POSITION_CLASS } from '@/features/canv
 import { NodeResizeHandle } from '@/features/canvas/ui/NodeResizeHandle';
 import {
   prepareNodeImageFromFile,
-  resolveImageDisplayUrl,
+  resolveNodeImageDisplayUrl,
   shouldUseOriginalImageByZoom,
   toPreparedNodeImageFields,
 } from '@/features/canvas/application/imageData';
@@ -296,12 +296,22 @@ export const UploadNode = memo(({ id, data, selected, width, height }: UploadNod
     if (transientPreviewUrl) {
       return transientPreviewUrl;
     }
-    const preferOriginal = shouldUseOriginalImageByZoom(zoom);
-    const picked = preferOriginal
-      ? data.imageUrl || data.previewImageUrl
-      : data.previewImageUrl || data.imageUrl;
-    return picked ? resolveImageDisplayUrl(picked) : null;
-  }, [data.imageUrl, data.previewImageUrl, transientPreviewUrl, zoom]);
+    return resolveNodeImageDisplayUrl({
+      imageUrl: data.imageUrl,
+      previewImageUrl: data.previewImageUrl,
+      fileAssetId: data.fileAssetId,
+      previewFileAssetId: data.previewFileAssetId,
+      preferOriginal: shouldUseOriginalImageByZoom(zoom),
+    });
+  }, [
+    assetManifest,
+    data.fileAssetId,
+    data.imageUrl,
+    data.previewFileAssetId,
+    data.previewImageUrl,
+    transientPreviewUrl,
+    zoom,
+  ]);
 
   const resolvedMediaKind = data.mediaKind ?? (data.imageUrl ? 'image' : null);
   const assetMediaUrl = useMemo(() => {
@@ -374,7 +384,12 @@ export const UploadNode = memo(({ id, data, selected, width, height }: UploadNod
           mediaKind={resolvedMediaKind}
           assetMediaUrl={assetMediaUrl}
           imageSource={imageSource}
-          imageViewerSourceUrl={data.imageUrl ? resolveImageDisplayUrl(data.imageUrl) : null}
+          imageViewerSourceUrl={resolveNodeImageDisplayUrl({
+            imageUrl: data.imageUrl,
+            previewImageUrl: null,
+            fileAssetId: data.fileAssetId,
+            preferOriginal: true,
+          })}
           textContent={data.textContent}
           onImageLoad={handleImageLoad}
         />
