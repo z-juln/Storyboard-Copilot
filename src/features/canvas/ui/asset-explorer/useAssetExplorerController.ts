@@ -13,6 +13,7 @@ import type { ProjectDirectoryEntry } from '@/features/project/types';
 import {
   getAssetExplorerClipboard,
   setAssetExplorerClipboard,
+  writeAssetPathsToSystemClipboard,
 } from '@/features/project/asset/assetExplorerClipboard';
 import {
   collectFilePathsFromEntry,
@@ -150,10 +151,12 @@ export function useAssetExplorerController({
       if (readOnly || entries.length === 0) {
         return;
       }
+      const items = entriesToClipboardItems(entries);
       setAssetExplorerClipboard({
         mode,
-        items: entriesToClipboardItems(entries),
+        items,
       });
+      void writeAssetPathsToSystemClipboard(items.map((item) => item.path));
     },
     [readOnly]
   );
@@ -481,9 +484,10 @@ export function useAssetExplorerController({
       const normalized = normalizeAssetPath(path);
       if (event.metaKey || event.ctrlKey) {
         togglePath(normalized);
-        return;
+      } else {
+        selectSingle(normalized);
       }
-      selectSingle(normalized);
+      containerRef.current?.focus();
     },
     [selectSingle, togglePath]
   );

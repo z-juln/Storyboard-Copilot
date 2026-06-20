@@ -23,3 +23,15 @@ export function setAssetExplorerClipboard(state: AssetExplorerClipboardState | n
 export function hasAssetExplorerClipboard(): boolean {
   return Boolean(clipboardState?.items.length);
 }
+
+export async function writeAssetPathsToSystemClipboard(paths: string[]): Promise<void> {
+  if (paths.length === 0) {
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(paths.join('\n'));
+  } catch (error) {
+    console.warn('[asset] failed to write system clipboard', error);
+  }
+}
