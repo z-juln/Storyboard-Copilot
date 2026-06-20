@@ -19,9 +19,9 @@ Payload 结构（`createUploadNodeFromProjectAsset.ts`）：
 
 ## 落点与节点创建
 
-1. `Canvas.tsx` 监听 pane `onDragOver` / `onDrop`。
+1. `Canvas.tsx` 监听 pane `onDragOver` / `onDrop`（薄胶水）。
 2. `screenToFlowPosition` 换算坐标。
-3. `buildUploadNodeDataFromProjectAsset` 构建节点 data；必要时 `registerFileAssetPath` + `commitAssetManifest`。
+3. `dropProjectAssetOnCanvas` 调用 `buildUploadNodeDataFromProjectAsset`；必要时 register + `commitAssetManifest`。
 4. `canvasStore.addNode(CANVAS_NODE_TYPES.upload, position, data)`。
 
 文本资产会在创建时 fetch 内容写入 `textContent`（过长截断）。

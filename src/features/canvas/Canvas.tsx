@@ -37,10 +37,10 @@ import {
 } from '@/features/canvas/domain/canvasNodes';
 import { prepareNodeImage, toPreparedNodeImageFields } from '@/features/canvas/application/imageData';
 import {
-  buildUploadNodeDataFromProjectAsset,
   parseProjectAssetDragPayload,
   PROJECT_ASSET_DRAG_MIME,
 } from '@/features/canvas/application/createUploadNodeFromProjectAsset';
+import { dropProjectAssetOnCanvas } from '@/features/canvas/application/dropProjectAssetOnCanvas';
 import {
   buildGenerationErrorReport,
   CURRENT_RUNTIME_SESSION_ID,
@@ -62,7 +62,6 @@ import { CanvasWorkspaceToolbar } from './ui/CanvasWorkspaceToolbar';
 import { AssetManagerPanel } from './ui/AssetManagerPanel';
 import { ImageViewerModal } from './ui/ImageViewerModal';
 import { MissingApiKeyHint } from '@/features/settings/MissingApiKeyHint';
-import { createEmptyAssetManifest } from '@/features/project/asset';
 
 const DEFAULT_VIEWPORT: Viewport = { x: 0, y: 0, zoom: 1 };
 
@@ -1649,20 +1648,15 @@ export function Canvas() {
       });
 
       try {
-        const { nodeData, manifest, manifestChanged } = await buildUploadNodeDataFromProjectAsset({
+        await dropProjectAssetOnCanvas({
           projectId: currentProjectId,
-          path: payload.path,
-          name: payload.name,
-          mediaKind: payload.mediaKind,
-          manifest: currentProject.assetManifest ?? createEmptyAssetManifest(),
+          payload,
+          position: flowPos,
+          assetManifest: currentProject.assetManifest,
+          commitAssetManifest,
+          addNode,
+          setSelectedNode,
         });
-
-        if (manifestChanged) {
-          commitAssetManifest(manifest);
-        }
-
-        const nodeId = addNode(CANVAS_NODE_TYPES.upload, flowPos, nodeData);
-        setSelectedNode(nodeId);
         scheduleCanvasPersist(0);
       } catch (error) {
         void showErrorDialog(

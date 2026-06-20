@@ -3,7 +3,7 @@ import { memo, useEffect, useState } from 'react';
 import { UiButton, UiModal } from '@/components/ui';
 import type { ProjectDirectoryEntry } from '@/features/project/types';
 import {
-  MAX_TEXT_PREVIEW_CHARS,
+  fetchAssetTextContent,
   type AssetPreviewKind,
 } from '@/features/project/asset/assetPreviewUtils';
 import { buildProjectAssetUrl } from '@/features/project/projectPaths';
@@ -30,7 +30,7 @@ export const AssetPreviewDialog = memo(({ projectId, state, onClose }: AssetPrev
   const assetUrl = entry ? buildProjectAssetUrl(projectId, entry.path) : '';
 
   useEffect(() => {
-    if (!isOpen || kind !== 'text' || !assetUrl) {
+    if (!isOpen || kind !== 'text' || !entry) {
       setTextContent('');
       setPreviewError(null);
       setLoadingText(false);
@@ -44,18 +44,14 @@ export const AssetPreviewDialog = memo(({ projectId, state, onClose }: AssetPrev
 
     void (async () => {
       try {
-        const response = await fetch(assetUrl);
-        if (!response.ok) {
-          throw new Error(`读取失败 (${response.status})`);
-        }
-        const raw = await response.text();
+        const content = await fetchAssetTextContent(projectId, entry.path);
         if (cancelled) {
           return;
         }
-        if (raw.length > MAX_TEXT_PREVIEW_CHARS) {
-          setTextContent(`${raw.slice(0, MAX_TEXT_PREVIEW_CHARS)}\n\n…（内容过长，已截断）`);
+        if (content === null) {
+          setPreviewError('无法加载文本');
         } else {
-          setTextContent(raw);
+          setTextContent(content);
         }
       } catch (error) {
         if (!cancelled) {
@@ -71,7 +67,7 @@ export const AssetPreviewDialog = memo(({ projectId, state, onClose }: AssetPrev
     return () => {
       cancelled = true;
     };
-  }, [assetUrl, isOpen, kind]);
+  }, [entry, isOpen, kind, projectId]);
 
   return (
     <UiModal

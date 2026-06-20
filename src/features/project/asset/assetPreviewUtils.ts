@@ -1,3 +1,5 @@
+import { buildProjectAssetUrl } from '@/features/project/projectPaths';
+
 export type AssetPreviewKind = 'image' | 'video' | 'audio' | 'text';
 
 const IMAGE_PATTERN = /\.(png|jpe?g|webp|gif|bmp|avif|tiff?|svg)$/i;
@@ -27,3 +29,18 @@ export function isAssetPreviewable(fileName: string): boolean {
 }
 
 export const MAX_TEXT_PREVIEW_CHARS = 512_000;
+
+export async function fetchAssetTextContent(
+  projectId: string,
+  path: string
+): Promise<string | null> {
+  const response = await fetch(buildProjectAssetUrl(projectId, path));
+  if (!response.ok) {
+    return null;
+  }
+  const raw = await response.text();
+  if (raw.length > MAX_TEXT_PREVIEW_CHARS) {
+    return `${raw.slice(0, MAX_TEXT_PREVIEW_CHARS)}\n\n…（内容过长，已截断）`;
+  }
+  return raw;
+}

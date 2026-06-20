@@ -41,13 +41,12 @@ import {
   shouldUseOriginalImageByZoom,
   toPreparedNodeImageFields,
 } from '@/features/canvas/application/imageData';
-import { CanvasNodeImage } from '@/features/canvas/ui/CanvasNodeImage';
+import { UploadNodeMediaBody } from '@/features/canvas/nodes/UploadNodeMediaBody';
 import { useCanvasStore } from '@/stores/canvasStore';
 import { useProjectStore } from '@/stores/projectStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { resolveFileAssetDisplayUrl } from '@/features/project/asset';
-import { MAX_TEXT_PREVIEW_CHARS } from '@/features/project/asset/assetPreviewUtils';
-import { buildProjectAssetUrl } from '@/features/project/projectPaths';
+import { fetchAssetTextContent } from '@/features/project/asset/assetPreviewUtils';
 
 type UploadNodeProps = NodeProps & {
   id: string;
@@ -333,22 +332,11 @@ export const UploadNode = memo(({ id, data, selected, width, height }: UploadNod
     const assetPath = data.imageUrl;
 
     void (async () => {
-      try {
-        const response = await fetch(buildProjectAssetUrl(projectId, assetPath));
-        if (!response.ok || cancelled) {
-          return;
-        }
-        const raw = await response.text();
-        if (cancelled) {
-          return;
-        }
-        const nextContent = raw.length > MAX_TEXT_PREVIEW_CHARS
-          ? `${raw.slice(0, MAX_TEXT_PREVIEW_CHARS)}\n\n…（内容过长，已截断）`
-          : raw;
-        updateNodeData(id, { textContent: nextContent });
-      } catch {
-        // ignore load failures; node still references asset path
+      const nextContent = await fetchAssetTextContent(projectId, assetPath);
+      if (cancelled || nextContent === null) {
+        return;
       }
+      updateNodeData(id, { textContent: nextContent });
     })();
 
     return () => {
@@ -382,40 +370,14 @@ export const UploadNode = memo(({ id, data, selected, width, height }: UploadNod
       />
 
       {hasMediaContent ? (
-        <div className="block h-full w-full overflow-hidden rounded-[var(--node-radius)] bg-bg-dark">
-          {resolvedMediaKind === 'video' && assetMediaUrl ? (
-            <video
-              src={assetMediaUrl}
-              controls
-              className="h-full w-full object-contain"
-              onClick={(event) => event.stopPropagation()}
-            />
-          ) : resolvedMediaKind === 'audio' && assetMediaUrl ? (
-            <div
-              className="flex h-full w-full items-center justify-center px-4"
-              onClick={(event) => event.stopPropagation()}
-            >
-              <audio src={assetMediaUrl} controls className="w-full" />
-            </div>
-          ) : resolvedMediaKind === 'text' ? (
-            <pre
-              className="h-full w-full overflow-auto whitespace-pre-wrap break-words p-3 text-left text-[11px] leading-5 text-text-dark"
-              onClick={(event) => event.stopPropagation()}
-            >
-              {typeof data.textContent === 'string' && data.textContent.length > 0
-                ? data.textContent
-                : '加载中…'}
-            </pre>
-          ) : (
-            <CanvasNodeImage
-              src={imageSource ?? ''}
-              viewerSourceUrl={data.imageUrl ? resolveImageDisplayUrl(data.imageUrl) : null}
-              alt="已上传图片"
-              className="h-full w-full object-contain"
-              onLoad={handleImageLoad}
-            />
-          )}
-        </div>
+        <UploadNodeMediaBody
+          mediaKind={resolvedMediaKind}
+          assetMediaUrl={assetMediaUrl}
+          imageSource={imageSource}
+          imageViewerSourceUrl={data.imageUrl ? resolveImageDisplayUrl(data.imageUrl) : null}
+          textContent={data.textContent}
+          onImageLoad={handleImageLoad}
+        />
       ) : (
         <label
           className="block h-full w-full overflow-hidden rounded-[var(--node-radius)] bg-bg-dark"

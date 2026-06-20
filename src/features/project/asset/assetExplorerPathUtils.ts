@@ -66,6 +66,13 @@ export function findEntryByPath(
   return null;
 }
 
+export function findEntryInTree(
+  root: ProjectDirectoryEntry,
+  path: string
+): ProjectDirectoryEntry | null {
+  return findEntryByPath([root], path);
+}
+
 export function filterTreeByQuery(
   entry: ProjectDirectoryEntry,
   scopePath: string,

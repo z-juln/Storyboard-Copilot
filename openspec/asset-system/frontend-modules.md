@@ -9,18 +9,19 @@
 | `assetRefIndex.ts` | 扫描 nodes 引用了哪些 fileAssetId |
 | `projectAssetService.ts` | CRUD 编排 + manifest 增量 |
 | `resolveAssetDisplayUrl.ts` | fileAssetId → HTTP URL |
-| `assetExplorerPathUtils.ts` | 路径 join / 树查找 |
+| `assetExplorerPathUtils.ts` | 路径 join / `findEntryInTree` |
 | `assetExplorerClipboard.ts` | 复制 / 剪切 / 粘贴 |
-| `assetPreviewUtils.ts` | 后缀 → 预览类型 |
-| `createUploadNodeFromProjectAsset.ts` | 资产 → upload 节点数据 |
+| `assetPreviewUtils.ts` | 预览类型、`fetchAssetTextContent` |
+| `createUploadNodeFromProjectAsset.ts` | drag payload + upload 节点 data |
+| `dropProjectAssetOnCanvas.ts` | 画布 drop 编排 |
+| `ui/asset-explorer/` | Explorer UI 拆分（hook + 子组件） |
+| `nodes/UploadNodeMediaBody.tsx` | upload 节点多媒体展示 |
 
 ## 数据流
 
 ```text
-AssetExplorerPanel / Canvas
-        │
-        ▼
-projectAssetService ──► rustApiClient ──► file_store
+ui/asset-explorer/ ──► projectAssetService ──► rustApiClient ──► file_store
+Canvas (drop 胶水) ──► dropProjectAssetOnCanvas ──► createUploadNodeFromProjectAsset
         │                      │
         ▼                      ▼
 assetManifest ◄──────────  assets/**

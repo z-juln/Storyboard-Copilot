@@ -5,10 +5,9 @@ import {
   type AssetManifest,
 } from '@/features/project/asset';
 import {
-  MAX_TEXT_PREVIEW_CHARS,
+  fetchAssetTextContent,
   type AssetPreviewKind,
 } from '@/features/project/asset/assetPreviewUtils';
-import { buildProjectAssetUrl } from '@/features/project/projectPaths';
 
 export const PROJECT_ASSET_DRAG_MIME = 'application/x-storyboard-copilot-asset';
 
@@ -86,13 +85,7 @@ export async function buildUploadNodeDataFromProjectAsset(input: {
   };
 
   if (input.mediaKind === 'text') {
-    const response = await fetch(buildProjectAssetUrl(input.projectId, input.path));
-    if (response.ok) {
-      const raw = await response.text();
-      nodeData.textContent = raw.length > MAX_TEXT_PREVIEW_CHARS
-        ? `${raw.slice(0, MAX_TEXT_PREVIEW_CHARS)}\n\n…（内容过长，已截断）`
-        : raw;
-    }
+    nodeData.textContent = await fetchAssetTextContent(input.projectId, input.path);
   }
 
   return { nodeData, manifest, manifestChanged };

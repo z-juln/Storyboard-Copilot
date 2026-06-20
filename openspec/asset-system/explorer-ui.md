@@ -1,6 +1,6 @@
 # 资产目录 UI
 
-入口：`AssetManagerPanel` → Tab「资产目录」→ `AssetExplorerPanel`。
+入口：`AssetManagerPanel` → Tab「资产目录」→ `AssetExplorerPanel`（实现于 `ui/asset-explorer/`）。
 
 ## 面板结构
 
