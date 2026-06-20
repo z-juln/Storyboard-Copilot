@@ -46,7 +46,6 @@ export function AssetExplorerTreeItem({
   activeDescendantOfSelection = false,
 }: AssetExplorerTreeItemProps) {
   const isDirectory = entry.kind === 'directory';
-  const hasChildren = Boolean(entry.children?.length);
   const [expanded, setExpanded] = useState(depth === 0);
 
   useEffect(() => {
@@ -74,7 +73,7 @@ export function AssetExplorerTreeItem({
 
   const leadingIconClass = 'inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center';
 
-  const leadingSlot = isDirectory && hasChildren ? (
+  const leadingSlot = isDirectory ? (
     <button
       type="button"
       className={leadingIconClass}
@@ -89,8 +88,6 @@ export function AssetExplorerTreeItem({
         <ChevronRight className="h-3 w-3 text-text-muted" />
       )}
     </button>
-  ) : isDirectory ? (
-    <span className={leadingIconClass} aria-hidden />
   ) : isImageFileName(entry.name) ? (
     <span className={leadingIconClass}>
       <ImageIcon className="h-3.5 w-3.5 text-text-muted" />
@@ -118,7 +115,7 @@ export function AssetExplorerTreeItem({
             onOpenPreview(entry);
             return;
           }
-          if (hasChildren) {
+          if (isDirectory) {
             setExpanded((value) => !value);
           }
         }}
