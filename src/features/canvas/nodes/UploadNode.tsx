@@ -35,6 +35,7 @@ import {
 import { canvasEventBus } from '@/features/canvas/application/canvasServices';
 import { subscribeUploadNodePasteImage } from '@/features/canvas/application/uploadNodePasteBridge';
 import { resolveDroppedImageFile } from '@/features/canvas/application/resolveDroppedExternalFile';
+import { NodeAssetBindingMeta } from '@/features/canvas/ui/NodeAssetBindingMeta';
 import { NodeHeader, NODE_HEADER_FLOATING_POSITION_CLASS } from '@/features/canvas/ui/NodeHeader';
 import { NodeResizeHandle } from '@/features/canvas/ui/NodeResizeHandle';
 import {
@@ -371,6 +372,12 @@ export const UploadNode = memo(({ id, data, selected, width, height }: UploadNod
         className={NODE_HEADER_FLOATING_POSITION_CLASS}
         icon={<Upload className="h-4 w-4" />}
         titleText={resolvedTitle}
+        meta={hasMediaContent ? (
+          <NodeAssetBindingMeta
+            binding={assetBinding}
+            sourceFileName={typeof data.sourceFileName === 'string' ? data.sourceFileName : ''}
+          />
+        ) : null}
         editable
         onTitleChange={(nextTitle) => updateNodeData(id, { displayName: nextTitle })}
       />

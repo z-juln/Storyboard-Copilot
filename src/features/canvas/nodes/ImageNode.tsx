@@ -26,6 +26,7 @@ import {
   shouldUseOriginalImageByZoom,
 } from '@/features/canvas/application/imageData';
 import { resolveNodeDisplayName } from '@/features/canvas/domain/nodeDisplay';
+import { NodeAssetBindingMeta } from '@/features/canvas/ui/NodeAssetBindingMeta';
 import { NodeHeader, NODE_HEADER_FLOATING_POSITION_CLASS } from '@/features/canvas/ui/NodeHeader';
 import { NodeResizeHandle } from '@/features/canvas/ui/NodeResizeHandle';
 import { CanvasNodeImage } from '@/features/canvas/ui/CanvasNodeImage';
@@ -159,6 +160,15 @@ export const ImageNode = memo(({ id, data, selected, type, width, height }: Imag
     });
   }, [assetManifest, availableAssetPaths, data.fileAssetId, data.imageUrl]);
 
+  const assetBinding = useMemo(
+    () => ({
+      imageUrl: data.imageUrl,
+      fileAssetId: data.fileAssetId,
+    }),
+    [data.fileAssetId, data.imageUrl]
+  );
+  const sourceFileName = typeof data.sourceFileName === 'string' ? data.sourceFileName : '';
+
   return (
     <div
       className={`
@@ -181,6 +191,12 @@ export const ImageNode = memo(({ id, data, selected, type, width, height }: Imag
           : <Sparkles className="h-4 w-4" />}
         titleText={resolvedTitle}
         titleClassName="inline-block max-w-[220px] truncate whitespace-nowrap align-bottom"
+        meta={data.imageUrl ? (
+          <NodeAssetBindingMeta
+            binding={assetBinding}
+            sourceFileName={sourceFileName}
+          />
+        ) : null}
         editable
         onTitleChange={(nextTitle) => updateNodeData(id, { displayName: nextTitle })}
       />

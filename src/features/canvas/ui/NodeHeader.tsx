@@ -37,10 +37,10 @@ type NodeHeaderProps = {
 };
 
 export const NODE_HEADER_TONE_CLASS = 'text-[rgba(15,23,42,0.68)] dark:text-white/55';
-export const NODE_HEADER_TITLE_CLASS = 'text-[14px] font-normal';
+export const NODE_HEADER_TITLE_CLASS = 'text-[14px] font-normal leading-none';
 export const NODE_HEADER_META_CLASS = 'text-xs text-text-muted';
 export const NODE_HEADER_FLOATING_POSITION_CLASS = 'absolute -top-7 left-1 right-1 z-10';
-const NODE_HEADER_TITLE_MAX_WIDTH_CLASS = 'max-w-[60%]';
+const NODE_HEADER_TITLE_MAX_WIDTH_CLASS = 'max-w-full';
 const NODE_HEADER_TITLE_FADE_STYLE: CSSProperties = {
   WebkitMaskImage: 'linear-gradient(to right, #000 0%, #000 82%, transparent 100%)',
   maskImage: 'linear-gradient(to right, #000 0%, #000 82%, transparent 100%)',
@@ -258,28 +258,34 @@ export function NodeHeader({
     ? <span className={joinClasses(NODE_HEADER_META_CLASS, metaClassName)}>{metaText}</span>
     : meta;
 
+  const hasMeta = Boolean(resolvedMeta);
+
   return (
     <div className={joinClasses('w-full max-w-full', className)}>
       <div className="min-w-0 flex-1" style={composeTransformStyle(headerAdjust)}>
-        <div className={joinClasses('flex w-full items-baseline justify-between gap-2', titleRowClassName)}>
-          <div className="flex min-w-0 flex-1 items-baseline gap-1">
+        <div className={joinClasses('flex w-full items-center justify-between gap-2', titleRowClassName)}>
+          <div className="flex min-w-0 flex-1 items-center gap-1">
             {icon ? (
               <span
-                className={joinClasses('inline-flex items-center justify-center self-center', tone, iconClassName)}
+                className={joinClasses('inline-flex shrink-0 items-center justify-center', tone, iconClassName)}
                 style={composeTransformStyle(iconAdjust)}
               >
                 {icon}
               </span>
             ) : null}
             <div
-              className="flex w-0 min-w-0 flex-1 items-baseline gap-2"
+              className="min-w-0 flex-1"
               style={composeTransformStyle(titleAdjust)}
             >
               {resolvedTitle}
-              {resolvedMeta}
             </div>
           </div>
-          {rightSlot ? <div className="ml-2 flex shrink-0 items-baseline">{rightSlot}</div> : null}
+          {hasMeta ? (
+            <div className={joinClasses('flex shrink-0 items-center', metaClassName)}>
+              {resolvedMeta}
+            </div>
+          ) : null}
+          {rightSlot ? <div className="ml-2 flex shrink-0 items-center">{rightSlot}</div> : null}
         </div>
         {subtitle ? (
           <div className={joinClasses('text-[11px] text-text-muted/80', subtitleClassName)}>

@@ -4,7 +4,7 @@ import {
   useMemo,
 } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
-import { FileText, Link2 } from 'lucide-react';
+import { FileText } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
@@ -22,6 +22,7 @@ import { CANVAS_NODE_TYPES, type TextNodeData } from '@/features/canvas/domain/c
 import { resolveNodeDisplayName } from '@/features/canvas/domain/nodeDisplay';
 import { useSyncedTextAssetContent } from '@/features/canvas/hooks/useSyncedTextAssetContent';
 import { NodeEditableTextarea } from '@/features/canvas/ui/NodeEditableTextarea';
+import { NodeAssetBindingMeta } from '@/features/canvas/ui/NodeAssetBindingMeta';
 import { NodeHeader, NODE_HEADER_FLOATING_POSITION_CLASS } from '@/features/canvas/ui/NodeHeader';
 import { NodeAssetUnavailableNotice } from '@/features/canvas/ui/NodeAssetUnavailableNotice';
 import { NodeResizeHandle } from '@/features/canvas/ui/NodeResizeHandle';
@@ -88,8 +89,6 @@ export const TextNode = memo(({
   const resolvedTitle = resolveNodeDisplayName(CANVAS_NODE_TYPES.text, data);
   const resolvedWidth = Math.max(TEXT_NODE_MIN_WIDTH, Math.round(width ?? TEXT_NODE_DEFAULT_WIDTH));
   const resolvedHeight = Math.max(TEXT_NODE_MIN_HEIGHT, Math.round(height ?? TEXT_NODE_DEFAULT_HEIGHT));
-  const bindingLabel = sourceFileName ? `已绑定 · ${sourceFileName}` : '已绑定文件';
-
   const handleContentChange = useCallback((nextContent: string) => {
     updateContent(nextContent);
     updateNodeData(id, { textContent: nextContent });
@@ -141,10 +140,10 @@ export const TextNode = memo(({
         icon={<FileText className="h-4 w-4" />}
         titleText={resolvedTitle}
         meta={(
-          <span className="inline-flex items-center gap-1 text-xs text-accent/90">
-            <Link2 className="h-3 w-3 shrink-0" />
-            {bindingLabel}
-          </span>
+          <NodeAssetBindingMeta
+            binding={assetBinding}
+            sourceFileName={sourceFileName}
+          />
         )}
         editable
         onTitleChange={(nextTitle) => updateNodeData(id, { displayName: nextTitle })}
