@@ -1,38 +1,14 @@
 import { canvasEventBus } from '@/features/canvas/application/canvasServices';
 import { detectAspectRatio, resolveNodeImageDisplayUrl } from '@/features/canvas/application/imageData';
 import { normalizeAssetPath } from '@/features/project/asset';
-import type { ReplaceableAssetKind } from '@/features/project/asset/replaceProjectAssetFile';
+import { nodeReferencesProjectAsset } from '@/features/project/asset/assetRefIndex';
+import type { ReplaceableAssetKind } from '@/features/project/asset/assetReplaceUtils';
 import { loadProjectAssetTextContent } from '@/features/project/asset/textAssetContent';
-import { useCanvasStore, type CanvasNode } from '@/stores/canvasStore';
+import { useCanvasStore } from '@/stores/canvasStore';
+import { persistActiveProjectGraphFromCanvas } from '@/stores/projectStore';
 
 function readOptionalString(value: unknown): string | null {
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
-}
-
-function nodeReferencesAsset(
-  node: CanvasNode,
-  fileAssetId: string,
-  path: string
-): boolean {
-  const data = node.data as Record<string, unknown>;
-  const nodeFileAssetId = readOptionalString(data.fileAssetId);
-  const nodeImageUrl = readOptionalString(data.imageUrl);
-  if (nodeFileAssetId === fileAssetId || nodeImageUrl === path) {
-    return true;
-  }
-
-  if (!Array.isArray(data.frames)) {
-    return false;
-  }
-
-  return data.frames.some((frame) => {
-    if (!frame || typeof frame !== 'object') {
-      return false;
-    }
-    const frameRecord = frame as Record<string, unknown>;
-    return readOptionalString(frameRecord.fileAssetId) === fileAssetId
-      || readOptionalString(frameRecord.imageUrl) === path;
-  });
 }
 
 async function resolveImageAspectRatio(
@@ -61,15 +37,17 @@ function buildImageReplacePatch(
   path: string,
   aspectRatio: string | null
 ): Record<string, unknown> | null {
+  if (!aspectRatio) {
+    return null;
+  }
+
   const patch: Record<string, unknown> = {};
   let changed = false;
 
   const nodeFileAssetId = readOptionalString(data.fileAssetId);
   const nodeImageUrl = readOptionalString(data.imageUrl);
   if (nodeFileAssetId === fileAssetId || nodeImageUrl === path) {
-    if (aspectRatio) {
-      patch.aspectRatio = aspectRatio;
-    }
+    patch.aspectRatio = aspectRatio;
     changed = true;
   }
 
@@ -86,9 +64,6 @@ function buildImageReplacePatch(
         return frame;
       }
       framesChanged = true;
-      if (!aspectRatio) {
-        return frame;
-      }
       return { ...frameRecord, aspectRatio };
     });
     if (framesChanged) {
@@ -118,7 +93,7 @@ export async function refreshCanvasNodesAfterAssetReplace(input: {
     });
 
     for (const node of nodes) {
-      if (!nodeReferencesAsset(node, input.fileAssetId, normalizedPath)) {
+      if (!nodeReferencesProjectAsset(node, input.fileAssetId, normalizedPath)) {
         continue;
       }
       if (remoteContent === null) {
@@ -129,13 +104,14 @@ export async function refreshCanvasNodesAfterAssetReplace(input: {
         textSyncedAt: input.updatedAt,
       });
     }
+    persistActiveProjectGraphFromCanvas();
     return;
   }
 
   const aspectRatio = await resolveImageAspectRatio(normalizedPath, input.fileAssetId);
 
   for (const node of nodes) {
-    if (!nodeReferencesAsset(node, input.fileAssetId, normalizedPath)) {
+    if (!nodeReferencesProjectAsset(node, input.fileAssetId, normalizedPath)) {
       continue;
     }
     const patch = buildImageReplacePatch(
@@ -154,4 +130,6 @@ export async function refreshCanvasNodesAfterAssetReplace(input: {
     fileAssetId: input.fileAssetId,
     updatedAt: input.updatedAt,
   });
+
+  persistActiveProjectGraphFromCanvas();
 }

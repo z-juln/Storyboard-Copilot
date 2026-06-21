@@ -194,16 +194,20 @@ function resolveAllowedNodeTypes(handleType: HandleType): CanvasNodeType[] {
   return getConnectMenuNodeTypes(handleType);
 }
 
-function canNodeTypeBeManualConnectionSource(type: CanvasNodeType): boolean {
-  return type === CANVAS_NODE_TYPES.upload || type === CANVAS_NODE_TYPES.exportImage;
+function isValidNodeConnection(sourceNode: CanvasNode, targetNode: CanvasNode): boolean {
+  return nodeHasSourceHandle(sourceNode.type) && nodeHasTargetHandle(targetNode.type);
 }
 
-function canNodeBeManualConnectionSource(nodeId: string | null | undefined, nodes: CanvasNode[]): boolean {
-  if (!nodeId) {
+function canStartConnectionFromHandle(
+  node: CanvasNode | undefined,
+  handleType: HandleType
+): boolean {
+  if (!node) {
     return false;
   }
-  const node = nodes.find((item) => item.id === nodeId);
-  return node ? canNodeTypeBeManualConnectionSource(node.type) : false;
+  return handleType === 'source'
+    ? nodeHasSourceHandle(node.type)
+    : nodeHasTargetHandle(node.type);
 }
 
 function getClientPosition(event: MouseEvent | TouchEvent): { x: number; y: number } | null {
@@ -670,7 +674,9 @@ export function Canvas() {
 
   const handleConnect = useCallback(
     (connection: Connection) => {
-      if (!canNodeBeManualConnectionSource(connection.source, nodes)) {
+      const sourceNode = nodes.find((node) => node.id === connection.source);
+      const targetNode = nodes.find((node) => node.id === connection.target);
+      if (!sourceNode || !targetNode || !isValidNodeConnection(sourceNode, targetNode)) {
         return;
       }
       connectNodes(connection);
@@ -1285,10 +1291,8 @@ export function Canvas() {
         return;
       }
 
-      if (
-        params.handleType === 'source'
-        && !canNodeBeManualConnectionSource(params.nodeId, nodes)
-      ) {
+      const connectStartNode = nodes.find((node) => node.id === params.nodeId);
+      if (!canStartConnectionFromHandle(connectStartNode, params.handleType)) {
         setPendingConnectStart(null);
         return;
       }
@@ -1567,9 +1571,7 @@ export function Canvas() {
         if (
           sourceNode &&
           targetNode &&
-          canNodeTypeBeManualConnectionSource(sourceNode.type) &&
-          nodeHasSourceHandle(sourceNode.type) &&
-          nodeHasTargetHandle(targetNode.type)
+          isValidNodeConnection(sourceNode, targetNode)
         ) {
           connectNodes({
             source: sourceNode.id,

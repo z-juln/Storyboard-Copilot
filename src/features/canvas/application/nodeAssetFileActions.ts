@@ -1,20 +1,13 @@
 import type { CanvasNode } from '@/stores/canvasStore';
 
-import { isNodeProjectAssetBound } from './nodeAssetBinding';
-import { refreshCanvasNodesAfterAssetReplace } from './refreshNodesAfterAssetReplace';
+import { commitProjectAssetReplacement } from './commitProjectAssetReplacement';
+import { isNodeProjectAssetBound, resolveBoundProjectAssetPath } from './nodeAssetBinding';
 import { isTextNode, isUploadNode } from '@/features/canvas/domain/canvasNodes';
 import {
   getAssetBaseName,
-  normalizeAssetPath,
-} from '@/features/project/asset';
-import {
-  isReplacementFileCompatible,
-  replaceProjectAssetFile,
   resolveReplaceableAssetKind,
   resolveReplaceFileAccept,
-  type ReplaceableAssetKind,
-} from '@/features/project/asset/replaceProjectAssetFile';
-import { isProjectRelativeAssetPath } from '@/features/project/projectPaths';
+} from '@/features/project/asset';
 import type { AssetManifest } from '@/features/project/asset/types';
 
 export type NodeAssetFileKind = 'image' | 'text';
@@ -29,22 +22,12 @@ export function resolveNodeAssetFileKind(node: CanvasNode): NodeAssetFileKind | 
   return null;
 }
 
-export function resolveBoundProjectAssetPath(input: {
-  imageUrl?: unknown;
-}): string | null {
-  const imageUrl = typeof input.imageUrl === 'string' ? input.imageUrl.trim() : '';
-  if (!imageUrl || !isProjectRelativeAssetPath(imageUrl)) {
-    return null;
-  }
-  return normalizeAssetPath(imageUrl);
-}
-
 export function canNodeReplaceBoundAsset(node: CanvasNode): boolean {
   if (!resolveNodeAssetFileKind(node)) {
     return false;
   }
   const data = node.data as { imageUrl?: unknown; fileAssetId?: unknown };
-  const assetPath = resolveBoundProjectAssetPath(data);
+  const assetPath = resolveBoundProjectAssetPath(data.imageUrl);
   if (!assetPath) {
     return false;
   }
@@ -59,9 +42,7 @@ export function resolveNodeAssetFileInputAccept(input: {
   imageUrl?: string | null;
   fileAssetId?: string | null;
 }): string {
-  const assetPath = typeof input.imageUrl === 'string' && isProjectRelativeAssetPath(input.imageUrl.trim())
-    ? input.imageUrl.trim()
-    : null;
+  const assetPath = resolveBoundProjectAssetPath(input.imageUrl);
 
   if (
     assetPath
@@ -76,18 +57,6 @@ export function resolveNodeAssetFileInputAccept(input: {
   return input.assetKind === 'image' ? 'image/*' : resolveReplaceFileAccept('text');
 }
 
-function resolveReplacementErrorMessage(
-  targetKind: ReplaceableAssetKind | null
-): string {
-  if (targetKind === 'text') {
-    return '只能使用文本文件替换';
-  }
-  if (targetKind === 'image') {
-    return '只能使用图片文件替换';
-  }
-  return '该绑定文件不支持替换';
-}
-
 export async function replaceBoundNodeAssetIfNeeded(input: {
   projectId: string | null;
   assetManifest: AssetManifest | undefined;
@@ -96,9 +65,7 @@ export async function replaceBoundNodeAssetIfNeeded(input: {
   fileAssetId?: string | null;
   file: File;
 }): Promise<boolean> {
-  const assetPath = typeof input.imageUrl === 'string' && isProjectRelativeAssetPath(input.imageUrl.trim())
-    ? normalizeAssetPath(input.imageUrl.trim())
-    : null;
+  const assetPath = resolveBoundProjectAssetPath(input.imageUrl);
 
   const isBoundProjectAsset = Boolean(
     input.projectId
@@ -114,25 +81,12 @@ export async function replaceBoundNodeAssetIfNeeded(input: {
     return false;
   }
 
-  const targetFileName = getAssetBaseName(assetPath);
-  const targetKind = resolveReplaceableAssetKind(targetFileName);
-  if (!targetKind || !isReplacementFileCompatible(targetFileName, input.file)) {
-    throw new Error(resolveReplacementErrorMessage(targetKind));
-  }
-
-  const result = await replaceProjectAssetFile({
+  await commitProjectAssetReplacement({
     projectId: input.projectId,
     path: assetPath,
     file: input.file,
     manifest: input.assetManifest,
-  });
-  input.commitAssetManifest(result.manifest);
-  await refreshCanvasNodesAfterAssetReplace({
-    projectId: input.projectId,
-    path: assetPath,
-    fileAssetId: result.fileAssetId,
-    updatedAt: result.updatedAt,
-    kind: targetKind,
+    commitAssetManifest: input.commitAssetManifest,
   });
   return true;
 }

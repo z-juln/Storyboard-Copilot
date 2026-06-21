@@ -28,6 +28,10 @@ import {
 } from '@/features/canvas/application/canvasServices';
 import { resolveErrorContent, showErrorDialog } from '@/features/canvas/application/errorDialog';
 import {
+  collectInputTexts,
+  mergePromptWithInputTexts,
+} from '@/features/canvas/application/graphTextResolver';
+import {
   detectAspectRatio,
   parseAspectRatio,
   resolveImageDisplayUrl,
@@ -274,6 +278,11 @@ export const ImageEditNode = memo(({ id, data, selected, width, height }: ImageE
     [id, nodes, edges]
   );
 
+  const upstreamTexts = useMemo(
+    () => collectInputTexts(id, nodes, edges),
+    [edges, id, nodes]
+  );
+
   const incomingImageItems = useMemo(
     () =>
       incomingImages.map((imageUrl, index) => ({
@@ -465,9 +474,10 @@ export const ImageEditNode = memo(({ id, data, selected, width, height }: ImageE
   }, []);
 
   const handleGenerate = useCallback(async () => {
-    const prompt = promptDraft.replace(/@(?=图\d+)/g, '').trim();
+    const localPrompt = promptDraft.replace(/@(?=图\d+)/g, '').trim();
+    const prompt = mergePromptWithInputTexts(localPrompt, upstreamTexts);
     if (!prompt) {
-      const errorMessage = '请输入提示词';
+      const errorMessage = '请输入提示词或连接文本节点';
       setError(errorMessage);
       void showErrorDialog(errorMessage, '错误');
       return;
@@ -603,6 +613,7 @@ export const ImageEditNode = memo(({ id, data, selected, width, height }: ImageE
     providerApiKey,
     findNodePosition,
     promptDraft,
+    upstreamTexts,
     effectiveExtraParams,
     id,
     incomingImages,
@@ -781,6 +792,11 @@ export const ImageEditNode = memo(({ id, data, selected, width, height }: ImageE
               style={{ scrollbarGutter: 'stable' }}
               {...bindField()}
             />
+          ) : null}
+          {upstreamTexts.length > 0 ? (
+            <div className="mt-1 px-1 text-[10px] text-text-muted">
+              已连接 {upstreamTexts.length} 个文本输入
+            </div>
           ) : null}
         </div>
 

@@ -52,7 +52,6 @@ import {
   resolveNewSiblingName,
 } from '@/features/project/asset/projectAssetService';
 import {
-  replaceProjectAssetFile,
   resolveReplaceFileAccept,
 } from '@/features/project/asset/replaceProjectAssetFile';
 import { resolveReplaceableAssetKind } from '@/features/project/asset/assetReplaceUtils';
@@ -63,7 +62,7 @@ import {
   serializeProjectAssetDragPayload,
 } from '@/features/canvas/application/createUploadNodeFromProjectAsset';
 import { subscribeAssetExplorerReveal } from '@/features/canvas/application/assetExplorerRevealBridge';
-import { refreshCanvasNodesAfterAssetReplace } from '@/features/canvas/application/refreshNodesAfterAssetReplace';
+import { commitProjectAssetReplacement } from '@/features/canvas/application/commitProjectAssetReplacement';
 import { rustApiClient } from '@/infrastructure/rustApiClient';
 import { isTypingTarget } from '@/features/canvas/application/canvasKeyboard';
 import { useCanvasStore } from '@/stores/canvasStore';
@@ -451,22 +450,15 @@ export function useAssetExplorerController({
       }
 
       try {
-        const result = await replaceProjectAssetFile({
+        await commitProjectAssetReplacement({
           projectId,
           path: targetPath,
           file,
           manifest,
+          commitAssetManifest: applyManifest,
         });
-        applyManifest(result.manifest);
         markAssetPathsAvailable([normalizeAssetPath(targetPath)]);
         await refreshAvailableAssetPaths();
-        await refreshCanvasNodesAfterAssetReplace({
-          projectId,
-          path: targetPath,
-          fileAssetId: result.fileAssetId,
-          updatedAt: result.updatedAt,
-          kind,
-        });
         await loadTree();
         setFlashPath(normalizeAssetPath(targetPath));
       } catch (replaceError) {

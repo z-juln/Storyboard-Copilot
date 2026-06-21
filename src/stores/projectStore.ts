@@ -165,7 +165,11 @@ function flushProjectUpsert(projectId: string, options?: FlushProjectUpsertOptio
       return;
     }
 
-    const snapshot = projectToSnapshot(project);
+    const projectToPersist = mergeLiveCanvasGraphIntoProject(
+      project,
+      resolveActiveProjectId?.() ?? null
+    );
+    const snapshot = projectToSnapshot(projectToPersist);
     void upsertProjectSnapshot(snapshot)
       .catch((error) => {
         console.error('Failed to persist project record', error);
@@ -316,6 +320,38 @@ function toAvailableAssetPathSet(paths: Iterable<string>): ReadonlySet<string> {
   return new Set(Array.from(paths, (path) => normalizeAssetPath(path)));
 }
 
+let resolveActiveProjectId: (() => string | null) | null = null;
+
+function mergeLiveCanvasGraphIntoProject(project: Project, activeProjectId: string | null): Project {
+  if (!activeProjectId || project.id !== activeProjectId || isComponentDocProjectId(activeProjectId)) {
+    return project;
+  }
+
+  const canvasState = useCanvasStore.getState();
+  return {
+    ...project,
+    nodes: canvasState.nodes,
+    edges: canvasState.edges,
+    history: canvasState.history,
+    nodeCount: canvasState.nodes.length,
+  };
+}
+
+export function persistActiveProjectGraphFromCanvas(): void {
+  const { currentProjectId, currentProject, saveCurrentProject } = useProjectStore.getState();
+  if (!currentProjectId || !currentProject) {
+    return;
+  }
+
+  const canvasState = useCanvasStore.getState();
+  saveCurrentProject(
+    canvasState.nodes,
+    canvasState.edges,
+    currentProject.viewport,
+    canvasState.history
+  );
+}
+
 interface ProjectState {
   projects: ProjectSummary[];
   currentProjectId: string | null;
@@ -350,7 +386,10 @@ interface ProjectState {
   refreshAvailableAssetPaths: () => Promise<void>;
 }
 
-export const useProjectStore = create<ProjectState>((set, get) => ({
+export const useProjectStore = create<ProjectState>((set, get) => {
+  resolveActiveProjectId = () => get().currentProjectId;
+
+  return {
   projects: [],
   currentProjectId: null,
   currentProject: null,
@@ -741,11 +780,14 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       useCanvasStore.setState({ nodes: syncedNodes });
     }
 
+    const latestCanvas = useCanvasStore.getState();
     const nextProject: Project = {
       ...currentProject,
       assetManifest: manifest,
-      nodes: syncedNodes,
-      edges: canvasState.edges,
+      nodes: latestCanvas.nodes,
+      edges: latestCanvas.edges,
+      history: latestCanvas.history,
+      nodeCount: latestCanvas.nodes.length,
       updatedAt: Date.now(),
     };
 
@@ -820,4 +862,5 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
     set({ availableAssetPaths: diskPathSet });
   },
-}));
+};
+});

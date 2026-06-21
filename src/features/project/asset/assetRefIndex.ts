@@ -8,6 +8,34 @@ function readOptionalString(value: unknown): string | null {
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
 }
 
+/** 判断节点（含分镜帧）是否引用指定 fileAssetId 或 assets 路径。 */
+export function nodeReferencesProjectAsset(
+  node: CanvasNode,
+  fileAssetId: string,
+  path: string
+): boolean {
+  const normalizedPath = normalizeAssetPath(path);
+  const data = node.data as Record<string, unknown>;
+  const nodeFileAssetId = readOptionalString(data.fileAssetId);
+  const nodeImageUrl = readOptionalString(data.imageUrl);
+  if (nodeFileAssetId === fileAssetId || nodeImageUrl === normalizedPath) {
+    return true;
+  }
+
+  if (!Array.isArray(data.frames)) {
+    return false;
+  }
+
+  return data.frames.some((frame) => {
+    if (!frame || typeof frame !== 'object') {
+      return false;
+    }
+    const frameRecord = frame as Record<string, unknown>;
+    return readOptionalString(frameRecord.fileAssetId) === fileAssetId
+      || readOptionalString(frameRecord.imageUrl) === normalizedPath;
+  });
+}
+
 /** 扫描节点中对 fileAssetId 或 assets/ 路径的引用。 */
 export function scanNodeAssetPathFields(nodes: CanvasNode[]): Array<{
   nodeId: string;

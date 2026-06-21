@@ -9,17 +9,17 @@ import {
 } from './assetReplaceUtils';
 import type { AssetManifest } from './types';
 
-export type { ReplaceableAssetKind } from './assetReplaceUtils';
-export { isReplacementFileCompatible, resolveReplaceableAssetKind } from './assetReplaceUtils';
-
 export async function replaceProjectAssetFile(input: {
   projectId: string;
   path: string;
   file: File | Blob;
   manifest: AssetManifest;
-  /** 跳过类型校验（仅内部测试用） */
-  skipTypeCheck?: boolean;
-}): Promise<{ manifest: AssetManifest; updatedAt: number; fileAssetId: string }> {
+}): Promise<{
+  manifest: AssetManifest;
+  updatedAt: number;
+  fileAssetId: string;
+  kind: ReplaceableAssetKind;
+}> {
   const normalizedPath = normalizeAssetPath(input.path);
   const targetFileName = getAssetBaseName(normalizedPath);
   const targetKind = resolveReplaceableAssetKind(targetFileName);
@@ -27,10 +27,8 @@ export async function replaceProjectAssetFile(input: {
     throw new Error('该文件类型不支持替换');
   }
 
-  if (!input.skipTypeCheck && input.file instanceof File) {
-    if (!isReplacementFileCompatible(targetFileName, input.file)) {
-      throw new Error(targetKind === 'image' ? '只能使用图片文件替换' : '只能使用文本文件替换');
-    }
+  if (input.file instanceof File && !isReplacementFileCompatible(targetFileName, input.file)) {
+    throw new Error(targetKind === 'image' ? '只能使用图片文件替换' : '只能使用文本文件替换');
   }
 
   if (input.file instanceof File) {
@@ -45,6 +43,7 @@ export async function replaceProjectAssetFile(input: {
     manifest: registered.manifest,
     updatedAt,
     fileAssetId: registered.fileAssetId,
+    kind: targetKind,
   };
 }
 

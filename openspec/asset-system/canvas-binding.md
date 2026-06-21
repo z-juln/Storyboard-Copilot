@@ -81,6 +81,22 @@ Payload 结构（`createUploadNodeFromProjectAsset.ts`）：
 - **video / audio / text** — 原生控件或 `<pre>`；不可用时统一 `NodeAssetUnavailableNotice`
 - 绑定资产后点击节点**不会**再弹出图片文件选择器
 
+## 原地替换文件
+
+支持在**保持 `fileAssetId`、相对 path、文件名不变**的前提下替换磁盘内容。适用：资产目录右键「替换文件…」、upload / text 节点工具栏「替换」。
+
+| 入口 | 行为 |
+|------|------|
+| 资产目录 | 选中图片或文本文件 → 替换文件… |
+| upload 节点 | 已绑定项目图片 → 工具栏「替换」或拖入/选文件时走替换分支 |
+| text 节点 | 已绑定项目文本 → 工具栏「替换」 |
+
+约束：
+
+- 类型必须匹配（图片 ↔ 图片，文本 ↔ 文本）；校验见 `assetReplaceUtils.ts`。
+- 替换后 `registerFileAssetPath` 保留同一 `fileAssetId`，仅 bump `updatedAt`；预览 URL 追加 `&v=updatedAt` 破缓存。
+- 画布刷新统一走 `commitProjectAssetReplacement` → `refreshCanvasNodesAfterAssetReplace`；写盘前 `persistActiveProjectGraphFromCanvas` 合并最新 edges，避免替换后连线丢失。
+
 ## 各类节点的资产绑定 UI
 
 凡展示项目资产的 `CanvasNodeImage`，传入：

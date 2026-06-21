@@ -60,9 +60,9 @@ export function AssetExplorerContextMenu({
   }, [onClose]);
 
   const items: Array<{ label: string; action: () => void; hidden?: boolean; disabled?: boolean }> = [
-  { label: '预览', action: onPreview, hidden: !canPreview },
-  { label: '替换文件…', action: onReplace, hidden: isDirectory || !canReplace, disabled: readOnly },
-  { label: '新建文件', action: onNewFile, hidden: !isDirectory, disabled: readOnly },
+    { label: '预览', action: onPreview, hidden: !canPreview },
+    { label: '替换文件…', action: onReplace, hidden: isDirectory || !canReplace, disabled: readOnly },
+    { label: '新建文件', action: onNewFile, hidden: !isDirectory, disabled: readOnly },
     { label: '新建文件夹', action: onNewFolder, hidden: !isDirectory, disabled: readOnly },
     { label: '复制', action: onCopy, disabled: readOnly },
     { label: '剪切', action: onCut, disabled: readOnly },

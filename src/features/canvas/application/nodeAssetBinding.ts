@@ -7,6 +7,14 @@ import {
 import type { AssetManifest } from '@/features/project/asset/types';
 import { isProjectRelativeAssetPath } from '@/features/project/projectPaths';
 
+export function resolveBoundProjectAssetPath(imageUrl: unknown): string | null {
+  const normalized = typeof imageUrl === 'string' ? imageUrl.trim() : '';
+  if (!normalized || !isProjectRelativeAssetPath(normalized)) {
+    return null;
+  }
+  return normalizeAssetPath(normalized);
+}
+
 export function isNodeProjectAssetBound(binding: ProjectAssetBinding): boolean {
   const fileAssetId = typeof binding.fileAssetId === 'string' ? binding.fileAssetId.trim() : '';
   if (fileAssetId.length > 0) {
