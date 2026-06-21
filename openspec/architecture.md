@@ -26,6 +26,7 @@ Source Node -> Process Node / Tool / AI -> Derived Output Node
 | AI Models | 模型定义、供应商、请求映射 | `src/features/canvas/models/`, `src-tauri/src/ai/` |
 | Persistence | Project Bundle（`project.json` + `assets/`）；读写走 `:1421` HTTP | `src/features/project/`, `src/commands/projectState.ts`, `src-tauri/src/project/` |
 | Asset System | `assetManifest`、**fileAssetId**、reconcile、资产目录、画布引用 | [`asset-system/README.md`](asset-system/README.md) |
+| Plugins | 可选能力扩展（Z-Image、Git 版本控制等） | [`plugins/README.md`](plugins/README.md)、`src/features/plugins/` |
 | i18n | 中英文文案 | `src/i18n/` |
 
 ## Change Routing
@@ -38,6 +39,7 @@ Source Node -> Process Node / Tool / AI -> Derived Output Node
 | 新模型 | `models/image/<provider>/`, `models/providers/`, Rust provider |
 | 持久化 | `projectStore.ts`, `features/project/projectCodec.ts`, `projectState.ts`, `file_store.rs` |
 | 资产 / 绑定 | [`asset-system/`](asset-system/README.md)、`features/project/asset/` |
+| 插件 / Git 版本 | [`plugins/README.md`](plugins/README.md)、[`changes/project-git-version-control.md`](changes/project-git-version-control.md) |
 | 文案 | `src/i18n/locales/zh.json`, `src/i18n/locales/en.json` |
 
 ## Runtime & Channels
@@ -51,6 +53,7 @@ Source Node -> Process Node / Tool / AI -> Derived Output Node
 | 图片分片上传 / prepare | HTTP | 落盘 + 注册 manifest |
 | 分镜合并 / metadata | HTTP | 需 `projectId` |
 | 内置 Adapter | HTTP | `/api/v1/adapters/*` |
+| 插件（Z-Image / Git 等） | HTTP | `/api/v1/local-zimage/*`、`/api/v1/plugins/git/status`、`/api/v1/projects/:id/git/*` |
 | 画布 AI 生图 / 部分图片处理 | Tauri `invoke` | 迁移中，见 `roadmap.md` |
 | API Key | HTTP + SQLite | `projects.db` |
 

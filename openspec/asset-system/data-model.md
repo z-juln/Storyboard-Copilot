@@ -12,6 +12,8 @@
 
 `.cache/` 为派生数据，可整目录删除后按需重建；不参与备份/同步的业务真相。
 
+可选：启用 [Git 版本控制插件](../plugins/README.md) 后，项目根目录可含 `.git/` 与 `.gitignore`（默认仍忽略 `.cache/`）。`project.json` 与 `assets/` 纳入 commit。
+
 ## assetManifest
 
 键为 **`fileAssetId`**（文件 id，非 node id）：
