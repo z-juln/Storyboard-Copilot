@@ -64,6 +64,10 @@ import { FAL_NANO_BANANA_2_MODEL_ID } from '@/features/canvas/models/image/fal/n
 import { KIE_NANO_BANANA_2_MODEL_ID } from '@/features/canvas/models/image/kie/nanoBanana2';
 import { resolveModelPriceDisplay } from '@/features/canvas/pricing';
 import { ModelParamsControls } from '@/features/canvas/ui/ModelParamsControls';
+import {
+  NODE_FORM_FIELD_CLASS,
+  useNodeFieldsEditMode,
+} from '@/features/canvas/hooks/useNodeFieldEditMode';
 import { CanvasNodeImage } from '@/features/canvas/ui/CanvasNodeImage';
 import {
   UiButton,
@@ -572,6 +576,12 @@ export const StoryboardGenNode = memo(({ id, data, selected, width, height }: St
   const usdToCnyRate = useSettingsStore((state) => state.usdToCnyRate);
   const preferDiscountedPrice = useSettingsStore((state) => state.preferDiscountedPrice);
   const grsaiCreditTierId = useSettingsStore((state) => state.grsaiCreditTierId);
+  const {
+    isEditing: isFieldEditing,
+    exitEditing: exitFieldEditing,
+    bindPreview,
+    bindField,
+  } = useNodeFieldsEditMode(Boolean(selected), () => setSelectedNode(id));
 
   const [error, setError] = useState<string | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -1506,6 +1516,8 @@ export const StoryboardGenNode = memo(({ id, data, selected, width, height }: St
         >
           {nodeData.frames.map((frame, index) => {
             const frameDescription = frameDescriptionDrafts[frame.id] ?? frame.description;
+            const frameFieldId = `frame:${frame.id}`;
+            const isFrameEditing = isFieldEditing(frameFieldId);
             return (
               <div
                 key={frame.id}
@@ -1516,40 +1528,54 @@ export const StoryboardGenNode = memo(({ id, data, selected, width, height }: St
                   ref={(element) => {
                     frameHighlightRefs.current[frame.id] = element;
                   }}
-                  aria-hidden="true"
-                  className="ui-scrollbar pointer-events-none absolute inset-0 overflow-y-auto overflow-x-hidden text-[10px] leading-4 text-text-dark"
+                  aria-hidden={isFrameEditing}
+                  className={`ui-scrollbar absolute inset-0 overflow-y-auto overflow-x-hidden text-[10px] leading-4 text-text-dark ${isFrameEditing ? 'pointer-events-none opacity-0' : 'pointer-events-auto'}`}
                   style={{ scrollbarGutter: 'stable' }}
+                  {...bindPreview(frameFieldId)}
+                  title="双击编辑"
                 >
                   <div className="min-h-full whitespace-pre-wrap break-words px-1.5 py-1 text-left">
-                    {renderFrameDescriptionWithHighlights(frameDescription, incomingImages.length)}
+                    {frameDescription.trim().length > 0 ? (
+                      renderFrameDescriptionWithHighlights(frameDescription, incomingImages.length)
+                    ) : (
+                      <span className="text-text-muted/40">{`分镜 ${String(index + 1).padStart(2, '0')} 描述`}</span>
+                    )}
                   </div>
                 </div>
-                <textarea
-                  ref={(element) => {
-                    frameTextareaRefs.current[frame.id] = element;
-                  }}
-                  value={frameDescription}
-                  onChange={(event) => {
-                    const nextValue = event.target.value;
-                    handleFrameDescriptionChange(index, nextValue);
-                  }}
-                  onKeyDown={(event) => handleFrameDescriptionKeyDown(index, event)}
-                  onScroll={() => syncFrameHighlightScroll(frame.id)}
-                  onPointerDown={(event) => {
-                    lastPointerAnchorRef.current = {
-                      frameIndex: index,
-                      anchor: resolvePointerAnchor(rootRef.current, event.clientX, event.clientY, zoom),
-                    };
-                  }}
-                  onFocus={(event) => {
-                    activeFrameTextareaRef.current = event.currentTarget;
-                    syncFrameHighlightScroll(frame.id);
-                  }}
-                  placeholder={`分镜 ${String(index + 1).padStart(2, '0')} 描述`}
-                  wrap="soft"
-                  className="ui-scrollbar nodrag nowheel relative z-10 h-full w-full resize-none overflow-y-auto overflow-x-hidden bg-transparent px-1.5 py-1 text-left text-[10px] leading-4 text-transparent caret-text-dark placeholder:text-text-muted/40 focus:border-accent/50 focus:outline-none whitespace-pre-wrap break-words"
-                  style={{ scrollbarGutter: 'stable' }}
-                />
+                {isFrameEditing ? (
+                  <textarea
+                    ref={(element) => {
+                      frameTextareaRefs.current[frame.id] = element;
+                      if (element) {
+                        element.focus();
+                      }
+                    }}
+                    value={frameDescription}
+                    onChange={(event) => {
+                      const nextValue = event.target.value;
+                      handleFrameDescriptionChange(index, nextValue);
+                    }}
+                    onKeyDown={(event) => handleFrameDescriptionKeyDown(index, event)}
+                    onScroll={() => syncFrameHighlightScroll(frame.id)}
+                    onBlur={() => exitFieldEditing()}
+                    {...bindField()}
+                    onPointerDown={(event) => {
+                      event.stopPropagation();
+                      lastPointerAnchorRef.current = {
+                        frameIndex: index,
+                        anchor: resolvePointerAnchor(rootRef.current, event.clientX, event.clientY, zoom),
+                      };
+                    }}
+                    onFocus={(event) => {
+                      activeFrameTextareaRef.current = event.currentTarget;
+                      syncFrameHighlightScroll(frame.id);
+                    }}
+                    placeholder={`分镜 ${String(index + 1).padStart(2, '0')} 描述`}
+                    wrap="soft"
+                    className={`ui-scrollbar ${NODE_FORM_FIELD_CLASS} relative z-10 h-full w-full resize-none overflow-y-auto overflow-x-hidden bg-transparent px-1.5 py-1 text-left text-[10px] leading-4 text-transparent caret-text-dark placeholder:text-text-muted/40 focus:border-accent/50 focus:outline-none whitespace-pre-wrap break-words`}
+                    style={{ scrollbarGutter: 'stable' }}
+                  />
+                ) : null}
               </div>
             );
           })}
@@ -1604,8 +1630,14 @@ export const StoryboardGenNode = memo(({ id, data, selected, width, height }: St
         className="relative mx-auto mt-auto flex shrink-0 items-center justify-between"
         style={{ width: `${frameLayout.paramsRowWidth}px` }}
       >
-        <ModelParamsControls
-          imageModels={imageModels}
+        <div
+          className="flex min-w-0 flex-1 items-center"
+          {...bindPreview('params')}
+          title={isFieldEditing('params') ? undefined : '双击编辑'}
+        >
+          <ModelParamsControls
+            interactive={isFieldEditing('params')}
+            imageModels={imageModels}
           selectedModel={selectedModel}
           resolutionOptions={resolutionOptions}
           selectedResolution={selectedResolution}
@@ -1646,6 +1678,7 @@ export const StoryboardGenNode = memo(({ id, data, selected, width, height }: St
           modelPanelClassName="inline-block min-w-[300px] max-w-[calc(100vw-32px)] p-2"
           paramsPanelClassName="w-[420px] p-3"
         />
+        </div>
 
         <UiButton
           onClick={(event: ReactMouseEvent<HTMLButtonElement>) => {

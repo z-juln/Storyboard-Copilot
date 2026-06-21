@@ -25,6 +25,7 @@ import {
   saveImageSourceToDirectory,
   type MergeStoryboardImagesResult,
 } from '@/commands/image';
+import { NodeEditableTextarea } from '@/features/canvas/ui/NodeEditableTextarea';
 import { NodeHeader, NODE_HEADER_FLOATING_POSITION_CLASS } from '@/features/canvas/ui/NodeHeader';
 import { NodeResizeHandle } from '@/features/canvas/ui/NodeResizeHandle';
 import { CanvasNodeImage } from '@/features/canvas/ui/CanvasNodeImage';
@@ -281,6 +282,7 @@ interface FrameCardProps {
   onSortHover: (frameId: string) => void;
   onTogglePicker: (frameId: string, x: number, y: number) => void;
   onEditFrame: (frame: StoryboardFrameItem) => void;
+  nodeSelected: boolean;
 }
 
 interface IncomingImageItem {
@@ -308,6 +310,7 @@ const FrameCard = memo(
     onSortHover,
     onTogglePicker,
     onEditFrame,
+    nodeSelected,
   }: FrameCardProps) => {
     const updateStoryboardFrame = useCanvasStore((state) => state.updateStoryboardFrame);
     const assetManifest = useProjectStore((state) => state.currentProject?.assetManifest);
@@ -405,18 +408,18 @@ const FrameCard = memo(
           </button>
         </div>
 
-        <textarea
+        <NodeEditableTextarea
+          selected={nodeSelected}
           value={frame.note}
-          onChange={(event) => {
-            const nextValue = event.target.value;
+          onValueChange={(nextValue) => {
             updateStoryboardFrame(nodeId, frame.id, {
               note: nextValue,
             });
           }}
-          onMouseDown={(event) => event.stopPropagation()}
-          onWheelCapture={(event) => event.stopPropagation()}
           placeholder={`分镜 ${String(index + 1).padStart(2, '0')} 描述`}
-          className="ui-scrollbar nodrag nowheel h-10 w-full resize-none overflow-y-auto border-0 border-t border-[rgba(255,255,255,0.12)] bg-bg-dark/90 px-2 py-1 text-[10px] text-text-dark outline-none focus:border-accent"
+          emptyPreview={<div className="text-[10px] text-text-muted/70">双击编辑描述</div>}
+          className="ui-scrollbar h-10 w-full resize-none overflow-y-auto border-0 border-t border-[rgba(255,255,255,0.12)] bg-bg-dark/90 px-2 py-1 text-[10px] text-text-dark outline-none focus:border-accent"
+          previewClassName="h-10 w-full border-t border-[rgba(255,255,255,0.12)] bg-bg-dark/90 px-2 py-1 text-[10px] text-text-dark"
         />
       </div>
     );
@@ -1065,6 +1068,7 @@ export const StoryboardNode = memo(({ id, data, selected, width, height }: Story
               onEditFrame={(targetFrame) => {
                 void handleEditFrame(targetFrame);
               }}
+              nodeSelected={Boolean(selected)}
             />
           ))}
         </div>

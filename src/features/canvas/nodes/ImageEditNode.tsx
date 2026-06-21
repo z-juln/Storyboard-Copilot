@@ -64,6 +64,10 @@ import {
   NODE_CONTROL_PRIMARY_BUTTON_CLASS,
 } from '@/features/canvas/ui/nodeControlStyles';
 import { ModelParamsControls } from '@/features/canvas/ui/ModelParamsControls';
+import {
+  NODE_FORM_FIELD_CLASS,
+  useNodeFieldsEditMode,
+} from '@/features/canvas/hooks/useNodeFieldEditMode';
 import { CanvasNodeImage } from '@/features/canvas/ui/CanvasNodeImage';
 import { NodePriceBadge } from '@/features/canvas/ui/NodePriceBadge';
 import { UiButton } from '@/components/ui';
@@ -251,6 +255,19 @@ export const ImageEditNode = memo(({ id, data, selected, width, height }: ImageE
   const usdToCnyRate = useSettingsStore((state) => state.usdToCnyRate);
   const preferDiscountedPrice = useSettingsStore((state) => state.preferDiscountedPrice);
   const grsaiCreditTierId = useSettingsStore((state) => state.grsaiCreditTierId);
+  const {
+    isEditing: isFieldEditing,
+    exitEditing: exitFieldEditing,
+    bindPreview,
+    bindField,
+  } = useNodeFieldsEditMode(Boolean(selected), () => setSelectedNode(id));
+  const isPromptEditing = isFieldEditing('prompt');
+
+  useEffect(() => {
+    if (isPromptEditing) {
+      promptRef.current?.focus();
+    }
+  }, [isPromptEditing]);
 
   const incomingImages = useMemo(
     () => graphImageResolver.collectInputImages(id, nodes, edges),
@@ -732,30 +749,39 @@ export const ImageEditNode = memo(({ id, data, selected, width, height }: ImageE
         <div className="relative h-full min-h-0">
           <div
             ref={promptHighlightRef}
-            aria-hidden="true"
-            className="ui-scrollbar pointer-events-none absolute inset-0 overflow-y-auto overflow-x-hidden text-sm leading-6 text-text-dark"
+            aria-hidden={isFieldEditing('prompt')}
+            className={`ui-scrollbar absolute inset-0 overflow-y-auto overflow-x-hidden text-sm leading-6 text-text-dark ${isFieldEditing('prompt') ? 'pointer-events-none opacity-0' : 'pointer-events-auto'}`}
             style={{ scrollbarGutter: 'stable' }}
+            {...bindPreview('prompt')}
+            title="双击编辑"
           >
             <div className="min-h-full whitespace-pre-wrap break-words px-1 py-0.5">
-              {renderPromptWithHighlights(promptDraft, incomingImages.length)}
+              {promptDraft.trim().length > 0 ? (
+                renderPromptWithHighlights(promptDraft, incomingImages.length)
+              ) : (
+                <span className="text-text-muted/80">双击编辑提示词</span>
+              )}
             </div>
           </div>
 
-          <textarea
-            ref={promptRef}
-            value={promptDraft}
-            onChange={(event) => {
-              const nextValue = event.target.value;
-              setPromptDraft(nextValue);
-              commitPromptDraft(nextValue);
-            }}
-            onKeyDown={handlePromptKeyDown}
-            onScroll={syncPromptHighlightScroll}
-            onMouseDown={(event) => event.stopPropagation()}
-            placeholder="描述任何你想要生成或编辑的内容"
-            className="ui-scrollbar nodrag nowheel relative z-10 h-full w-full resize-none overflow-y-auto overflow-x-hidden border-none bg-transparent px-1 py-0.5 text-sm leading-6 text-transparent caret-text-dark outline-none placeholder:text-text-muted/80 focus:border-transparent whitespace-pre-wrap break-words"
-            style={{ scrollbarGutter: 'stable' }}
-          />
+          {isFieldEditing('prompt') ? (
+            <textarea
+              ref={promptRef}
+              value={promptDraft}
+              onChange={(event) => {
+                const nextValue = event.target.value;
+                setPromptDraft(nextValue);
+                commitPromptDraft(nextValue);
+              }}
+              onKeyDown={handlePromptKeyDown}
+              onScroll={syncPromptHighlightScroll}
+              onBlur={() => exitFieldEditing()}
+              placeholder="描述任何你想要生成或编辑的内容"
+              className={`ui-scrollbar ${NODE_FORM_FIELD_CLASS} relative z-10 h-full w-full resize-none overflow-y-auto overflow-x-hidden border-none bg-transparent px-1 py-0.5 text-sm leading-6 text-transparent caret-text-dark outline-none placeholder:text-text-muted/80 focus:border-transparent whitespace-pre-wrap break-words`}
+              style={{ scrollbarGutter: 'stable' }}
+              {...bindField()}
+            />
+          ) : null}
         </div>
 
         {showImagePicker && incomingImageItems.length > 0 && (
@@ -802,8 +828,14 @@ export const ImageEditNode = memo(({ id, data, selected, width, height }: ImageE
       </div>
 
       <div className="mt-2 flex shrink-0 items-center gap-1">
-        <ModelParamsControls
-          imageModels={imageModels}
+        <div
+          className="flex min-w-0 flex-1 items-center gap-1"
+          {...bindPreview('params')}
+          title={isFieldEditing('params') ? undefined : '双击编辑'}
+        >
+          <ModelParamsControls
+            interactive={isFieldEditing('params')}
+            imageModels={imageModels}
           selectedModel={selectedModel}
           resolutionOptions={resolutionOptions}
           selectedResolution={selectedResolution}
@@ -844,6 +876,7 @@ export const ImageEditNode = memo(({ id, data, selected, width, height }: ImageE
           modelChipClassName={NODE_CONTROL_MODEL_CHIP_CLASS}
           paramsChipClassName={NODE_CONTROL_PARAMS_CHIP_CLASS}
         />
+        </div>
 
         <div className="ml-auto" />
 

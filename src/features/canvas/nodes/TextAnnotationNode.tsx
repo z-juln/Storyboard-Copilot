@@ -8,6 +8,7 @@ import { openUrl } from '@tauri-apps/plugin-opener';
 
 import { CANVAS_NODE_TYPES, type TextAnnotationNodeData } from '@/features/canvas/domain/canvasNodes';
 import { resolveNodeDisplayName } from '@/features/canvas/domain/nodeDisplay';
+import { NodeEditableTextarea } from '@/features/canvas/ui/NodeEditableTextarea';
 import { NodeHeader, NODE_HEADER_FLOATING_POSITION_CLASS } from '@/features/canvas/ui/NodeHeader';
 import { NodeResizeHandle } from '@/features/canvas/ui/NodeResizeHandle';
 import { useCanvasStore } from '@/stores/canvasStore';
@@ -38,12 +39,39 @@ export const TextAnnotationNode = memo(({
   const resolvedTitle = resolveNodeDisplayName(CANVAS_NODE_TYPES.textAnnotation, data);
   const resolvedWidth = Math.max(MIN_WIDTH, Math.round(width ?? DEFAULT_WIDTH));
   const resolvedHeight = Math.max(MIN_HEIGHT, Math.round(height ?? DEFAULT_HEIGHT));
+
   const handleMarkdownLinkClick = useCallback((href?: string) => {
     if (!href) {
       return;
     }
     void openUrl(href);
   }, []);
+
+  const renderMarkdownPreview = useCallback((previewContent: string) => (
+    <div className="markdown-body break-words [&_a]:text-accent [&_blockquote]:border-l-2 [&_blockquote]:border-white/20 [&_blockquote]:pl-3 [&_code]:rounded [&_code]:bg-white/10 [&_code]:px-1 [&_code]:py-0.5 [&_h1]:text-base [&_h1]:font-semibold [&_h2]:text-[15px] [&_h2]:font-semibold [&_h3]:text-sm [&_h3]:font-semibold [&_hr]:border-white/10 [&_li]:my-0.5 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:my-0 [&_p+_p]:mt-4 [&_pre]:overflow-auto [&_pre]:rounded-md [&_pre]:bg-black/30 [&_pre]:p-2 [&_table]:w-full [&_table]:border-collapse [&_table]:text-xs [&_td]:border [&_td]:border-white/10 [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:border-white/10 [&_th]:px-2 [&_th]:py-1 [&_ul]:list-disc [&_ul]:pl-5">
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm, remarkBreaks]}
+        components={{
+          a: ({ href, children, ...props }) => (
+            <a
+              {...props}
+              href={href}
+              target="_blank"
+              rel="noreferrer"
+              onClick={(event) => {
+                event.preventDefault();
+                handleMarkdownLinkClick(href);
+              }}
+            >
+              {children}
+            </a>
+          ),
+        }}
+      >
+        {previewContent}
+      </ReactMarkdown>
+    </div>
+  ), [handleMarkdownLinkClick]);
 
   return (
     <div
@@ -71,48 +99,17 @@ export const TextAnnotationNode = memo(({
         maxHeight={MAX_HEIGHT}
       />
 
-      {selected ? (
-        <textarea
-          autoFocus
-          value={content}
-          onChange={(event) => {
-            const nextValue = event.target.value;
-            updateNodeData(id, { content: nextValue });
-          }}
-          placeholder="输入 Markdown 文本，取消选中后会渲染预览"
-          className="nodrag nowheel h-full w-full resize-none border-none bg-transparent px-1 py-0.5 text-sm leading-6 text-text-dark outline-none placeholder:text-text-muted/70"
-        />
-      ) : (
-        <div className="nodrag nowheel h-full w-full overflow-auto px-1 py-0.5 text-sm leading-6 text-text-dark">
-          {content.trim().length > 0 ? (
-            <div className="markdown-body break-words [&_a]:text-accent [&_blockquote]:border-l-2 [&_blockquote]:border-white/20 [&_blockquote]:pl-3 [&_code]:rounded [&_code]:bg-white/10 [&_code]:px-1 [&_code]:py-0.5 [&_h1]:text-base [&_h1]:font-semibold [&_h2]:text-[15px] [&_h2]:font-semibold [&_h3]:text-sm [&_h3]:font-semibold [&_hr]:border-white/10 [&_li]:my-0.5 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:my-0 [&_p+_p]:mt-4 [&_pre]:overflow-auto [&_pre]:rounded-md [&_pre]:bg-black/30 [&_pre]:p-2 [&_table]:w-full [&_table]:border-collapse [&_table]:text-xs [&_td]:border [&_td]:border-white/10 [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:border-white/10 [&_th]:px-2 [&_th]:py-1 [&_ul]:list-disc [&_ul]:pl-5">
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm, remarkBreaks]}
-                components={{
-                  a: ({ href, children, ...props }) => (
-                    <a
-                      {...props}
-                      href={href}
-                      target="_blank"
-                      rel="noreferrer"
-                      onClick={(event) => {
-                        event.preventDefault();
-                        handleMarkdownLinkClick(href);
-                      }}
-                    >
-                      {children}
-                    </a>
-                  ),
-                }}
-              >
-                {content}
-              </ReactMarkdown>
-            </div>
-          ) : (
-            <div className="pt-1 text-text-muted">空注释</div>
-          )}
-        </div>
-      )}
+      <NodeEditableTextarea
+        selected={selected}
+        value={content}
+        onValueChange={(nextValue) => updateNodeData(id, { content: nextValue })}
+        onEnterEditing={() => setSelectedNode(id)}
+        placeholder="输入 Markdown 文本"
+        emptyPreview={<div className="pt-1 text-text-muted">双击编辑注释</div>}
+        renderPreview={renderMarkdownPreview}
+        className="h-full w-full resize-none border-none bg-transparent px-1 py-0.5 text-sm leading-6 text-text-dark outline-none placeholder:text-text-muted/70"
+        previewClassName="px-1 py-0.5 text-sm leading-6 text-text-dark"
+      />
     </div>
   );
 });

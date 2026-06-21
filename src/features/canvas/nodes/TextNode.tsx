@@ -1,10 +1,7 @@
 import {
   memo,
   useCallback,
-  useEffect,
   useMemo,
-  useRef,
-  useState,
 } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { FileText, Link2 } from 'lucide-react';
@@ -24,6 +21,7 @@ import {
 import { CANVAS_NODE_TYPES, type TextNodeData } from '@/features/canvas/domain/canvasNodes';
 import { resolveNodeDisplayName } from '@/features/canvas/domain/nodeDisplay';
 import { useSyncedTextAssetContent } from '@/features/canvas/hooks/useSyncedTextAssetContent';
+import { NodeEditableTextarea } from '@/features/canvas/ui/NodeEditableTextarea';
 import { NodeHeader, NODE_HEADER_FLOATING_POSITION_CLASS } from '@/features/canvas/ui/NodeHeader';
 import { NodeAssetUnavailableNotice } from '@/features/canvas/ui/NodeAssetUnavailableNotice';
 import { NodeResizeHandle } from '@/features/canvas/ui/NodeResizeHandle';
@@ -51,8 +49,6 @@ export const TextNode = memo(({
   const setSelectedNode = useCanvasStore((state) => state.setSelectedNode);
   const updateNodeData = useCanvasStore((state) => state.updateNodeData);
   const projectId = useProjectStore((state) => state.currentProjectId);
-  const [isEditing, setIsEditing] = useState(false);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const sourceFileName = typeof data.sourceFileName === 'string' ? data.sourceFileName : '';
   const assetPath = typeof data.imageUrl === 'string' ? data.imageUrl : null;
@@ -82,18 +78,6 @@ export const TextNode = memo(({
     onContentSaved: handleContentSaved,
   });
 
-  useEffect(() => {
-    if (!selected) {
-      setIsEditing(false);
-    }
-  }, [selected]);
-
-  useEffect(() => {
-    if (isEditing) {
-      textareaRef.current?.focus();
-    }
-  }, [isEditing]);
-
   const handleMarkdownLinkClick = useCallback((href?: string) => {
     if (!href) {
       return;
@@ -111,14 +95,35 @@ export const TextNode = memo(({
     updateNodeData(id, { textContent: nextContent });
   }, [id, updateContent, updateNodeData]);
 
-  const enterEditing = useCallback(() => {
-    setSelectedNode(id);
-    setIsEditing(true);
-  }, [id, setSelectedNode]);
-
-  const exitEditing = useCallback(() => {
-    setIsEditing(false);
-  }, []);
+  const renderTextPreview = useCallback((previewContent: string) => (
+    isMarkdown ? (
+      <div className="markdown-body break-words [&_a]:text-accent [&_blockquote]:border-l-2 [&_blockquote]:border-white/20 [&_blockquote]:pl-3 [&_code]:rounded [&_code]:bg-white/10 [&_code]:px-1 [&_code]:py-0.5 [&_h1]:text-base [&_h1]:font-semibold [&_h2]:text-[15px] [&_h2]:font-semibold [&_h3]:text-sm [&_h3]:font-semibold [&_hr]:border-white/10 [&_li]:my-0.5 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:my-0 [&_p+_p]:mt-4 [&_pre]:overflow-auto [&_pre]:rounded-md [&_pre]:bg-black/30 [&_pre]:p-2 [&_table]:w-full [&_table]:border-collapse [&_table]:text-xs [&_td]:border [&_td]:border-white/10 [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:border-white/10 [&_th]:px-2 [&_th]:py-1 [&_ul]:list-disc [&_ul]:pl-5">
+        <ReactMarkdown
+          remarkPlugins={[remarkGfm, remarkBreaks]}
+          components={{
+            a: ({ href, children, ...props }) => (
+              <a
+                {...props}
+                href={href}
+                target="_blank"
+                rel="noreferrer"
+                onClick={(event) => {
+                  event.preventDefault();
+                  handleMarkdownLinkClick(href);
+                }}
+              >
+                {children}
+              </a>
+            ),
+          }}
+        >
+          {previewContent}
+        </ReactMarkdown>
+      </div>
+    ) : (
+      <pre className="whitespace-pre-wrap break-words font-sans">{previewContent}</pre>
+    )
+  ), [handleMarkdownLinkClick, isMarkdown]);
 
   return (
     <div
@@ -155,62 +160,18 @@ export const TextNode = memo(({
       <div className="flex h-full w-full flex-col overflow-hidden rounded-md">
         {isAssetUnavailable ? (
           <NodeAssetUnavailableNotice message={PROJECT_ASSET_UNAVAILABLE_MESSAGE} />
-        ) : isEditing ? (
-          <textarea
-            ref={textareaRef}
-            value={content}
-            onChange={(event) => handleContentChange(event.target.value)}
-            onBlur={exitEditing}
-            onKeyDown={(event) => {
-              if (event.key === 'Escape') {
-                event.preventDefault();
-                exitEditing();
-              }
-            }}
-            placeholder={isMarkdown ? '输入 Markdown 文本…' : '输入文本…'}
-            className="nodrag nowheel h-full w-full resize-none border-none bg-transparent px-1 py-0.5 text-sm leading-6 text-text-dark outline-none placeholder:text-text-muted/70"
-          />
         ) : (
-          <div
-            className="nowheel h-full w-full overflow-auto px-1 py-0.5 text-sm leading-6 text-text-dark"
-            onDoubleClick={(event) => {
-              event.stopPropagation();
-              enterEditing();
-            }}
-            title="双击编辑"
-          >
-            {content.trim().length > 0 ? (
-              isMarkdown ? (
-                <div className="markdown-body break-words [&_a]:text-accent [&_blockquote]:border-l-2 [&_blockquote]:border-white/20 [&_blockquote]:pl-3 [&_code]:rounded [&_code]:bg-white/10 [&_code]:px-1 [&_code]:py-0.5 [&_h1]:text-base [&_h1]:font-semibold [&_h2]:text-[15px] [&_h2]:font-semibold [&_h3]:text-sm [&_h3]:font-semibold [&_hr]:border-white/10 [&_li]:my-0.5 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:my-0 [&_p+_p]:mt-4 [&_pre]:overflow-auto [&_pre]:rounded-md [&_pre]:bg-black/30 [&_pre]:p-2 [&_table]:w-full [&_table]:border-collapse [&_table]:text-xs [&_td]:border [&_td]:border-white/10 [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:border-white/10 [&_th]:px-2 [&_th]:py-1 [&_ul]:list-disc [&_ul]:pl-5">
-                  <ReactMarkdown
-                    remarkPlugins={[remarkGfm, remarkBreaks]}
-                    components={{
-                      a: ({ href, children, ...props }) => (
-                        <a
-                          {...props}
-                          href={href}
-                          target="_blank"
-                          rel="noreferrer"
-                          onClick={(event) => {
-                            event.preventDefault();
-                            handleMarkdownLinkClick(href);
-                          }}
-                        >
-                          {children}
-                        </a>
-                      ),
-                    }}
-                  >
-                    {content}
-                  </ReactMarkdown>
-                </div>
-              ) : (
-                <pre className="whitespace-pre-wrap break-words font-sans">{content}</pre>
-              )
-            ) : (
-              <div className="pt-1 text-text-muted">双击编辑文本</div>
-            )}
-          </div>
+          <NodeEditableTextarea
+            selected={selected}
+            value={content}
+            onValueChange={handleContentChange}
+            placeholder={isMarkdown ? '输入 Markdown 文本…' : '输入文本…'}
+            emptyPreview={<div className="pt-1 text-text-muted">双击编辑文本</div>}
+            renderPreview={renderTextPreview}
+            onEnterEditing={() => setSelectedNode(id)}
+            className="h-full w-full resize-none border-none bg-transparent px-1 py-0.5 text-sm leading-6 text-text-dark outline-none placeholder:text-text-muted/70"
+            previewClassName="px-1 py-0.5 text-sm leading-6 text-text-dark"
+          />
         )}
       </div>
 

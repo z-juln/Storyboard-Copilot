@@ -42,6 +42,8 @@ import {
 import { ZIMAGE_LOCAL_PROVIDER_ID } from '@/features/canvas/external-tech/providers/zimageLocal';
 import { rustApiClient } from '@/infrastructure/rustApiClient';
 import { NodeHeader, NODE_HEADER_FLOATING_POSITION_CLASS } from '@/features/canvas/ui/NodeHeader';
+import { NodeEditableSelect } from '@/features/canvas/ui/NodeEditableSelect';
+import { NodeEditableTextarea } from '@/features/canvas/ui/NodeEditableTextarea';
 import { NodeResizeHandle } from '@/features/canvas/ui/NodeResizeHandle';
 import {
   NODE_CONTROL_CHIP_CLASS,
@@ -81,6 +83,7 @@ export const ExternalTechNode = memo(({
   const nodes = useCanvasStore((state) => state.nodes);
   const edges = useCanvasStore((state) => state.edges);
   const updateNodeData = useCanvasStore((state) => state.updateNodeData);
+  const setSelectedNode = useCanvasStore((state) => state.setSelectedNode);
   const addNode = useCanvasStore((state) => state.addNode);
   const addEdge = useCanvasStore((state) => state.addEdge);
   const findNodePosition = useCanvasStore((state) => state.findNodePosition);
@@ -290,6 +293,7 @@ export const ExternalTechNode = memo(({
     <div
       className="group/node relative flex flex-col rounded-xl border border-border-dark bg-surface-dark shadow-lg"
       style={{ width: nodeWidth, height: nodeHeight }}
+      onClick={() => setSelectedNode(id)}
     >
       <NodeHeader
         className={NODE_HEADER_FLOATING_POSITION_CLASS}
@@ -314,43 +318,43 @@ export const ExternalTechNode = memo(({
       <div className="flex min-h-0 flex-1 flex-col gap-2 p-3 pt-10">
         <div className="flex items-center gap-2">
           <label className="shrink-0 text-[11px] text-text-muted">场景</label>
-          <select
+          <NodeEditableSelect
+            selected={selected}
             value={provider?.id ?? ''}
             disabled={isRunning}
-            onChange={(event) => handleProviderChange(event.target.value)}
-            onMouseDown={(event) => event.stopPropagation()}
-            className={`${NODE_CONTROL_CHIP_CLASS} nodrag nowheel min-w-0 flex-1 border border-border-dark bg-bg-dark text-text-dark outline-none`}
-          >
-            {providers.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.label}
-              </option>
-            ))}
-          </select>
+            onEnterEditing={() => setSelectedNode(id)}
+            onValueChange={handleProviderChange}
+            options={providers.map((item) => ({
+              value: item.id,
+              label: item.label,
+            }))}
+            className={`${NODE_CONTROL_CHIP_CLASS} min-w-0 flex-1 border border-border-dark bg-bg-dark text-text-dark outline-none`}
+            previewClassName={`${NODE_CONTROL_CHIP_CLASS} min-w-0 flex-1 border border-border-dark bg-bg-dark/60 text-text-dark`}
+          />
         </div>
 
         {isLocalZImage ? (
           <div className="flex items-center gap-2">
             <label className="shrink-0 text-[11px] text-text-muted">尺寸</label>
-            <select
+            <NodeEditableSelect
+              selected={selected}
               value={String(imageSize)}
               disabled={isRunning}
-              onChange={(event) => {
-                const nextSize = normalizeZImageSize(Number(event.target.value));
+              onEnterEditing={() => setSelectedNode(id)}
+              onValueChange={(nextValue) => {
+                const nextSize = normalizeZImageSize(Number(nextValue));
                 updateNodeData(id, {
                   imageSize: nextSize,
                   generationDurationMs: estimateZImageDurationMs(nextSize),
                 });
               }}
-              onMouseDown={(event) => event.stopPropagation()}
-              className={`${NODE_CONTROL_CHIP_CLASS} nodrag nowheel min-w-0 flex-1 border border-border-dark bg-bg-dark text-text-dark outline-none`}
-            >
-              {ZIMAGE_SIZE_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+              options={ZIMAGE_SIZE_OPTIONS.map((option) => ({
+                value: String(option.value),
+                label: option.label,
+              }))}
+              className={`${NODE_CONTROL_CHIP_CLASS} min-w-0 flex-1 border border-border-dark bg-bg-dark text-text-dark outline-none`}
+              previewClassName={`${NODE_CONTROL_CHIP_CLASS} min-w-0 flex-1 border border-border-dark bg-bg-dark/60 text-text-dark`}
+            />
           </div>
         ) : null}
 
@@ -423,14 +427,17 @@ export const ExternalTechNode = memo(({
         ) : null}
 
         <div className="relative min-h-[72px] shrink-0 rounded-lg border border-border-dark bg-bg-dark/60 p-2">
-          <textarea
+          <NodeEditableTextarea
+            selected={selected}
             value={promptDraft}
             disabled={isRunning}
-            onChange={(event) => setPromptDraft(event.target.value)}
+            onEnterEditing={() => setSelectedNode(id)}
+            onValueChange={setPromptDraft}
             onBlur={() => commitPromptDraft(promptDraft)}
-            onMouseDown={(event) => event.stopPropagation()}
             placeholder={provider?.inputs.find((port) => port.id === 'prompt')?.label ?? '输入提示词'}
-            className="ui-scrollbar nodrag nowheel h-full min-h-[56px] w-full resize-none border-none bg-transparent text-sm leading-6 text-text-dark outline-none placeholder:text-text-muted/80"
+            className="ui-scrollbar h-full min-h-[56px] w-full resize-none border-none bg-transparent text-sm leading-6 text-text-dark outline-none placeholder:text-text-muted/80"
+            previewClassName="min-h-[56px] text-sm leading-6 text-text-dark"
+            emptyPreview={<div className="text-sm text-text-muted/80">双击编辑提示词</div>}
           />
           {upstreamTexts.length > 0 ? (
             <div className="mt-1 text-[10px] text-text-muted">

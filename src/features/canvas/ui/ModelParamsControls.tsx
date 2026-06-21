@@ -47,6 +47,7 @@ interface ModelParamsControlsProps {
   paramsPanelClassName?: string;
   providerOptionClassName?: string;
   modelOptionClassName?: string;
+  interactive?: boolean;
 }
 
 interface PanelAnchor {
@@ -166,6 +167,7 @@ export const ModelParamsControls = memo(({
   paramsPanelClassName = 'w-[420px] p-3',
   providerOptionClassName = DEFAULT_PROVIDER_OPTION_CLASS_NAME,
   modelOptionClassName = DEFAULT_MODEL_OPTION_CLASS_NAME,
+  interactive = true,
 }: ModelParamsControlsProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const modelTriggerRef = useRef<HTMLDivElement>(null);
@@ -381,10 +383,13 @@ export const ModelParamsControls = memo(({
     <div ref={containerRef} className="flex items-center gap-1">
       <div ref={modelTriggerRef} className="relative flex">
         <UiChipButton
-          active={openPanel === 'model'}
+          active={interactive && openPanel === 'model'}
           className={`${chipClassName} ${modelChipClassName}`}
           onClick={(event) => {
             event.stopPropagation();
+            if (!interactive) {
+              return;
+            }
             if (openPanel === 'model') {
               setOpenPanel(null);
               return;
@@ -409,10 +414,13 @@ export const ModelParamsControls = memo(({
 
       <div ref={paramsTriggerRef} className="relative flex">
         <UiChipButton
-          active={openPanel === 'params'}
+          active={interactive && openPanel === 'params'}
           className={`${chipClassName} ${paramsChipClassName}`}
           onClick={(event) => {
             event.stopPropagation();
+            if (!interactive) {
+              return;
+            }
             if (openPanel === 'params') {
               setOpenPanel(null);
               return;
@@ -435,10 +443,13 @@ export const ModelParamsControls = memo(({
       {hasOtherParamsPanel && (
         <div ref={otherParamsTriggerRef} className="relative flex">
           <UiChipButton
-            active={openPanel === 'otherParams'}
+            active={interactive && openPanel === 'otherParams'}
             className={`${chipClassName} w-auto shrink-0 justify-center`}
             onClick={(event) => {
               event.stopPropagation();
+              if (!interactive) {
+                return;
+              }
               if (openPanel === 'otherParams') {
                 setOpenPanel(null);
                 return;
