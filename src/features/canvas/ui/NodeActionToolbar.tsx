@@ -14,6 +14,7 @@ import {
   type CanvasNode,
   type NodeToolType,
 } from '@/features/canvas/domain/canvasNodes';
+import { canNodeReplaceBoundAsset } from '@/features/canvas/application/nodeAssetFileActions';
 import { canvasEventBus } from '@/features/canvas/application/canvasServices';
 import { getNodeToolPlugins } from '@/features/canvas/tools';
 import type { ToolIconKey } from '@/features/canvas/tools';
@@ -57,7 +58,7 @@ export const NodeActionToolbar = memo(({ node }: NodeActionToolbarProps) => {
   const tools = useMemo(() => getNodeToolPlugins(node), [node]);
   const deleteNode = useCanvasStore((state) => state.deleteNode);
   const ungroupNode = useCanvasStore((state) => state.ungroupNode);
-  const canReplace = isUploadNode(node) && Boolean(node.data.imageUrl);
+  const canReplace = canNodeReplaceBoundAsset(node);
   const downloadPresetPaths = useSettingsStore((state) => state.downloadPresetPaths);
   const ignoreAtTagWhenCopyingAndGenerating = useSettingsStore(
     (state) => state.ignoreAtTagWhenCopyingAndGenerating
@@ -325,7 +326,7 @@ export const NodeActionToolbar = memo(({ node }: NodeActionToolbarProps) => {
             key="upload-replace"
             className={`h-8 ${TOOLBAR_BUTTON_RADIUS_CLASS} px-2.5 text-xs ${TOOLBAR_NEUTRAL_BUTTON_CLASS}`}
             onClick={() =>
-              canvasEventBus.publish('upload-node/replace', {
+              canvasEventBus.publish('node-asset/replace', {
                 nodeId: node.id,
               })
             }

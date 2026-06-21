@@ -18,8 +18,10 @@ import {
   TEXT_NODE_MIN_HEIGHT,
   TEXT_NODE_MIN_WIDTH,
 } from '@/features/canvas/application/textNodeSizing';
+import { replaceBoundNodeAssetIfNeeded } from '@/features/canvas/application/nodeAssetFileActions';
 import { CANVAS_NODE_TYPES, type TextNodeData } from '@/features/canvas/domain/canvasNodes';
 import { resolveNodeDisplayName } from '@/features/canvas/domain/nodeDisplay';
+import { useNodeAssetReplaceFileInput } from '@/features/canvas/hooks/useNodeAssetReplaceFileInput';
 import { useSyncedTextAssetContent } from '@/features/canvas/hooks/useSyncedTextAssetContent';
 import { NodeEditableTextarea } from '@/features/canvas/ui/NodeEditableTextarea';
 import { NodeAssetBindingMeta } from '@/features/canvas/ui/NodeAssetBindingMeta';
@@ -50,6 +52,8 @@ export const TextNode = memo(({
   const setSelectedNode = useCanvasStore((state) => state.setSelectedNode);
   const updateNodeData = useCanvasStore((state) => state.updateNodeData);
   const projectId = useProjectStore((state) => state.currentProjectId);
+  const assetManifest = useProjectStore((state) => state.currentProject?.assetManifest);
+  const commitAssetManifest = useProjectStore((state) => state.commitAssetManifest);
 
   const sourceFileName = typeof data.sourceFileName === 'string' ? data.sourceFileName : '';
   const assetPath = typeof data.imageUrl === 'string' ? data.imageUrl : null;
@@ -93,6 +97,32 @@ export const TextNode = memo(({
     updateContent(nextContent);
     updateNodeData(id, { textContent: nextContent });
   }, [id, updateContent, updateNodeData]);
+
+  const handleReplaceFile = useCallback(async (file: File) => {
+    const replaced = await replaceBoundNodeAssetIfNeeded({
+      projectId,
+      assetManifest,
+      commitAssetManifest,
+      imageUrl: data.imageUrl,
+      fileAssetId: data.fileAssetId,
+      file,
+    });
+    if (!replaced) {
+      throw new Error('文本节点未绑定项目文件，无法替换');
+    }
+  }, [assetManifest, commitAssetManifest, data.fileAssetId, data.imageUrl, projectId]);
+
+  const {
+    inputRef,
+    fileInputAccept,
+    handleFileChange,
+  } = useNodeAssetReplaceFileInput({
+    nodeId: id,
+    assetKind: 'text',
+    imageUrl: data.imageUrl,
+    fileAssetId: data.fileAssetId,
+    onFileSelected: handleReplaceFile,
+  });
 
   const renderTextPreview = useCallback((previewContent: string) => (
     isMarkdown ? (
@@ -179,6 +209,13 @@ export const TextNode = memo(({
         id="source"
         position={Position.Right}
         className="!h-2 !w-2 !border-surface-dark !bg-accent"
+      />
+      <input
+        ref={inputRef}
+        type="file"
+        accept={fileInputAccept}
+        className="hidden"
+        onChange={handleFileChange}
       />
     </div>
   );

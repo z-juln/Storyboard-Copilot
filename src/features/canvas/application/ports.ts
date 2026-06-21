@@ -83,7 +83,7 @@ export interface CanvasEventMap {
     toolType: NodeToolType;
   };
   'tool-dialog/close': undefined;
-  'upload-node/replace': {
+  'node-asset/replace': {
     nodeId: string;
   };
   'asset-explorer/reveal-asset': {
