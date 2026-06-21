@@ -2,6 +2,7 @@ import json
 import os
 import tempfile
 import threading
+import uuid
 from pathlib import Path
 
 import gradio as gr
@@ -15,10 +16,12 @@ HOST = os.environ.get("ZIMAGE_HOST", "127.0.0.1")
 ALLOWED_SIZES = {512, 768, 1024}
 DEFAULT_SIZE = int(os.environ.get("ZIMAGE_DEFAULT_SIZE", "768"))
 MODEL_STATUS_PATH = ROOT / "model-status.json"
+GENERATE_JOBS_PATH = ROOT / "generate-jobs.json"
 
 PIPE = None
 LOAD_LOCK = threading.Lock()
 LOAD_THREAD = None
+JOBS_LOCK = threading.Lock()
 
 
 def write_model_status(
@@ -57,6 +60,35 @@ def read_model_status_dict() -> dict:
         "progress": 100.0 if PIPE is not None else 0.0,
         "error": None,
     }
+
+
+def read_generate_jobs() -> dict:
+    try:
+        if GENERATE_JOBS_PATH.is_file():
+            data = json.loads(GENERATE_JOBS_PATH.read_text(encoding="utf-8"))
+            if isinstance(data, dict):
+                return data
+    except (OSError, json.JSONDecodeError, TypeError):
+        pass
+    return {}
+
+
+def write_generate_jobs(jobs: dict) -> None:
+    GENERATE_JOBS_PATH.write_text(
+        json.dumps(jobs, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+
+def update_generate_job(job_id: str, **fields) -> None:
+    with JOBS_LOCK:
+        jobs = read_generate_jobs()
+        current = jobs.get(job_id, {})
+        if not isinstance(current, dict):
+            current = {}
+        current.update(fields)
+        jobs[job_id] = current
+        write_generate_jobs(jobs)
 
 
 def resolve_device_and_dtype():
@@ -131,7 +163,6 @@ def _warmup_worker() -> None:
     try:
         load_pipeline()
     except Exception:
-        # load_pipeline already persisted error state
         return
 
 
@@ -170,10 +201,10 @@ def get_model_status():
     ]
 
 
-def generate(prompt: str, size: str = str(DEFAULT_SIZE)):
+def _run_generate(prompt: str, size: str) -> str:
     cleaned = (prompt or "").strip()
     if not cleaned:
-        raise gr.Error("请输入提示词")
+        raise ValueError("请输入提示词")
     side = normalize_size(size)
     pipe = load_pipeline()
     with torch.inference_mode():
@@ -205,6 +236,109 @@ def generate(prompt: str, size: str = str(DEFAULT_SIZE)):
     return str(path)
 
 
+def _generate_worker(job_id: str, prompt: str, size: str) -> None:
+    try:
+        update_generate_job(
+            job_id,
+            status="running",
+            phase="准备生成",
+            progress=15.0,
+            error=None,
+        )
+        update_generate_job(job_id, phase="正在生成图片", progress=45.0)
+        path = _run_generate(prompt, size)
+        update_generate_job(
+            job_id,
+            status="succeeded",
+            phase="完成",
+            progress=100.0,
+            result_path=path,
+            error=None,
+        )
+    except Exception as exc:
+        update_generate_job(
+            job_id,
+            status="failed",
+            phase="生成失败",
+            progress=0.0,
+            error=str(exc),
+        )
+
+
+def submit_generate_job(job_id: str, prompt: str, size: str = str(DEFAULT_SIZE)):
+    cleaned_job_id = (job_id or "").strip()
+    if not cleaned_job_id:
+        cleaned_job_id = str(uuid.uuid4())
+
+    cleaned_prompt = (prompt or "").strip()
+    if not cleaned_prompt:
+        raise gr.Error("请输入提示词")
+
+    normalized_size = str(normalize_size(size))
+
+    with JOBS_LOCK:
+        jobs = read_generate_jobs()
+        existing = jobs.get(cleaned_job_id)
+        if isinstance(existing, dict) and existing.get("status") in ("queued", "running"):
+            return cleaned_job_id
+        jobs[cleaned_job_id] = {
+            "status": "queued",
+            "phase": "排队中",
+            "progress": 0.0,
+            "prompt": cleaned_prompt,
+            "size": normalized_size,
+            "result_path": None,
+            "error": None,
+        }
+        write_generate_jobs(jobs)
+
+    worker = threading.Thread(
+        target=_generate_worker,
+        args=(cleaned_job_id, cleaned_prompt, normalized_size),
+        daemon=True,
+    )
+    worker.start()
+    return cleaned_job_id
+
+
+def get_generate_job(job_id: str):
+    cleaned_job_id = (job_id or "").strip()
+    if not cleaned_job_id:
+        return {
+            "status": "not_found",
+            "progress": 0.0,
+            "phase": "",
+            "result_path": "",
+            "error": "缺少 job_id",
+        }
+
+    job = read_generate_jobs().get(cleaned_job_id)
+    if not isinstance(job, dict):
+        return {
+            "status": "not_found",
+            "progress": 0.0,
+            "phase": "",
+            "result_path": "",
+            "error": "job not found",
+        }
+
+    error_value = job.get("error")
+    return {
+        "status": str(job.get("status") or "unknown"),
+        "progress": float(job.get("progress") or 0.0),
+        "phase": str(job.get("phase") or ""),
+        "result_path": str(job.get("result_path") or ""),
+        "error": "" if error_value is None else str(error_value),
+    }
+
+
+def generate(prompt: str, size: str = str(DEFAULT_SIZE)):
+    try:
+        return _run_generate(prompt, size)
+    except ValueError as exc:
+        raise gr.Error(str(exc)) from exc
+
+
 write_model_status(loaded=False, loading=False, phase="等待加载模型", progress=0.0)
 
 with gr.Blocks(title="Z-Image Local") as demo:
@@ -218,6 +352,29 @@ with gr.Blocks(title="Z-Image Local") as demo:
     button = gr.Button("生成", variant="primary")
     output = gr.Image(label="结果", type="filepath")
     button.click(generate, inputs=[prompt, size], outputs=[output], api_name="generate")
+
+    job_id_input = gr.Textbox(visible=False)
+    job_prompt_input = gr.Textbox(visible=False)
+    job_size_input = gr.Textbox(visible=False)
+    job_id_output = gr.Textbox(visible=False)
+    submit_job_btn = gr.Button(visible=False)
+    submit_job_btn.click(
+        submit_generate_job,
+        inputs=[job_id_input, job_prompt_input, job_size_input],
+        outputs=[job_id_output],
+        api_name="submit_generate_job",
+    )
+
+    query_job_id_input = gr.Textbox(visible=False)
+    query_job_output = gr.JSON(visible=False)
+    query_job_btn = gr.Button(visible=False)
+    query_job_btn.click(
+        get_generate_job,
+        inputs=[query_job_id_input],
+        outputs=[query_job_output],
+        api_name="get_generate_job",
+    )
+
     warmup_btn = gr.Button("预加载模型", visible=False)
     warmup_btn.click(warmup_model, None, None, api_name="warmup_model")
     status_btn = gr.Button("读取模型状态", visible=False)

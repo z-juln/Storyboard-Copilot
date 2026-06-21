@@ -115,6 +115,7 @@ interface DuplicateResult {
 
 const ALT_DRAG_COPY_Z_INDEX = 2000;
 const GENERATION_JOB_POLL_INTERVAL_MS = 1400;
+const LOCAL_ZIMAGE_JOB_POLL_INTERVAL_MS = GENERATION_JOB_POLL_INTERVAL_MS * 3;
 
 interface GenerationStoryboardMetadata {
   gridRows: number;
@@ -445,6 +446,7 @@ export function Canvas() {
 
       void (async () => {
         try {
+          let isZImagePoll = false;
           while (true) {
             const currentNode = useCanvasStore.getState().nodes.find((node) => node.id === pendingNode.id);
             if (!currentNode) {
@@ -461,6 +463,13 @@ export function Canvas() {
             const generationProviderId = typeof currentData.generationProviderId === 'string'
               ? currentData.generationProviderId
               : '';
+            if (generationProviderId === ZIMAGE_LOCAL_PROVIDER_ID) {
+              isZImagePoll = true;
+            }
+
+            const pollIntervalMs = isZImagePoll
+              ? LOCAL_ZIMAGE_JOB_POLL_INTERVAL_MS
+              : GENERATION_JOB_POLL_INTERVAL_MS;
 
             if (generationProviderId && generationProviderId !== ZIMAGE_LOCAL_PROVIDER_ID) {
               const providerApiKey = apiKeys[generationProviderId] ?? '';
@@ -477,14 +486,15 @@ export function Canvas() {
 
             const polled = await pollGenerationJobStatus(jobId, generationProviderId);
             if (!polled) {
-              await sleep(GENERATION_JOB_POLL_INTERVAL_MS);
+              await sleep(pollIntervalMs);
               continue;
             }
 
             const { status, isZImageJob } = polled;
+            isZImagePoll = isZImageJob;
 
             if (status.status === 'queued' || status.status === 'running') {
-              await sleep(GENERATION_JOB_POLL_INTERVAL_MS);
+              await sleep(isZImageJob ? LOCAL_ZIMAGE_JOB_POLL_INTERVAL_MS : GENERATION_JOB_POLL_INTERVAL_MS);
               continue;
             }
 

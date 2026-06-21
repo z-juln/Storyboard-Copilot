@@ -172,6 +172,8 @@ impl LocalZImageService {
 
         if !gradio_client::probe_server(DEFAULT_SERVER_URL).await {
             self.start_server().await?;
+        } else if !gradio_client::supports_job_api(DEFAULT_SERVER_URL).await {
+            self.start_server().await?;
         }
 
         let size = match request.size {
@@ -183,7 +185,6 @@ impl LocalZImageService {
             .map(|value| value.trim().to_string())
             .filter(|value| !value.is_empty());
 
-        let event_id = gradio_client::submit_generate(DEFAULT_SERVER_URL, &prompt, size).await?;
         let job_id = Uuid::new_v4().to_string();
         let now = now_ms();
 
@@ -194,12 +195,40 @@ impl LocalZImageService {
                 INSERT INTO local_zimage_jobs (
                   job_id, status, project_id, prompt, size, external_event_id,
                   result, error, phase, progress, created_at, updated_at
-                ) VALUES (?1, 'running', ?2, ?3, ?4, ?5, NULL, NULL, '生成中', 0, ?6, ?6)
+                ) VALUES (?1, 'running', ?2, ?3, ?4, NULL, NULL, NULL, '提交中', 0, ?5, ?5)
                 "#,
-                params![job_id, project_id, prompt, size as i64, event_id, now],
+                params![job_id, project_id, prompt, size as i64, now],
             )
             .map_err(|err| format!("写入生成任务失败: {err}"))?;
         }
+
+        if let Err(error) = gradio_client::submit_python_generate_job(
+            DEFAULT_SERVER_URL,
+            &job_id,
+            &prompt,
+            size,
+        )
+        .await
+        {
+            let _ = self.update_job_status(
+                &job_id,
+                "failed",
+                None,
+                Some(error.as_str()),
+                None,
+                None,
+            );
+            return Err(error);
+        }
+
+        let _ = self.update_job_status(
+            &job_id,
+            "running",
+            None,
+            None,
+            Some("已提交 Python 生成任务"),
+            Some(5.0),
+        );
 
         self.spawn_job_worker(job_id.clone());
         Ok(SubmitLocalZImageJobResponseDto { job_id })
@@ -329,10 +358,6 @@ impl LocalZImageService {
             return;
         }
 
-        if record.external_event_id.is_none() {
-            return;
-        }
-
         if !gradio_client::probe_server(DEFAULT_SERVER_URL).await {
             return;
         }
@@ -371,43 +396,129 @@ impl LocalZImageService {
             return;
         }
 
-        let Some(event_id) = record.external_event_id.clone() else {
-            let _ = self.update_job_status(
+        let poll_interval = Duration::from_secs(1);
+        let mut resubmitted = false;
+
+        loop {
+            if !gradio_client::probe_server(DEFAULT_SERVER_URL).await {
+                let _ = self.update_job_status(
+                    &job_id,
+                    "failed",
+                    None,
+                    Some("Z-Image 服务不可用"),
+                    None,
+                    None,
+                );
+                cleanup(&self, &job_id);
+                return;
+            }
+
+            let python_status = match gradio_client::poll_python_generate_job(
+                DEFAULT_SERVER_URL,
                 &job_id,
-                "failed",
-                None,
-                Some("缺少 Gradio event_id"),
-                None,
-                None,
-            );
-            cleanup(&self, &job_id);
-            return;
-        };
+            )
+            .await
+            {
+                Ok(status) => status,
+                Err(error) => {
+                    let _ = self.update_job_status(
+                        &job_id,
+                        "failed",
+                        None,
+                        Some(error.as_str()),
+                        None,
+                        None,
+                    );
+                    cleanup(&self, &job_id);
+                    return;
+                }
+            };
 
-        let _ = self.update_job_status(
-            &job_id,
-            "running",
-            None,
-            None,
-            Some("等待 Gradio 生成结果"),
-            Some(10.0),
-        );
+            let phase = if python_status.phase.trim().is_empty() {
+                "生成中".to_string()
+            } else {
+                python_status.phase.clone()
+            };
 
-        let gradio_result = gradio_client::read_generate_result(DEFAULT_SERVER_URL, &event_id).await;
+            match python_status.status.as_str() {
+                "succeeded" => {
+                    let raw_path = python_status.result_path.trim();
+                    if raw_path.is_empty() {
+                        let _ = self.update_job_status(
+                            &job_id,
+                            "failed",
+                            None,
+                            Some("Python 任务成功但未返回图片路径"),
+                            None,
+                            None,
+                        );
+                        cleanup(&self, &job_id);
+                        return;
+                    }
 
-        match gradio_result {
-            Ok(raw_path) => {
-                let final_path = if let Some(project_id) = record.project_id.as_deref() {
-                    match prepare_from_source(
-                        &self.app_data_dir,
-                        project_id,
-                        &raw_path,
-                        512,
-                    )
-                    .await
-                    {
-                        Ok(prepared) => prepared.image_path,
-                        Err(error) => {
+                    let final_path = if let Some(project_id) = record.project_id.as_deref() {
+                        match prepare_from_source(
+                            &self.app_data_dir,
+                            project_id,
+                            raw_path,
+                            512,
+                        )
+                        .await
+                        {
+                            Ok(prepared) => prepared.image_path,
+                            Err(error) => {
+                                let _ = self.update_job_status(
+                                    &job_id,
+                                    "failed",
+                                    None,
+                                    Some(error.as_str()),
+                                    None,
+                                    None,
+                                );
+                                cleanup(&self, &job_id);
+                                return;
+                            }
+                        }
+                    } else {
+                        raw_path.to_string()
+                    };
+
+                    let _ = self.update_job_status(
+                        &job_id,
+                        "succeeded",
+                        Some(final_path.as_str()),
+                        None,
+                        Some("完成"),
+                        Some(100.0),
+                    );
+                    cleanup(&self, &job_id);
+                    return;
+                }
+                "failed" => {
+                    let message = python_status
+                        .error
+                        .unwrap_or_else(|| "Python 生成任务失败".to_string());
+                    let _ = self.update_job_status(
+                        &job_id,
+                        "failed",
+                        None,
+                        Some(message.as_str()),
+                        None,
+                        None,
+                    );
+                    cleanup(&self, &job_id);
+                    return;
+                }
+                "not_found" => {
+                    if !resubmitted {
+                        if let Err(error) = gradio_client::submit_python_generate_job(
+                            DEFAULT_SERVER_URL,
+                            &job_id,
+                            &record.prompt,
+                            record.size,
+                        )
+                        .await
+                        {
                             let _ = self.update_job_status(
                                 &job_id,
                                 "failed",
@@ -419,33 +530,53 @@ impl LocalZImageService {
                             cleanup(&self, &job_id);
                             return;
                         }
+                        resubmitted = true;
+                        let _ = self.update_job_status(
+                            &job_id,
+                            "running",
+                            None,
+                            None,
+                            Some("已重新提交 Python 生成任务"),
+                            Some(5.0),
+                        );
+                        tokio::time::sleep(poll_interval).await;
+                        continue;
                     }
-                } else {
-                    raw_path
-                };
-
-                let _ = self.update_job_status(
-                    &job_id,
-                    "succeeded",
-                    Some(final_path.as_str()),
-                    None,
-                    Some("完成"),
-                    Some(100.0),
-                );
-            }
-            Err(error) => {
-                let _ = self.update_job_status(
-                    &job_id,
-                    "failed",
-                    None,
-                    Some(error.as_str()),
-                    None,
-                    None,
-                );
+                    let _ = self.update_job_status(
+                        &job_id,
+                        "failed",
+                        None,
+                        Some("Python 侧未找到生成任务"),
+                        None,
+                        None,
+                    );
+                    cleanup(&self, &job_id);
+                    return;
+                }
+                "queued" | "running" | "unknown" => {
+                    let _ = self.update_job_status(
+                        &job_id,
+                        "running",
+                        None,
+                        None,
+                        Some(phase.as_str()),
+                        Some(python_status.progress.max(5.0)),
+                    );
+                    tokio::time::sleep(poll_interval).await;
+                }
+                _ => {
+                    let _ = self.update_job_status(
+                        &job_id,
+                        "running",
+                        None,
+                        None,
+                        Some(phase.as_str()),
+                        Some(python_status.progress),
+                    );
+                    tokio::time::sleep(poll_interval).await;
+                }
             }
         }
-
-        cleanup(&self, &job_id);
     }
 }
 

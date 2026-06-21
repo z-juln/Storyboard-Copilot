@@ -443,15 +443,25 @@ impl LocalZImageService {
         if !self.venv_python().is_file() {
             return Err("本地 Z-Image 尚未安装，请先在设置中完成安装".to_string());
         }
-        {
-            let status = self.status.read().await;
-            if status.server_running {
-                if status.server_detached {
+
+        self.sync_app_py()?;
+
+        if gradio_client::probe_server(DEFAULT_SERVER_URL).await {
+            if gradio_client::supports_job_api(DEFAULT_SERVER_URL).await {
+                let status = self.status.read().await;
+                if status.server_running && status.server_detached {
+                    drop(status);
                     self.recover_server_pid_from_port();
-                    self.push_log("检测到上次未关闭的 Z-Image 服务，已直接复用（模型可能仍在内存中）".to_string());
+                    self.push_log(
+                        "检测到上次未关闭的 Z-Image 服务，已直接复用（模型可能仍在内存中）".to_string(),
+                    );
                 }
+                self.refresh_server_state().await;
                 return Ok(());
             }
+
+            self.push_log("检测到 Z-Image 服务版本过旧，正在重启以加载新 API…".to_string());
+            self.stop_server(true).await?;
         }
 
         std::fs::create_dir_all(&self.root_dir)
@@ -462,7 +472,6 @@ impl LocalZImageService {
         if !app_py.is_file() {
             return Err("缺少 app.py，请重新安装本地 Z-Image".to_string());
         }
-        let _ = std::fs::write(&app_py, include_str!("app.py"));
 
         let mut command = std::process::Command::new(&python);
         command
@@ -515,6 +524,14 @@ impl LocalZImageService {
         }
 
         Err("Gradio 启动超时，请稍后重试".to_string())
+    }
+
+    fn sync_app_py(&self) -> Result<(), String> {
+        std::fs::create_dir_all(&self.root_dir)
+            .map_err(|err| format!("创建目录失败: {err}"))?;
+        std::fs::write(self.app_py_path(), include_str!("app.py"))
+            .map_err(|err| format!("写入 app.py 失败: {err}"))?;
+        Ok(())
     }
 
     pub async fn stop_server(&self, force: bool) -> Result<(), String> {
