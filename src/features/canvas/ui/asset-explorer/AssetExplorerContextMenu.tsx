@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 
 import { isAssetPreviewable } from '@/features/project/asset/assetPreviewUtils';
+import { resolveReplaceableAssetKind } from '@/features/project/asset/assetReplaceUtils';
 
 import type { ContextMenuState } from './types';
 
@@ -16,6 +17,7 @@ interface AssetExplorerContextMenuProps {
   onCut: () => void;
   onPaste: () => void;
   onPreview: () => void;
+  onReplace: () => void;
   onRename: () => void;
   onDelete: () => void;
   onFindInFolder: () => void;
@@ -32,6 +34,7 @@ export function AssetExplorerContextMenu({
   onCut,
   onPaste,
   onPreview,
+  onReplace,
   onRename,
   onDelete,
   onFindInFolder,
@@ -39,6 +42,7 @@ export function AssetExplorerContextMenu({
   const isDirectory = state.entry.kind === 'directory';
   const isAssetsRoot = state.isAssetsRoot === true;
   const canPreview = !isDirectory && isAssetPreviewable(state.entry.name);
+  const canReplace = !isDirectory && resolveReplaceableAssetKind(state.entry.name) !== null;
 
   useEffect(() => {
     const handlePointerDown = () => onClose();
@@ -56,8 +60,9 @@ export function AssetExplorerContextMenu({
   }, [onClose]);
 
   const items: Array<{ label: string; action: () => void; hidden?: boolean; disabled?: boolean }> = [
-    { label: '预览', action: onPreview, hidden: !canPreview },
-    { label: '新建文件', action: onNewFile, hidden: !isDirectory, disabled: readOnly },
+  { label: '预览', action: onPreview, hidden: !canPreview },
+  { label: '替换文件…', action: onReplace, hidden: isDirectory || !canReplace, disabled: readOnly },
+  { label: '新建文件', action: onNewFile, hidden: !isDirectory, disabled: readOnly },
     { label: '新建文件夹', action: onNewFolder, hidden: !isDirectory, disabled: readOnly },
     { label: '复制', action: onCopy, disabled: readOnly },
     { label: '剪切', action: onCut, disabled: readOnly },

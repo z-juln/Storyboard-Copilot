@@ -45,7 +45,12 @@ export function resolveFileAssetDisplayUrl(input: {
       return '';
     }
     if (preferPreview) {
-      return buildProjectAssetPreviewUrl(projectId, path, maxPreviewDimension);
+      const preview = buildProjectAssetPreviewUrl(projectId, path, maxPreviewDimension);
+      const record = fileAssetId ? assetManifest?.[fileAssetId] : undefined;
+      if (record?.updatedAt) {
+        return `${preview}&v=${record.updatedAt}`;
+      }
+      return preview;
     }
     const record = fileAssetId ? assetManifest?.[fileAssetId] : undefined;
     const base = buildProjectAssetUrl(projectId, path);

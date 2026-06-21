@@ -49,6 +49,9 @@ export const AssetExplorerPanel = memo(({ projectId, readOnly = false }: AssetEx
     handleAssetsRootDrop,
     handleTreeContextMenu,
     handleRenameCommit,
+    beginReplaceFile,
+    handleReplaceFileSelected,
+    replaceInputRef,
     openPreview,
     confirmDelete,
     handleCreateInDirectory,
@@ -188,6 +191,9 @@ export const AssetExplorerPanel = memo(({ projectId, readOnly = false }: AssetEx
           onPreview={() => {
             openPreview(contextMenu.entry);
           }}
+          onReplace={() => {
+            beginReplaceFile(contextMenu.entry);
+          }}
           onRename={() => setRenamingPath(contextMenu.entry.path)}
           onDelete={() => deleteContextMenuSelection()}
           onFindInFolder={() => {
@@ -214,6 +220,14 @@ export const AssetExplorerPanel = memo(({ projectId, readOnly = false }: AssetEx
         }}
         onConfirm={() => {
           void confirmDelete();
+        }}
+      />
+      <input
+        ref={replaceInputRef}
+        type="file"
+        className="hidden"
+        onChange={(event) => {
+          void handleReplaceFileSelected(event);
         }}
       />
     </div>

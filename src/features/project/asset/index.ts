@@ -89,6 +89,15 @@ export {
   type AssetPreviewKind,
 } from './assetPreviewUtils';
 export {
+  isReplacementFileCompatible,
+  resolveReplaceableAssetKind,
+  type ReplaceableAssetKind,
+} from './assetReplaceUtils';
+export {
+  replaceProjectAssetFile,
+  resolveReplaceFileAccept,
+} from './replaceProjectAssetFile';
+export {
   loadProjectAssetTextContent,
   saveProjectAssetTextContent,
 } from './textAssetContent';

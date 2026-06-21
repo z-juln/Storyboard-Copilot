@@ -33,6 +33,8 @@ import {
   resolveNodeDisplayName,
 } from '@/features/canvas/domain/nodeDisplay';
 import { canvasEventBus } from '@/features/canvas/application/canvasServices';
+import { isNodeProjectAssetBound } from '@/features/canvas/application/nodeAssetBinding';
+import { refreshCanvasNodesAfterAssetReplace } from '@/features/canvas/application/refreshNodesAfterAssetReplace';
 import { subscribeUploadNodePasteImage } from '@/features/canvas/application/uploadNodePasteBridge';
 import { resolveDroppedImageFile } from '@/features/canvas/application/resolveDroppedExternalFile';
 import { NodeAssetBindingMeta } from '@/features/canvas/ui/NodeAssetBindingMeta';
@@ -49,7 +51,16 @@ import { useCanvasStore } from '@/stores/canvasStore';
 import { useProjectStore } from '@/stores/projectStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { resolveFileAssetDisplayUrl } from '@/features/project/asset';
+import {
+  isReplacementFileCompatible,
+  replaceProjectAssetFile,
+  resolveReplaceableAssetKind,
+  resolveReplaceFileAccept,
+} from '@/features/project/asset/replaceProjectAssetFile';
+import { getAssetBaseName } from '@/features/project/asset/assetExplorerPathUtils';
+import { normalizeAssetPath } from '@/features/project/asset';
 import { fetchAssetTextContent } from '@/features/project/asset/assetPreviewUtils';
+import { isProjectRelativeAssetPath } from '@/features/project/projectPaths';
 
 type UploadNodeProps = NodeProps & {
   id: string;
@@ -70,6 +81,7 @@ export const UploadNode = memo(({ id, data, selected, width, height }: UploadNod
   const updateNodeData = useCanvasStore((state) => state.updateNodeData);
   const projectId = useProjectStore((state) => state.currentProjectId);
   const assetManifest = useProjectStore((state) => state.currentProject?.assetManifest);
+  const commitAssetManifest = useProjectStore((state) => state.commitAssetManifest);
   const useUploadFilenameAsNodeTitle = useSettingsStore((state) => state.useUploadFilenameAsNodeTitle);
   const { zoom } = useViewport();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -109,6 +121,22 @@ export const UploadNode = memo(({ id, data, selected, width, height }: UploadNod
     return resolveNodeDisplayName(CANVAS_NODE_TYPES.upload, data);
   }, [data, useUploadFilenameAsNodeTitle]);
 
+  const fileInputAccept = useMemo(() => {
+    const assetPath = typeof data.imageUrl === 'string' && isProjectRelativeAssetPath(data.imageUrl.trim())
+      ? data.imageUrl.trim()
+      : null;
+    if (
+      assetPath
+      && isNodeProjectAssetBound({ imageUrl: assetPath, fileAssetId: data.fileAssetId })
+    ) {
+      const kind = resolveReplaceableAssetKind(getAssetBaseName(assetPath));
+      if (kind) {
+        return resolveReplaceFileAccept(kind);
+      }
+    }
+    return 'image/*';
+  }, [data.fileAssetId, data.imageUrl]);
+
   const clearTransientPreview = useCallback(() => {
     setTransientPreviewUrl((current) => {
       if (current) {
@@ -145,6 +173,57 @@ export const UploadNode = memo(({ id, data, selected, width, height }: UploadNod
       });
 
       try {
+        const assetPath = typeof data.imageUrl === 'string' && isProjectRelativeAssetPath(data.imageUrl.trim())
+          ? normalizeAssetPath(data.imageUrl.trim())
+          : null;
+        const isBoundProjectAsset = Boolean(
+          projectId
+          && assetManifest
+          && assetPath
+          && isNodeProjectAssetBound({
+            imageUrl: assetPath,
+            fileAssetId: data.fileAssetId,
+          })
+        );
+
+        if (isBoundProjectAsset && assetPath && projectId && assetManifest) {
+          const targetFileName = getAssetBaseName(assetPath);
+          const targetKind = resolveReplaceableAssetKind(targetFileName);
+          if (!targetKind || !isReplacementFileCompatible(targetFileName, file)) {
+            throw new Error(
+              targetKind === 'text'
+                ? '只能使用文本文件替换'
+                : targetKind === 'image'
+                  ? '只能使用图片文件替换'
+                  : '该绑定文件不支持替换'
+            );
+          }
+
+          const result = await replaceProjectAssetFile({
+            projectId,
+            path: assetPath,
+            file,
+            manifest: assetManifest,
+          });
+          commitAssetManifest(result.manifest);
+          await refreshCanvasNodesAfterAssetReplace({
+            projectId,
+            path: assetPath,
+            fileAssetId: result.fileAssetId,
+            updatedAt: result.updatedAt,
+            kind: targetKind,
+          });
+
+          if (uploadSequenceRef.current === sequence) {
+            clearTransientPreview();
+          }
+
+          console.info(
+            `[upload-perf][node] replaceFile success nodeId=${id} name="${file.name}" size=${file.size}B elapsed=${Math.round(performance.now() - started)}ms`
+          );
+          return;
+        }
+
         const prepared = await prepareNodeImageFromFile(file);
         const nextData: Partial<UploadImageNodeData> = {
           ...toPreparedNodeImageFields(prepared),
@@ -169,7 +248,7 @@ export const UploadNode = memo(({ id, data, selected, width, height }: UploadNod
         throw error;
       }
     },
-    [clearTransientPreview, id, updateNodeData, useUploadFilenameAsNodeTitle]
+    [assetManifest, clearTransientPreview, commitAssetManifest, data.fileAssetId, data.imageUrl, id, projectId, updateNodeData, useUploadFilenameAsNodeTitle]
   );
 
   const handleImageLoad = useCallback((event: SyntheticEvent<HTMLImageElement>) => {
@@ -252,7 +331,7 @@ export const UploadNode = memo(({ id, data, selected, width, height }: UploadNod
   );
 
   useEffect(() => {
-    return canvasEventBus.subscribe('upload-node/reupload', ({ nodeId }) => {
+    return canvasEventBus.subscribe('upload-node/replace', ({ nodeId }) => {
       if (nodeId !== id) {
         return;
       }
@@ -409,7 +488,7 @@ export const UploadNode = memo(({ id, data, selected, width, height }: UploadNod
       <input
         ref={inputRef}
         type="file"
-        accept="image/*"
+        accept={fileInputAccept}
         className="hidden"
         onChange={handleFileChange}
       />

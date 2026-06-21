@@ -4,6 +4,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type ChangeEvent,
   type DragEvent,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent,
@@ -50,6 +51,11 @@ import {
   renameProjectAssetEntry,
   resolveNewSiblingName,
 } from '@/features/project/asset/projectAssetService';
+import {
+  replaceProjectAssetFile,
+  resolveReplaceFileAccept,
+} from '@/features/project/asset/replaceProjectAssetFile';
+import { resolveReplaceableAssetKind } from '@/features/project/asset/assetReplaceUtils';
 import { createEmptyAssetManifest, type AssetManifest } from '@/features/project/asset';
 import { resolveAssetPreviewKind } from '@/features/project/asset/assetPreviewUtils';
 import {
@@ -57,6 +63,7 @@ import {
   serializeProjectAssetDragPayload,
 } from '@/features/canvas/application/createUploadNodeFromProjectAsset';
 import { subscribeAssetExplorerReveal } from '@/features/canvas/application/assetExplorerRevealBridge';
+import { refreshCanvasNodesAfterAssetReplace } from '@/features/canvas/application/refreshNodesAfterAssetReplace';
 import { rustApiClient } from '@/infrastructure/rustApiClient';
 import { isTypingTarget } from '@/features/canvas/application/canvasKeyboard';
 import { useCanvasStore } from '@/stores/canvasStore';
@@ -94,6 +101,8 @@ export function useAssetExplorerController({
   const [revealPath, setRevealPath] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const dragSourcePathsRef = useRef<string[]>([]);
+  const replaceInputRef = useRef<HTMLInputElement>(null);
+  const replaceTargetPathRef = useRef<string | null>(null);
 
   const {
     selectedPaths,
@@ -406,6 +415,72 @@ export function useAssetExplorerController({
       }
     },
     [applyManifest, loadTree, manifest, projectId, readOnly, refreshAvailableAssetPaths, selectSingle]
+  );
+
+  const beginReplaceFile = useCallback((entry: ProjectDirectoryEntry) => {
+    if (readOnly || entry.kind !== 'file') {
+      return;
+    }
+    const kind = resolveReplaceableAssetKind(entry.name);
+    if (!kind) {
+      return;
+    }
+    replaceTargetPathRef.current = entry.path;
+    const input = replaceInputRef.current;
+    if (!input) {
+      return;
+    }
+    input.accept = resolveReplaceFileAccept(kind);
+    input.click();
+  }, [readOnly]);
+
+  const handleReplaceFileSelected = useCallback(
+    async (event: ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      event.target.value = '';
+      const targetPath = replaceTargetPathRef.current;
+      replaceTargetPathRef.current = null;
+      if (!file || !targetPath) {
+        return;
+      }
+
+      const kind = resolveReplaceableAssetKind(getAssetBaseName(targetPath));
+      if (!kind) {
+        setError('该文件类型不支持替换');
+        return;
+      }
+
+      try {
+        const result = await replaceProjectAssetFile({
+          projectId,
+          path: targetPath,
+          file,
+          manifest,
+        });
+        applyManifest(result.manifest);
+        markAssetPathsAvailable([normalizeAssetPath(targetPath)]);
+        await refreshAvailableAssetPaths();
+        await refreshCanvasNodesAfterAssetReplace({
+          projectId,
+          path: targetPath,
+          fileAssetId: result.fileAssetId,
+          updatedAt: result.updatedAt,
+          kind,
+        });
+        await loadTree();
+        setFlashPath(normalizeAssetPath(targetPath));
+      } catch (replaceError) {
+        setError(replaceError instanceof Error ? replaceError.message : '替换文件失败');
+      }
+    },
+    [
+      applyManifest,
+      loadTree,
+      manifest,
+      markAssetPathsAvailable,
+      projectId,
+      refreshAvailableAssetPaths,
+    ]
   );
 
   const collectSiblingNames = useCallback((dirEntry: ProjectDirectoryEntry): string[] => {
@@ -862,6 +937,9 @@ export function useAssetExplorerController({
     handleAssetsRootDrop,
     handleTreeContextMenu,
     handleRenameCommit,
+    beginReplaceFile,
+    handleReplaceFileSelected,
+    replaceInputRef,
     openPreview,
     requestDeleteSelection,
     confirmDelete,

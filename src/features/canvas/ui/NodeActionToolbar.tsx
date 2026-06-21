@@ -57,7 +57,7 @@ export const NodeActionToolbar = memo(({ node }: NodeActionToolbarProps) => {
   const tools = useMemo(() => getNodeToolPlugins(node), [node]);
   const deleteNode = useCanvasStore((state) => state.deleteNode);
   const ungroupNode = useCanvasStore((state) => state.ungroupNode);
-  const canReupload = isUploadNode(node) && Boolean(node.data.imageUrl);
+  const canReplace = isUploadNode(node) && Boolean(node.data.imageUrl);
   const downloadPresetPaths = useSettingsStore((state) => state.downloadPresetPaths);
   const ignoreAtTagWhenCopyingAndGenerating = useSettingsStore(
     (state) => state.ignoreAtTagWhenCopyingAndGenerating
@@ -320,18 +320,18 @@ export const NodeActionToolbar = memo(({ node }: NodeActionToolbarProps) => {
             </UiChipButton>
           );
         })}
-        {!isImageEdit && canReupload && (
+        {!isImageEdit && canReplace && (
           <UiChipButton
-            key="upload-reupload"
+            key="upload-replace"
             className={`h-8 ${TOOLBAR_BUTTON_RADIUS_CLASS} px-2.5 text-xs ${TOOLBAR_NEUTRAL_BUTTON_CLASS}`}
             onClick={() =>
-              canvasEventBus.publish('upload-node/reupload', {
+              canvasEventBus.publish('upload-node/replace', {
                 nodeId: node.id,
               })
             }
           >
             <RefreshCw className="h-3.5 w-3.5" />
-            重新上传
+            替换
           </UiChipButton>
         )}
         {!isImageEdit && canHandleImage && (
