@@ -32,6 +32,7 @@ export function useLocalZImageInstallFlow() {
   const [busyStepId, setBusyStepId] = useState<LocalZImageInstallStepId | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [stopServerConfirm, setStopServerConfirm] = useState<{ activeCount: number } | null>(null);
 
   const refreshStatus = useCallback(async () => {
     const next = await rustApiClient.getLocalZImageStatus();
@@ -126,16 +127,37 @@ export function useLocalZImageInstallFlow() {
     }
   }, [refreshStatus]);
 
-  const stopServer = useCallback(async () => {
+  const executeStopServer = useCallback(async (force: boolean) => {
     setBusyStepId('start-server');
     try {
-      const next = await rustApiClient.stopLocalZImageServer();
+      const next = await rustApiClient.stopLocalZImageServer({ force });
       setStatus(next);
+      setStopServerConfirm(null);
       return next;
     } finally {
       setBusyStepId(null);
     }
   }, []);
+
+  const stopServer = useCallback(async () => {
+    const activeJobs = await rustApiClient.getLocalZImageActiveJobs().catch(() => ({ count: 0 }));
+    if (activeJobs.count > 0) {
+      setStopServerConfirm({ activeCount: activeJobs.count });
+      return null;
+    }
+    return executeStopServer(false);
+  }, [executeStopServer]);
+
+  const cancelStopServer = useCallback(() => {
+    setStopServerConfirm(null);
+  }, []);
+
+  const confirmStopServer = useCallback(async () => {
+    if (!stopServerConfirm) {
+      return null;
+    }
+    return executeStopServer(true);
+  }, [executeStopServer, stopServerConfirm]);
 
   const warmupModel = useCallback(async () => {
     setBusyStepId('start-server');
@@ -163,6 +185,9 @@ export function useLocalZImageInstallFlow() {
     refreshStatus,
     runStep,
     stopServer,
+    cancelStopServer,
+    confirmStopServer,
+    stopServerConfirm,
     warmupModel,
   };
 }

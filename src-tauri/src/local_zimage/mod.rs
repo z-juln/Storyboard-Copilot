@@ -1,6 +1,8 @@
 mod gradio_client;
 mod install;
+mod jobs;
 
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
@@ -11,6 +13,10 @@ pub use install::{
     next_recommended_step, probe_system_python, read_install_state, run_install, run_install_step,
     InstallStateFile, INSTALL_STEPS,
 };
+pub use jobs::{
+    LocalZImageActiveJobsDto, LocalZImageJobStatusDto, SubmitLocalZImageJobRequestDto,
+    SubmitLocalZImageJobResponseDto,
+};
 
 pub const DEFAULT_SERVER_URL: &str = "http://127.0.0.1:7860";
 pub const DEFAULT_SERVER_PORT: u16 = 7860;
@@ -18,6 +24,12 @@ pub const DEFAULT_SERVER_PORT: u16 = 7860;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RunInstallStepRequestDto {
     pub step: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct StopLocalZImageServerRequestDto {
+    #[serde(default)]
+    pub force: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Default, Deserialize)]
@@ -75,11 +87,13 @@ pub struct ExternalTechRunResponseDto {
 }
 
 pub struct LocalZImageService {
+    app_data_dir: PathBuf,
     root_dir: PathBuf,
     status: Arc<RwLock<LocalZImageStatusDto>>,
     log_lines: Arc<Mutex<Vec<String>>>,
     initial_server_running: Mutex<Option<bool>>,
     session_spawned_server: Mutex<bool>,
+    job_workers: Arc<RwLock<HashSet<String>>>,
 }
 
 impl LocalZImageService {
@@ -88,11 +102,13 @@ impl LocalZImageService {
         let mut initial = LocalZImageStatusDto::default();
         initial.server_url = DEFAULT_SERVER_URL.to_string();
         let service = Arc::new(Self {
+            app_data_dir,
             root_dir,
             status: Arc::new(RwLock::new(initial)),
             log_lines: Arc::new(Mutex::new(Vec::new())),
             initial_server_running: Mutex::new(None),
             session_spawned_server: Mutex::new(false),
+            job_workers: Arc::new(RwLock::new(HashSet::new())),
         });
         service.refresh_sync_state();
         service
@@ -501,7 +517,17 @@ impl LocalZImageService {
         Err("Gradio 启动超时，请稍后重试".to_string())
     }
 
-    pub async fn stop_server(&self) -> Result<(), String> {
+    pub async fn stop_server(&self, force: bool) -> Result<(), String> {
+        let active_jobs = self.count_active_jobs()?;
+        if active_jobs > 0 && !force {
+            return Err(format!(
+                "当前有 {active_jobs} 个 Z-Image 生成任务进行中，停止服务将中断任务"
+            ));
+        }
+        if active_jobs > 0 {
+            self.fail_all_active_jobs("Z-Image 服务已停止，任务已中断")?;
+        }
+
         if let Some(pid) = self.read_server_pid() {
             terminate_process(pid);
             self.clear_server_pid();

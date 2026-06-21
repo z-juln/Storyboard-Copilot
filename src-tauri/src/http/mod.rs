@@ -43,7 +43,9 @@ use crate::project::dto::{
 };
 use crate::local_zimage::{
     ExternalTechRunRequestDto, ExternalTechRunResponseDto, LocalZImageService,
-    LocalZImageStatusDto, RunInstallStepRequestDto,
+    LocalZImageStatusDto, RunInstallStepRequestDto, StopLocalZImageServerRequestDto,
+    SubmitLocalZImageJobRequestDto, SubmitLocalZImageJobResponseDto,
+    LocalZImageActiveJobsDto, LocalZImageJobStatusDto,
 };
 use crate::project::ProjectService;
 
@@ -251,6 +253,15 @@ pub async fn start_http_server_with_app_data(app_data_dir: PathBuf) -> Result<()
         .route(
             "/api/v1/local-zimage/model/warmup",
             post(local_zimage_model_warmup),
+        )
+        .route("/api/v1/local-zimage/jobs", post(local_zimage_submit_job))
+        .route(
+            "/api/v1/local-zimage/jobs/active",
+            get(local_zimage_active_jobs),
+        )
+        .route(
+            "/api/v1/local-zimage/jobs/:job_id",
+            get(local_zimage_get_job),
         )
         .route("/api/v1/external-tech/run", post(external_tech_run))
         .merge(upload_routes)
@@ -825,13 +836,46 @@ async fn local_zimage_model_warmup(
 
 async fn local_zimage_server_stop(
     State(state): State<HttpState>,
+    payload: Option<Json<StopLocalZImageServerRequestDto>>,
 ) -> Result<Json<LocalZImageStatusDto>, Response> {
+    let force = payload.map(|value| value.force).unwrap_or(false);
     state
         .local_zimage
-        .stop_server()
+        .stop_server(force)
         .await
         .map_err(|error| api_error(StatusCode::BAD_REQUEST, error))?;
     Ok(Json(state.local_zimage.status().await))
+}
+
+async fn local_zimage_submit_job(
+    State(state): State<HttpState>,
+    Json(payload): Json<SubmitLocalZImageJobRequestDto>,
+) -> Result<Json<SubmitLocalZImageJobResponseDto>, Response> {
+    state
+        .local_zimage
+        .submit_generation_job(payload)
+        .await
+        .map(Json)
+        .map_err(|error| api_error(StatusCode::BAD_REQUEST, error))
+}
+
+async fn local_zimage_active_jobs(
+    State(state): State<HttpState>,
+) -> Json<LocalZImageActiveJobsDto> {
+    let count = state.local_zimage.count_active_jobs().unwrap_or(0);
+    Json(LocalZImageActiveJobsDto { count })
+}
+
+async fn local_zimage_get_job(
+    State(state): State<HttpState>,
+    Path(job_id): Path<String>,
+) -> Result<Json<LocalZImageJobStatusDto>, Response> {
+    state
+        .local_zimage
+        .get_generation_job(job_id.trim())
+        .await
+        .map(Json)
+        .map_err(|error| api_error(StatusCode::BAD_REQUEST, error))
 }
 
 async fn external_tech_run(

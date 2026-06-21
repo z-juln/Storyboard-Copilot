@@ -37,7 +37,7 @@ import {
   type CanvasNodeType,
   DEFAULT_NODE_WIDTH,
 } from '@/features/canvas/domain/canvasNodes';
-import { prepareNodeImage, toPreparedNodeImageFields } from '@/features/canvas/application/imageData';
+import { prepareNodeImage, prepareNodeImageForCanvas, toPreparedNodeImageFields } from '@/features/canvas/application/imageData';
 import {
   parseProjectAssetDragPayload,
   PROJECT_ASSET_DRAG_MIME,
@@ -54,6 +54,8 @@ import {
   buildGenerationErrorReport,
   CURRENT_RUNTIME_SESSION_ID,
 } from '@/features/canvas/application/generationErrorReport';
+import { ZIMAGE_LOCAL_PROVIDER_ID } from '@/features/canvas/external-tech/providers/zimageLocal';
+import { rustApiClient } from '@/infrastructure/rustApiClient';
 import { showErrorDialog } from '@/features/canvas/application/errorDialog';
 import {
   getConnectMenuNodeTypes,
@@ -459,7 +461,9 @@ export function Canvas() {
             const generationProviderId = typeof currentData.generationProviderId === 'string'
               ? currentData.generationProviderId
               : '';
-            if (generationProviderId) {
+            const isZImageJob = generationProviderId === ZIMAGE_LOCAL_PROVIDER_ID;
+
+            if (generationProviderId && !isZImageJob) {
               const providerApiKey = apiKeys[generationProviderId] ?? '';
               if (providerApiKey) {
                 await canvasAiGateway.setApiKey(generationProviderId, providerApiKey).catch((error) => {
@@ -472,10 +476,15 @@ export function Canvas() {
               }
             }
 
-            const status = await canvasAiGateway.getGenerateImageJob(jobId).catch((error) => {
-              console.warn('[GenerationJob] poll failed', { nodeId: pendingNode.id, jobId, error });
-              return null;
-            });
+            const status = isZImageJob
+              ? await rustApiClient.getLocalZImageJob(jobId).catch((error) => {
+                console.warn('[GenerationJob] zimage poll failed', { nodeId: pendingNode.id, jobId, error });
+                return null;
+              })
+              : await canvasAiGateway.getGenerateImageJob(jobId).catch((error) => {
+                console.warn('[GenerationJob] poll failed', { nodeId: pendingNode.id, jobId, error });
+                return null;
+              });
             if (!status) {
               await sleep(GENERATION_JOB_POLL_INTERVAL_MS);
               continue;
@@ -487,7 +496,11 @@ export function Canvas() {
             }
 
             if (status.status === 'succeeded' && typeof status.result === 'string' && status.result.trim()) {
-              const prepared = await prepareNodeImage(status.result);
+              const prepared = isZImageJob
+                ? await prepareNodeImageForCanvas(
+                  status.result.startsWith('/') ? `file://${status.result}` : status.result
+                )
+                : await prepareNodeImage(status.result);
               const storyboardMetadataRaw = currentData.generationStoryboardMetadata as GenerationStoryboardMetadata | undefined;
               const hasStoryboardMetadata = Boolean(
                 storyboardMetadataRaw

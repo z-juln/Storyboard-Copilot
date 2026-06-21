@@ -14,6 +14,7 @@ import {
   LocalZImageModelLoadBanner,
 } from '@/features/local-zimage/LocalZImageModelLoadBanner';
 import { useLocalZImageInstallFlow } from '@/features/local-zimage/useLocalZImageInstallFlow';
+import { LocalZImageStopServerDialog } from '@/features/local-zimage/LocalZImageStopServerDialog';
 
 interface LocalZImageInstallFlowPanelProps {
   compact?: boolean;
@@ -33,6 +34,9 @@ export function LocalZImageInstallFlowPanel({
     recommendedStep,
     runStep,
     stopServer,
+    cancelStopServer,
+    confirmStopServer,
+    stopServerConfirm,
     warmupModel,
   } = useLocalZImageInstallFlow();
   const [confirmStep, setConfirmStep] = useState<LocalZImageInstallStepDefinition | null>(null);
@@ -274,6 +278,16 @@ export function LocalZImageInstallFlowPanel({
           </UiButton>
         </div>
       </UiModal>
+
+      <LocalZImageStopServerDialog
+        activeCount={stopServerConfirm?.activeCount ?? 0}
+        isOpen={Boolean(stopServerConfirm)}
+        isStopping={busyStepId === 'start-server'}
+        onCancel={cancelStopServer}
+        onConfirm={() => {
+          void confirmStopServer();
+        }}
+      />
     </div>
   );
 }

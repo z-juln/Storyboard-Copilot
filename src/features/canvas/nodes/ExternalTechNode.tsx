@@ -16,6 +16,7 @@ import {
   prepareNodeImageForCanvas,
   toPreparedNodeImageFields,
 } from '@/features/canvas/application/imageData';
+import { CURRENT_RUNTIME_SESSION_ID } from '@/features/canvas/application/generationErrorReport';
 import { runExternalTech } from '@/features/canvas/application/runExternalTech';
 import {
   CANVAS_NODE_TYPES,
@@ -181,6 +182,37 @@ export const ExternalTechNode = memo(({
       }
     );
     addEdge(id, newNodeId);
+
+    if (isLocalZImage) {
+      try {
+        const { job_id: jobId } = await rustApiClient.submitLocalZImageJob({
+          prompt: mergedPrompt,
+          size: imageSize,
+          projectId: currentProjectId,
+        });
+        updateNodeData(newNodeId, {
+          generationJobId: jobId,
+          generationProviderId: ZIMAGE_LOCAL_PROVIDER_ID,
+          generationClientSessionId: CURRENT_RUNTIME_SESSION_ID,
+        });
+        updateNodeData(id, { prompt: promptDraft });
+      } catch (error) {
+        const resolvedError = resolveErrorContent(error, '提交 Z-Image 生成任务失败');
+        updateNodeData(newNodeId, {
+          isGenerating: false,
+          generationStartedAt: null,
+          generationError: resolvedError.message,
+          generationErrorDetails: resolvedError.details,
+        });
+        void showErrorDialog(resolvedError.message, '错误', resolvedError.details);
+      } finally {
+        updateNodeData(id, {
+          isRunning: false,
+          generationStartedAt: null,
+        });
+      }
+      return;
+    }
 
     try {
       const result = await runExternalTech({

@@ -256,6 +256,15 @@ function normalizeNodes(rawNodes: CanvasNode[]): CanvasNode[] {
         }
       }
 
+      if (node.type === CANVAS_NODE_TYPES.externalTech) {
+        if ('isRunning' in mergedData) {
+          (mergedData as { isRunning?: boolean }).isRunning = false;
+        }
+        if ('generationStartedAt' in mergedData) {
+          (mergedData as { generationStartedAt?: number | null }).generationStartedAt = null;
+        }
+      }
+
       return {
         ...node,
         type: node.type as CanvasNodeType,

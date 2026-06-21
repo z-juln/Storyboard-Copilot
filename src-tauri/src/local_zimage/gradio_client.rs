@@ -26,10 +26,10 @@ fn gradio_api(base_url: &str, path: &str) -> String {
     format!("{base_url}/gradio_api{path}")
 }
 
-pub async fn call_generate(base_url: &str, prompt: &str, size: u32) -> Result<String, String> {
+pub async fn submit_generate(base_url: &str, prompt: &str, size: u32) -> Result<String, String> {
     let normalized_size = normalize_size(size);
     let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(900))
+        .timeout(std::time::Duration::from_secs(60))
         .build()
         .map_err(|err| format!("创建 HTTP 客户端失败: {err}"))?;
 
@@ -52,10 +52,18 @@ pub async fn call_generate(base_url: &str, prompt: &str, size: u32) -> Result<St
         .await
         .map_err(|err| format!("解析 Gradio 响应失败: {err}"))?;
 
-    let event_id = payload
+    payload
         .get("event_id")
         .and_then(|value| value.as_str())
-        .ok_or_else(|| "Gradio 未返回 event_id".to_string())?;
+        .map(str::to_string)
+        .ok_or_else(|| "Gradio 未返回 event_id".to_string())
+}
+
+pub async fn read_generate_result(base_url: &str, event_id: &str) -> Result<String, String> {
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(900))
+        .build()
+        .map_err(|err| format!("创建 HTTP 客户端失败: {err}"))?;
 
     let result_url = gradio_api(base_url, &format!("/call/generate/{event_id}"));
     let response = client
@@ -73,6 +81,11 @@ pub async fn call_generate(base_url: &str, prompt: &str, size: u32) -> Result<St
     }
 
     read_gradio_sse(response).await
+}
+
+pub async fn call_generate(base_url: &str, prompt: &str, size: u32) -> Result<String, String> {
+    let event_id = submit_generate(base_url, prompt, size).await?;
+    read_generate_result(base_url, &event_id).await
 }
 
 pub async fn call_warmup(base_url: &str) -> Result<(), String> {

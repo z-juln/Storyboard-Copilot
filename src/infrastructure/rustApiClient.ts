@@ -243,6 +243,29 @@ export interface RunExternalTechResult {
   outputs: Record<string, string>;
 }
 
+export interface LocalZImageJobStatus {
+  job_id: string;
+  status: string;
+  result?: string | null;
+  error?: string | null;
+  phase?: string | null;
+  progress?: number | null;
+}
+
+export interface SubmitLocalZImageJobPayload {
+  prompt: string;
+  size?: number;
+  projectId?: string | null;
+}
+
+export interface SubmitLocalZImageJobResult {
+  job_id: string;
+}
+
+export interface LocalZImageActiveJobsResult {
+  count: number;
+}
+
 export interface RustApiClient {
   health: () => Promise<{ status: string; version: string }>;
   listAdapters: () => Promise<BuiltinAdapterSummary[]>;
@@ -326,8 +349,11 @@ export interface RustApiClient {
   getLocalZImageStatus: () => Promise<LocalZImageStatus>;
   installLocalZImage: () => Promise<LocalZImageStatus>;
   startLocalZImageServer: () => Promise<LocalZImageStatus>;
-  stopLocalZImageServer: () => Promise<LocalZImageStatus>;
+  stopLocalZImageServer: (options?: { force?: boolean }) => Promise<LocalZImageStatus>;
   warmupLocalZImageModel: () => Promise<LocalZImageStatus>;
+  submitLocalZImageJob: (payload: SubmitLocalZImageJobPayload) => Promise<SubmitLocalZImageJobResult>;
+  getLocalZImageJob: (jobId: string) => Promise<LocalZImageJobStatus>;
+  getLocalZImageActiveJobs: () => Promise<LocalZImageActiveJobsResult>;
   runExternalTech: (payload: RunExternalTechPayload) => Promise<RunExternalTechResult>;
   runLocalZImageInstallStep: (step: string) => Promise<LocalZImageStatus>;
 }
@@ -602,9 +628,11 @@ export function createRustApiClient(baseUrl = resolveBaseUrl()): RustApiClient {
       });
       return readJson<LocalZImageStatus>(response);
     },
-    stopLocalZImageServer: async () => {
+    stopLocalZImageServer: async (options) => {
       const response = await fetch(`${normalizedBaseUrl}/api/v1/local-zimage/server/stop`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ force: options?.force === true }),
       });
       return readJson<LocalZImageStatus>(response);
     },
@@ -613,6 +641,28 @@ export function createRustApiClient(baseUrl = resolveBaseUrl()): RustApiClient {
         method: 'POST',
       });
       return readJson<LocalZImageStatus>(response);
+    },
+    submitLocalZImageJob: async (payload) => {
+      const response = await fetch(`${normalizedBaseUrl}/api/v1/local-zimage/jobs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: payload.prompt,
+          size: payload.size,
+          project_id: payload.projectId ?? null,
+        }),
+      });
+      return readJson<SubmitLocalZImageJobResult>(response);
+    },
+    getLocalZImageJob: async (jobId) => {
+      const response = await fetch(
+        `${normalizedBaseUrl}/api/v1/local-zimage/jobs/${encodeURIComponent(jobId)}`
+      );
+      return readJson<LocalZImageJobStatus>(response);
+    },
+    getLocalZImageActiveJobs: async () => {
+      const response = await fetch(`${normalizedBaseUrl}/api/v1/local-zimage/jobs/active`);
+      return readJson<LocalZImageActiveJobsResult>(response);
     },
     runExternalTech: async (payload: RunExternalTechPayload) => {
       const response = await fetch(`${normalizedBaseUrl}/api/v1/external-tech/run`, {
