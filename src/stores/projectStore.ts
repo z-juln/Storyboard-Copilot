@@ -322,18 +322,42 @@ function toAvailableAssetPathSet(paths: Iterable<string>): ReadonlySet<string> {
 
 let resolveActiveProjectId: (() => string | null) | null = null;
 
+function resolveActiveProjectGraph(fallbackProject: Project): {
+  nodes: CanvasNode[];
+  edges: CanvasEdge[];
+  history: CanvasHistoryState;
+} {
+  const canvasState = useCanvasStore.getState();
+  if (canvasState.nodes.length === 0 && fallbackProject.nodes.length > 0) {
+    console.warn(
+      '[project] canvas graph is empty while project still has nodes; keeping persisted graph'
+    );
+    return {
+      nodes: fallbackProject.nodes,
+      edges: fallbackProject.edges,
+      history: fallbackProject.history ?? createEmptyHistory(),
+    };
+  }
+
+  return {
+    nodes: canvasState.nodes,
+    edges: canvasState.edges,
+    history: canvasState.history,
+  };
+}
+
 function mergeLiveCanvasGraphIntoProject(project: Project, activeProjectId: string | null): Project {
   if (!activeProjectId || project.id !== activeProjectId || isComponentDocProjectId(activeProjectId)) {
     return project;
   }
 
-  const canvasState = useCanvasStore.getState();
+  const graph = resolveActiveProjectGraph(project);
   return {
     ...project,
-    nodes: canvasState.nodes,
-    edges: canvasState.edges,
-    history: canvasState.history,
-    nodeCount: canvasState.nodes.length,
+    nodes: graph.nodes,
+    edges: graph.edges,
+    history: graph.history,
+    nodeCount: graph.nodes.length,
   };
 }
 
@@ -343,12 +367,12 @@ export function persistActiveProjectGraphFromCanvas(): void {
     return;
   }
 
-  const canvasState = useCanvasStore.getState();
+  const graph = resolveActiveProjectGraph(currentProject);
   saveCurrentProject(
-    canvasState.nodes,
-    canvasState.edges,
+    graph.nodes,
+    graph.edges,
     currentProject.viewport,
-    canvasState.history
+    graph.history
   );
 }
 
@@ -780,14 +804,14 @@ export const useProjectStore = create<ProjectState>((set, get) => {
       useCanvasStore.setState({ nodes: syncedNodes });
     }
 
-    const latestCanvas = useCanvasStore.getState();
+    const graph = resolveActiveProjectGraph(currentProject);
     const nextProject: Project = {
       ...currentProject,
       assetManifest: manifest,
-      nodes: latestCanvas.nodes,
-      edges: latestCanvas.edges,
-      history: latestCanvas.history,
-      nodeCount: latestCanvas.nodes.length,
+      nodes: graph.nodes,
+      edges: graph.edges,
+      history: graph.history,
+      nodeCount: graph.nodes.length,
       updatedAt: Date.now(),
     };
 
