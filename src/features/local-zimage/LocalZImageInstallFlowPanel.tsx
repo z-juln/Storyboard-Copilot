@@ -84,8 +84,8 @@ export function LocalZImageInstallFlowPanel({
   }
 
   return (
-    <div className={`space-y-4 ${className}`}>
-      <div className="rounded-lg border border-border-dark bg-bg-dark p-4">
+    <div className={`${compact ? 'space-y-3' : 'space-y-4'} ${className}`}>
+      <div className={compact ? 'space-y-3' : 'rounded-lg border border-border-dark bg-bg-dark p-4'}>
         {!compact ? (
           <>
             <h3 className="text-sm font-medium text-text-dark">本地 Z-Image 安装向导</h3>
@@ -96,13 +96,13 @@ export function LocalZImageInstallFlowPanel({
         ) : null}
 
         {allReady ? (
-          <div className="mt-3 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-200">
+          <div className={`rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-200${compact ? '' : ' mt-3'}`}>
             本地 Z-Image 已就绪（{status?.server_url}），模型已加载，可在外部科技节点中直接生成。
           </div>
         ) : null}
 
         {status?.server_running && !status.model_loaded ? (
-          <div className="mt-3">
+          <div className={compact ? '' : 'mt-3'}>
             <LocalZImageModelLoadBanner
               status={status}
               warmupDisabled={busyStepId !== null}
@@ -114,17 +114,17 @@ export function LocalZImageInstallFlowPanel({
         ) : null}
 
         {status?.model_error ? (
-          <p className="mt-3 text-xs text-red-400">模型加载失败：{status.model_error}</p>
+          <p className={`text-xs text-red-400${compact ? '' : ' mt-3'}`}>模型加载失败：{status.model_error}</p>
         ) : null}
 
         {successMessage ? (
-          <div className="mt-3 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-200">
+          <div className={`rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-200${compact ? '' : ' mt-3'}`}>
             {successMessage}
           </div>
         ) : null}
 
         {status?.server_detached ? (
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+          <div className={`flex flex-wrap items-center justify-between gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100${compact ? '' : ' mt-3'}`}>
             <span>
               检测到上次未关闭的 Z-Image 服务（{status.server_url}），模型可能仍在内存中，可直接生成。
             </span>
@@ -142,12 +142,12 @@ export function LocalZImageInstallFlowPanel({
         ) : null}
 
         {skippedPythonNote ? (
-          <div className="mt-3 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-200">
+          <div className={`rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-200${compact ? '' : ' mt-3'}`}>
             {skippedPythonNote}
           </div>
         ) : null}
 
-        <ol className={`${compact ? '' : 'mt-4'} space-y-3`}>
+        <ol className={`${compact ? 'space-y-2' : 'mt-4 space-y-3'}`}>
           {stepItems.map(({ step, presentation, state }) => {
             const isRunningStep =
               Boolean(status?.install_running) && recommendedStep?.id === step.id;
@@ -155,7 +155,7 @@ export function LocalZImageInstallFlowPanel({
             return (
               <li
                 key={step.id}
-                className={`rounded-md border px-3 py-2 ${
+                className={`rounded-md border px-3 ${compact ? 'py-1.5' : 'py-2'} ${
                   state === 'active'
                     ? 'border-accent/40 bg-accent/5'
                     : 'border-border-dark bg-surface-dark/40'
@@ -207,11 +207,11 @@ export function LocalZImageInstallFlowPanel({
         </ol>
 
         {error ? (
-          <p className="mt-3 text-xs text-red-400">{error}</p>
+          <p className={`text-xs text-red-400${compact ? '' : ' mt-3'}`}>{error}</p>
         ) : null}
 
         {status?.install_running && recommendedStep ? (
-          <div className="mt-4 flex items-center gap-2 text-xs text-accent">
+          <div className={`flex items-center gap-2 text-xs text-accent${compact ? ' mt-2' : ' mt-4'}`}>
             <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
             <span>
               正在执行：{status.install_phase || '处理中'}
@@ -222,7 +222,7 @@ export function LocalZImageInstallFlowPanel({
         ) : null}
 
         {!allReady && recommendedStep && !status?.install_running ? (
-          <div className="mt-4">
+          <div className={compact ? 'mt-2' : 'mt-4'}>
             <UiButton
               size="sm"
               disabled={busyStepId !== null}
@@ -240,9 +240,9 @@ export function LocalZImageInstallFlowPanel({
       </div>
 
       {status?.log_tail?.length ? (
-        <div className="rounded-lg border border-border-dark bg-bg-dark p-4">
+        <div className={compact ? '' : 'rounded-lg border border-border-dark bg-bg-dark p-4'}>
           <h4 className="text-xs font-medium text-text-dark">安装日志</h4>
-          <pre className="ui-scrollbar mt-2 max-h-48 overflow-auto whitespace-pre-wrap text-[11px] text-text-muted">
+          <pre className={`mt-2 whitespace-pre-wrap text-[11px] text-text-muted ${compact ? '' : 'ui-scrollbar max-h-48 overflow-auto'}`}>
             {status.log_tail.join('\n')}
           </pre>
         </div>

@@ -5,7 +5,7 @@ import {
   useState,
 } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
-import { Loader2, Play } from 'lucide-react';
+import { Loader2, Play, AlertTriangle, CheckCircle2 } from 'lucide-react';
 
 import {
   collectInputTexts,
@@ -29,6 +29,9 @@ import {
   listExternalTechProviders,
 } from '@/features/canvas/external-tech/registry';
 import { openLocalZImageInstallDialog } from '@/features/local-zimage/localZImageInstallEvents';
+import { isLocalZImageFullyReady } from '@/features/local-zimage/LocalZImageModelLoadBanner';
+import { useLocalZImageStatus } from '@/features/local-zimage/useLocalZImageStatus';
+import { navigateToProjectHomeTab } from '@/features/project/projectHomeNavigation';
 import {
   DEFAULT_ZIMAGE_SIZE,
   estimateZImageDurationMs,
@@ -92,6 +95,9 @@ export const ExternalTechNode = memo(({
   const providers = useMemo(() => listExternalTechProviders(), []);
   const isRunning = data.isRunning === true;
   const isLocalZImage = provider?.id === ZIMAGE_LOCAL_PROVIDER_ID;
+  const localZImageStatus = useLocalZImageStatus(isLocalZImage);
+  const isZImageReady = isLocalZImageFullyReady(localZImageStatus);
+  const isZImageModelLoading = Boolean(localZImageStatus?.model_loading);
   const imageSize = normalizeZImageSize(data.imageSize ?? DEFAULT_ZIMAGE_SIZE);
   const nodeWidth = typeof width === 'number' && width > 0 ? width : DEFAULT_WIDTH;
   const nodeHeight = typeof height === 'number' && height > 0 ? height : DEFAULT_HEIGHT;
@@ -129,12 +135,12 @@ export const ExternalTechNode = memo(({
 
     if (provider.runner === 'local-zimage') {
       try {
-        const localStatus = await rustApiClient.getLocalZImageStatus();
-        if (localStatus.needs_setup) {
-          openLocalZImageInstallDialog({ focusCurrentStep: true });
+        const localStatus = localZImageStatus ?? await rustApiClient.getLocalZImageStatus();
+        if (!isLocalZImageFullyReady(localStatus)) {
+          navigateToProjectHomeTab('plugins');
           void showErrorDialog(
-            '本地 Z-Image 尚未就绪。请先在安装向导中逐步完成安装与启动（每一步需确认）。',
-            '需要安装'
+            '本地 Z-Image 尚未就绪。请先在项目管理 → 插件列表中安装并启动服务后再生成。',
+            '服务未就绪'
           );
           return;
         }
@@ -227,6 +233,7 @@ export const ExternalTechNode = memo(({
     id,
     imageSize,
     isLocalZImage,
+    localZImageStatus,
     promptDraft,
     provider,
     updateNodeData,
@@ -301,7 +308,58 @@ export const ExternalTechNode = memo(({
           </div>
         ) : null}
 
-        {provider?.embedUrl ? (
+        {isLocalZImage ? (
+          <div className="relative min-h-0 flex-1 overflow-hidden rounded-lg border border-border-dark bg-bg-dark">
+            {isZImageReady ? (
+              <div className="flex h-full flex-col items-center justify-center gap-2 px-4 text-center">
+                <CheckCircle2 className="h-8 w-8 text-emerald-400" />
+                <p className="text-xs leading-5 text-emerald-200">
+                  本地 Z-Image 已就绪
+                </p>
+                <p className="text-[11px] leading-5 text-text-muted">
+                  在下方输入提示词后点击「生成」即可出图
+                </p>
+              </div>
+            ) : isZImageModelLoading ? (
+              <div className="flex h-full flex-col items-center justify-center gap-3 px-4 text-center">
+                <Loader2 className="h-7 w-7 animate-spin text-accent" />
+                <p className="text-xs text-text-dark">
+                  {localZImageStatus?.model_phase || '模型加载中…'}
+                </p>
+                <p className="text-[11px] tabular-nums text-accent">
+                  {Math.round(localZImageStatus?.model_progress ?? 0)}%
+                </p>
+                <p className="text-[10px] leading-5 text-text-muted">
+                  可在插件列表中查看详情；加载完成后即可生成
+                </p>
+              </div>
+            ) : (
+              <div className="flex h-full flex-col items-center justify-center gap-3 px-4 text-center">
+                <AlertTriangle className="h-8 w-8 text-amber-400" />
+                <p className="text-xs leading-5 text-text-muted">
+                  本地 Z-Image 服务未开启或未就绪，无法生成。请前往
+                  {' '}
+                  <span className="text-text-dark">项目管理 → 插件列表</span>
+                  {' '}
+                  完成安装与启动。
+                </p>
+                <UiButton
+                  type="button"
+                  size="sm"
+                  variant="muted"
+                  onClick={() => navigateToProjectHomeTab('plugins')}
+                >
+                  前往插件列表
+                </UiButton>
+              </div>
+            )}
+            {isRunning ? (
+              <div className="absolute inset-0 flex items-center justify-center bg-bg-dark/70 text-xs text-text-muted">
+                正在本地生成…
+              </div>
+            ) : null}
+          </div>
+        ) : provider?.embedUrl ? (
           <div className="relative min-h-0 flex-1 overflow-hidden rounded-lg border border-border-dark bg-bg-dark">
             <iframe
               title={provider.label}
@@ -337,18 +395,28 @@ export const ExternalTechNode = memo(({
       </div>
 
       <div className="flex shrink-0 items-center gap-2 border-t border-border-dark px-3 py-2">
-        <button
-          type="button"
-          className="min-w-0 flex-1 truncate text-left text-[10px] text-accent hover:underline"
-          onClick={() => openLocalZImageInstallDialog({ focusCurrentStep: true })}
-        >
-          打开本地 Z-Image 安装向导
-        </button>
+        {isLocalZImage ? (
+          <button
+            type="button"
+            className="min-w-0 flex-1 truncate text-left text-[10px] text-accent hover:underline"
+            onClick={() => navigateToProjectHomeTab('plugins')}
+          >
+            前往插件列表配置 Z-Image
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="min-w-0 flex-1 truncate text-left text-[10px] text-accent hover:underline"
+            onClick={() => openLocalZImageInstallDialog({ focusCurrentStep: true })}
+          >
+            打开本地 Z-Image 安装向导
+          </button>
+        )}
         <UiButton
           type="button"
           size="sm"
           variant="primary"
-          disabled={isRunning}
+          disabled={isRunning || (isLocalZImage && !isZImageReady)}
           className={NODE_CONTROL_PRIMARY_BUTTON_CLASS}
           onClick={() => {
             void handleGenerate();

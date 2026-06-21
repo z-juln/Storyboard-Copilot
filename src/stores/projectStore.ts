@@ -44,6 +44,8 @@ import {
 
 export type { Project, ProjectSummary } from '@/features/project';
 
+export type ProjectHomeTab = 'projects' | 'plugins';
+
 let openProjectRequestSeq = 0;
 const UPSERT_DEBOUNCE_MS = 260;
 const VIEWPORT_UPSERT_DEBOUNCE_MS = 280;
@@ -321,6 +323,7 @@ interface ProjectState {
   availableAssetPaths: ReadonlySet<string> | null;
   isHydrated: boolean;
   isOpeningProject: boolean;
+  projectHomeTab: ProjectHomeTab;
 
   hydrate: () => Promise<void>;
   createProject: (name: string) => string;
@@ -328,6 +331,7 @@ interface ProjectState {
   renameProject: (id: string, name: string) => void;
   openProject: (id: string) => void;
   closeProject: () => void;
+  setProjectHomeTab: (tab: ProjectHomeTab) => void;
   getCurrentProject: () => Project | null;
   saveCurrentProject: (
     nodes: CanvasNode[],
@@ -353,6 +357,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   availableAssetPaths: null,
   isHydrated: false,
   isOpeningProject: false,
+  projectHomeTab: 'projects',
 
   hydrate: async () => {
     if (get().isHydrated) {
@@ -585,6 +590,10 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       availableAssetPaths: null,
       isOpeningProject: false,
     }));
+  },
+
+  setProjectHomeTab: (tab) => {
+    set({ projectHomeTab: tab });
   },
 
   getCurrentProject: () => {

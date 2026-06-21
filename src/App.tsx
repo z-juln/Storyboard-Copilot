@@ -229,7 +229,7 @@ function App() {
           onBackClick={closeProject}
         />
 
-        <main className="flex-1 relative">
+        <main className="relative min-h-0 flex-1 overflow-hidden">
           {currentProjectId ? <Canvas /> : <ProjectManager />}
         </main>
 
