@@ -4,10 +4,12 @@ import tempfile
 import threading
 import uuid
 from pathlib import Path
+from typing import cast
 
 import gradio as gr
 import torch
-from diffusers import ZImagePipeline
+from diffusers.pipelines.z_image.pipeline_output import ZImagePipelineOutput
+from diffusers.pipelines.z_image.pipeline_z_image import ZImagePipeline
 
 ROOT = Path(__file__).resolve().parent
 MODEL_ID = os.environ.get("ZIMAGE_MODEL_ID", "Tongyi-MAI/Z-Image-Turbo")
@@ -209,12 +211,15 @@ def _run_generate(prompt: str, size: str) -> str:
     pipe = load_pipeline()
     with torch.inference_mode():
         write_model_status(loaded=True, loading=False, phase="正在生成图片", progress=100.0)
-        result = pipe(
-            prompt=cleaned,
-            height=side,
-            width=side,
-            num_inference_steps=9,
-            guidance_scale=0.0,
+        result = cast(
+            ZImagePipelineOutput,
+            pipe(
+                prompt=cleaned,
+                height=side,
+                width=side,
+                num_inference_steps=9,
+                guidance_scale=0.0,
+            ),
         )
     image = result.images[0]
     output_dir = ROOT / "outputs"

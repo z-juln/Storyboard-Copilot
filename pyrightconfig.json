@@ -1,0 +1,8 @@
+{
+  "include": ["src-tauri/src/local_zimage"],
+  "exclude": ["**/__pycache__", "src-tauri/target"],
+  "pythonVersion": "3.10",
+  "typeCheckingMode": "basic",
+  "reportMissingImports": "warning",
+  "reportMissingModuleSource": "warning"
+}
