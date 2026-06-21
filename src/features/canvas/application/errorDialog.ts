@@ -56,9 +56,14 @@ export function resolveErrorContent(error: unknown, fallbackMessage: string): Re
       (typeof record.msg === 'string' && record.msg) ||
       '';
     const details = stringifyUnknown(record);
+    const serializedDetails = details?.trim();
+    const isEmptyEnvelope =
+      serializedDetails === '{"error":null}'
+      || serializedDetails === '{"message":null}'
+      || serializedDetails === '{"error":null,"message":null}';
     return {
       message: candidate.trim() || fallbackMessage,
-      details: details?.trim() || undefined,
+      details: serializedDetails && !isEmptyEnvelope ? serializedDetails : undefined,
     };
   }
 

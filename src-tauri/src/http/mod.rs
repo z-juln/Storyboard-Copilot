@@ -41,6 +41,10 @@ use crate::project::dto::{
     CreateAssetDirectoryRequestDto, ImportProjectAssetsRequestDto, MoveProjectAssetRequestDto,
     ProjectSnapshot, RenameProjectRequestDto, UpdateProjectViewportRequestDto,
 };
+use crate::local_zimage::{
+    ExternalTechRunRequestDto, ExternalTechRunResponseDto, LocalZImageService,
+    LocalZImageStatusDto, RunInstallStepRequestDto,
+};
 use crate::project::ProjectService;
 
 #[derive(Clone)]
@@ -48,6 +52,7 @@ pub struct HttpState {
     pub ai: Arc<AiService>,
     pub project: Arc<ProjectService>,
     pub app_data_dir: PathBuf,
+    pub local_zimage: Arc<LocalZImageService>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -98,10 +103,12 @@ pub async fn start_http_server_with_app_data(app_data_dir: PathBuf) -> Result<()
 
     let _ = cleanup_stale_upload_sessions(&app_data_dir);
 
+    let local_zimage = LocalZImageService::new(app_data_dir.clone());
     let state = HttpState {
         ai: Arc::new(AiService::new(ai_db_path)),
         project: Arc::new(ProjectService::new(app_data_dir.clone())),
         app_data_dir,
+        local_zimage,
     };
 
     let cors = CorsLayer::new()
@@ -227,6 +234,25 @@ pub async fn start_http_server_with_app_data(app_data_dir: PathBuf) -> Result<()
         )
         .route("/api/v1/image", get(serve_image))
         .route("/image", get(serve_image))
+        .route("/api/v1/local-zimage/status", get(local_zimage_status))
+        .route("/api/v1/local-zimage/install", post(local_zimage_install))
+        .route(
+            "/api/v1/local-zimage/install/step",
+            post(local_zimage_install_step),
+        )
+        .route(
+            "/api/v1/local-zimage/server/start",
+            post(local_zimage_server_start),
+        )
+        .route(
+            "/api/v1/local-zimage/server/stop",
+            post(local_zimage_server_stop),
+        )
+        .route(
+            "/api/v1/local-zimage/model/warmup",
+            post(local_zimage_model_warmup),
+        )
+        .route("/api/v1/external-tech/run", post(external_tech_run))
         .merge(upload_routes)
         .layer(cors)
         .with_state(state);
@@ -747,6 +773,99 @@ async fn serve_image(
             .into_response(),
         Err(err) => api_error(StatusCode::NOT_FOUND, err),
     }
+}
+
+async fn local_zimage_status(State(state): State<HttpState>) -> Json<LocalZImageStatusDto> {
+    Json(state.local_zimage.status().await)
+}
+
+async fn local_zimage_install_step(
+    State(state): State<HttpState>,
+    Json(payload): Json<RunInstallStepRequestDto>,
+) -> Result<Json<LocalZImageStatusDto>, Response> {
+    state
+        .local_zimage
+        .run_install_step(payload.step.trim())
+        .await
+        .map_err(|error| api_error(StatusCode::BAD_REQUEST, error))?;
+    Ok(Json(state.local_zimage.status().await))
+}
+
+async fn local_zimage_install(State(state): State<HttpState>) -> Result<Json<LocalZImageStatusDto>, Response> {
+    state
+        .local_zimage
+        .start_install()
+        .await
+        .map_err(|error| api_error(StatusCode::BAD_REQUEST, error))?;
+    Ok(Json(state.local_zimage.status().await))
+}
+
+async fn local_zimage_server_start(
+    State(state): State<HttpState>,
+) -> Result<Json<LocalZImageStatusDto>, Response> {
+    state
+        .local_zimage
+        .start_server()
+        .await
+        .map_err(|error| api_error(StatusCode::BAD_REQUEST, error))?;
+    LocalZImageService::trigger_model_warmup(&state.local_zimage);
+    Ok(Json(state.local_zimage.status().await))
+}
+
+async fn local_zimage_model_warmup(
+    State(state): State<HttpState>,
+) -> Result<Json<LocalZImageStatusDto>, Response> {
+    state
+        .local_zimage
+        .warmup_model()
+        .await
+        .map_err(|error| api_error(StatusCode::BAD_REQUEST, error))?;
+    Ok(Json(state.local_zimage.status().await))
+}
+
+async fn local_zimage_server_stop(
+    State(state): State<HttpState>,
+) -> Result<Json<LocalZImageStatusDto>, Response> {
+    state
+        .local_zimage
+        .stop_server()
+        .await
+        .map_err(|error| api_error(StatusCode::BAD_REQUEST, error))?;
+    Ok(Json(state.local_zimage.status().await))
+}
+
+async fn external_tech_run(
+    State(state): State<HttpState>,
+    Json(payload): Json<ExternalTechRunRequestDto>,
+) -> Result<Json<ExternalTechRunResponseDto>, Response> {
+    let mut response = state
+        .local_zimage
+        .run_external_tech(payload.clone())
+        .await
+        .map_err(|error| api_error(StatusCode::BAD_REQUEST, error))?;
+
+    if let Some(project_id) = payload
+        .project_id
+        .as_ref()
+        .map(|value| value.trim())
+        .filter(|value| !value.is_empty())
+    {
+        if let Some(source) = response.outputs.get("image").cloned() {
+            let prepared = prepare_from_source(
+                &state.app_data_dir,
+                project_id,
+                &source,
+                512,
+            )
+            .await
+            .map_err(|error| api_error(StatusCode::BAD_REQUEST, error))?;
+            response
+                .outputs
+                .insert("image".to_string(), prepared.image_path);
+        }
+    }
+
+    Ok(Json(response))
 }
 
 fn api_error(status: StatusCode, error: String) -> Response {

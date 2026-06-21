@@ -13,11 +13,14 @@ import {
   type TextAnnotationNodeData,
   type TextNodeData,
   type UploadImageNodeData,
+  type ExternalTechNodeData,
 } from './canvasNodes';
 import { DEFAULT_NODE_DISPLAY_NAME } from './nodeDisplay';
 import { DEFAULT_IMAGE_MODEL_ID } from '../models';
+import { DEFAULT_ZIMAGE_SIZE, estimateZImageDurationMs } from '@/features/local-zimage/zimageOptions';
+import { getDefaultExternalTechProviderId } from '../external-tech/registry';
 
-export type MenuIconKey = 'upload' | 'sparkles' | 'layout' | 'text';
+export type MenuIconKey = 'upload' | 'sparkles' | 'layout' | 'text' | 'globe';
 
 export interface CanvasNodeCapabilities {
   toolbar: boolean;
@@ -275,6 +278,34 @@ const storyboardGenNodeDefinition: CanvasNodeDefinition<StoryboardGenNodeData> =
   }),
 };
 
+const externalTechNodeDefinition: CanvasNodeDefinition<ExternalTechNodeData> = {
+  type: CANVAS_NODE_TYPES.externalTech,
+  menuLabelKey: 'node.menu.externalTech',
+  menuIcon: 'globe',
+  visibleInMenu: true,
+  capabilities: {
+    toolbar: true,
+    promptInput: false,
+  },
+  connectivity: {
+    sourceHandle: true,
+    targetHandle: true,
+    connectMenu: {
+      fromSource: true,
+      fromTarget: true,
+    },
+  },
+  createDefaultData: () => ({
+    displayName: DEFAULT_NODE_DISPLAY_NAME[CANVAS_NODE_TYPES.externalTech],
+    providerId: getDefaultExternalTechProviderId(),
+    prompt: '',
+    imageSize: DEFAULT_ZIMAGE_SIZE,
+    isRunning: false,
+    generationStartedAt: null,
+    generationDurationMs: estimateZImageDurationMs(DEFAULT_ZIMAGE_SIZE),
+  }),
+};
+
 export const canvasNodeDefinitions: Record<CanvasNodeType, CanvasNodeDefinition> = {
   [CANVAS_NODE_TYPES.upload]: uploadNodeDefinition,
   [CANVAS_NODE_TYPES.imageEdit]: imageEditNodeDefinition,
@@ -284,6 +315,7 @@ export const canvasNodeDefinitions: Record<CanvasNodeType, CanvasNodeDefinition>
   [CANVAS_NODE_TYPES.group]: groupNodeDefinition,
   [CANVAS_NODE_TYPES.storyboardSplit]: storyboardSplitDefinition,
   [CANVAS_NODE_TYPES.storyboardGen]: storyboardGenNodeDefinition,
+  [CANVAS_NODE_TYPES.externalTech]: externalTechNodeDefinition,
 };
 
 export function getNodeDefinition(type: CanvasNodeType): CanvasNodeDefinition {

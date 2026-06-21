@@ -21,6 +21,18 @@
 | `GET` | `/projects/:id/assets?path=&v=` | 读原图（`v` 为 cache bust） |
 | `GET` | `/projects/:id/assets/preview?path=&max=` | 读缩略图（按内容 hash 缓存于 `.cache/previews/`） |
 
+## 本地 Z-Image / 外部科技
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| `GET` | `/local-zimage/status` | 安装进度、Python 路径、Gradio 服务状态 |
+| `POST` | `/local-zimage/install` | 后台安装（检测 python3，必要时 uv 安装 Python + venv + pip） |
+| `POST` | `/local-zimage/server/start` | 启动本地 Gradio（`:7860`） |
+| `POST` | `/local-zimage/server/stop` | 停止 Gradio |
+| `POST` | `/external-tech/run` | `{ provider_id, prompt, inputs }` → `{ outputs }` |
+
+详见 `openspec/changes/local-zimage.md`。
+
 ## 约束
 
 - move/rename：**只改磁盘 + manifest.path**，不批量改节点 JSON。

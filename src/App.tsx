@@ -23,6 +23,8 @@ import {
   subscribeOpenSettingsDialog,
   type SettingsCategory,
 } from './features/settings/settingsEvents';
+import { LocalZImageInstallDialog } from './features/local-zimage/LocalZImageInstallDialog';
+import { subscribeOpenLocalZImageInstallDialog } from './features/local-zimage/localZImageInstallEvents';
 
 function toRgbCssValue(hexColor: string): string {
   const hex = hexColor.replace('#', '');
@@ -49,6 +51,7 @@ function App() {
   const [latestVersion, setLatestVersion] = useState<string>('');
   const [currentVersion, setCurrentVersion] = useState<string>('');
   const [globalError, setGlobalError] = useState<GlobalErrorDialogDetail | null>(null);
+  const [showLocalZImageInstall, setShowLocalZImageInstall] = useState(false);
 
   const isHydrated = useProjectStore((state) => state.isHydrated);
   const hydrate = useProjectStore((state) => state.hydrate);
@@ -100,6 +103,13 @@ function App() {
     const unsubscribe = subscribeOpenSettingsDialog(({ category }) => {
       setSettingsInitialCategory(category ?? 'general');
       setShowSettings(true);
+    });
+    return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = subscribeOpenLocalZImageInstallDialog(() => {
+      setShowLocalZImageInstall(true);
     });
     return unsubscribe;
   }, []);
@@ -243,6 +253,10 @@ function App() {
           details={globalError?.details}
           copyText={globalError?.copyText}
           onClose={() => setGlobalError(null)}
+        />
+        <LocalZImageInstallDialog
+          isOpen={showLocalZImageInstall}
+          onClose={() => setShowLocalZImageInstall(false)}
         />
       </div>
     </ReactFlowProvider>

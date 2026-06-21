@@ -16,6 +16,7 @@ import { GRSAI_CREDIT_TIERS } from '@/features/canvas/pricing/types';
 import providerGuideMarkdown from '../../docs/settings/provider-guide.md?raw';
 import type { SettingsCategory } from '@/features/settings/settingsEvents';
 import { BuiltinModelsPanel } from '@/components/settings/BuiltinModelsPanel';
+import { LocalZImagePanel } from '@/components/settings/LocalZImagePanel';
 
 interface SettingsDialogProps {
   isOpen: boolean;
@@ -90,6 +91,7 @@ export function SettingsDialog({
     apiKeys,
     grsaiNanoBananaProModel,
     hideProviderGuidePopover,
+    hideLocalZImageHomePanel,
     downloadPresetPaths,
     useUploadFilenameAsNodeTitle,
     storyboardGenKeepStyleConsistent,
@@ -130,6 +132,7 @@ export function SettingsDialog({
     setCanvasEdgeRoutingMode,
     setAutoCheckAppUpdateOnLaunch,
     setEnableUpdateDialog,
+    setHideLocalZImageHomePanel,
   } = useSettingsStore();
   const providers = useMemo(() => {
     const providerOrder = ['kie', 'ppio', 'fal', 'grsai'];
@@ -633,7 +636,17 @@ export function SettingsDialog({
             )}
 
             {activeCategory === 'aiModels' && (
-              <div className="ui-scrollbar flex-1 overflow-y-auto p-6">
+              <div className="ui-scrollbar flex-1 space-y-6 overflow-y-auto p-6">
+                <LocalZImagePanel />
+                {!hideLocalZImageHomePanel ? null : (
+                  <button
+                    type="button"
+                    className="text-xs text-accent hover:underline"
+                    onClick={() => setHideLocalZImageHomePanel(false)}
+                  >
+                    在首页显示 Z-Image 安装面板
+                  </button>
+                )}
                 <BuiltinModelsPanel />
               </div>
             )}

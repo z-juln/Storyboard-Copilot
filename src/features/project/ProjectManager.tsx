@@ -5,6 +5,7 @@ import { getConfiguredApiKeyCount, useSettingsStore } from '@/stores/settingsSto
 import { UI_CONTENT_OVERLAY_INSET_CLASS } from '@/components/ui/motion';
 import { UiButton, UiSelect } from '@/components/ui/primitives';
 import { MissingApiKeyHint } from '@/features/settings/MissingApiKeyHint';
+import { LocalZImageHomePanel } from '@/features/local-zimage/LocalZImageHomePanel';
 import { listModelProviders } from '@/features/canvas/models';
 import { RenameDialog } from './RenameDialog';
 import { isComponentDocProjectId } from '@/features/canvas/component-doc';
@@ -108,6 +109,8 @@ export function ProjectManager() {
         </div>
 
         {configuredApiKeyCount === 0 && <MissingApiKeyHint className="mb-8" />}
+
+        <LocalZImageHomePanel />
 
         {projects.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-text-muted">

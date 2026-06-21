@@ -2,6 +2,7 @@ pub mod ai;
 pub mod clipboard;
 pub mod commands;
 pub mod http;
+pub mod local_zimage;
 pub mod media;
 pub mod project;
 

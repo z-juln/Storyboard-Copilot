@@ -8,6 +8,7 @@ import type {
 } from '@/features/aiModels/types';
 import type { ProjectDirectoryEntry, ProjectSnapshot } from '@/features/project/types';
 import type { ProjectSummaryRecord } from '@/commands/projectState';
+import type { LocalZImageStatus } from '@/features/canvas/external-tech/types';
 
 const DEFAULT_BASE_URL = 'http://127.0.0.1:1421';
 const DEFAULT_UPLOAD_CHUNK_SIZE = 4 * 1024 * 1024;
@@ -80,10 +81,38 @@ interface CreateUploadSessionResult {
   chunkSize: number;
 }
 
+function formatApiError(payload: unknown, status: number): string {
+  if (payload && typeof payload === 'object') {
+    const record = payload as Record<string, unknown>;
+    if (typeof record.error === 'string' && record.error.trim()) {
+      return record.error.trim();
+    }
+    if (typeof record.message === 'string' && record.message.trim()) {
+      return record.message.trim();
+    }
+  }
+  if (typeof payload === 'string' && payload.trim()) {
+    return payload.trim();
+  }
+  try {
+    const serialized = JSON.stringify(payload);
+    const isEmptyEnvelope =
+      serialized === '{"error":null}'
+      || serialized === '{"message":null}'
+      || serialized === '{"error":null,"message":null}';
+    if (serialized && serialized !== 'null' && serialized !== '{}' && !isEmptyEnvelope) {
+      return serialized;
+    }
+  } catch {
+    // ignore
+  }
+  return `HTTP ${status}`;
+}
+
 async function readJson<T>(response: Response): Promise<T> {
-  const payload = (await response.json()) as T & { error?: string };
+  const payload = (await response.json()) as T & { error?: string | null; message?: string | null };
   if (!response.ok) {
-    throw new Error(payload.error || `HTTP ${response.status}`);
+    throw new Error(formatApiError(payload, response.status));
   }
   return payload;
 }
@@ -93,8 +122,8 @@ async function readEmpty(response: Response): Promise<void> {
     return;
   }
 
-  const payload = (await response.json().catch(() => ({}))) as { error?: string };
-  throw new Error(payload.error || `HTTP ${response.status}`);
+  const payload = (await response.json().catch(() => ({}))) as { error?: string | null; message?: string | null };
+  throw new Error(formatApiError(payload, response.status));
 }
 
 async function abortUploadSession(
@@ -203,6 +232,17 @@ async function uploadProjectAssetAtPathInChunks(
   return payload.path;
 }
 
+export interface RunExternalTechPayload {
+  providerId: string;
+  prompt: string;
+  inputs: Record<string, string>;
+  projectId?: string | null;
+}
+
+export interface RunExternalTechResult {
+  outputs: Record<string, string>;
+}
+
 export interface RustApiClient {
   health: () => Promise<{ status: string; version: string }>;
   listAdapters: () => Promise<BuiltinAdapterSummary[]>;
@@ -283,6 +323,13 @@ export interface RustApiClient {
     source: string,
     metadata: StoryboardImageMetadata
   ) => Promise<string>;
+  getLocalZImageStatus: () => Promise<LocalZImageStatus>;
+  installLocalZImage: () => Promise<LocalZImageStatus>;
+  startLocalZImageServer: () => Promise<LocalZImageStatus>;
+  stopLocalZImageServer: () => Promise<LocalZImageStatus>;
+  warmupLocalZImageModel: () => Promise<LocalZImageStatus>;
+  runExternalTech: (payload: RunExternalTechPayload) => Promise<RunExternalTechResult>;
+  runLocalZImageInstallStep: (step: string) => Promise<LocalZImageStatus>;
 }
 
 export function createRustApiClient(baseUrl = resolveBaseUrl()): RustApiClient {
@@ -530,6 +577,55 @@ export function createRustApiClient(baseUrl = resolveBaseUrl()): RustApiClient {
       );
       const result = await readJson<{ path: string }>(response);
       return result.path;
+    },
+    getLocalZImageStatus: async () => {
+      const response = await fetch(`${normalizedBaseUrl}/api/v1/local-zimage/status`);
+      return readJson<LocalZImageStatus>(response);
+    },
+    installLocalZImage: async () => {
+      const response = await fetch(`${normalizedBaseUrl}/api/v1/local-zimage/install`, {
+        method: 'POST',
+      });
+      return readJson<LocalZImageStatus>(response);
+    },
+    runLocalZImageInstallStep: async (step) => {
+      const response = await fetch(`${normalizedBaseUrl}/api/v1/local-zimage/install/step`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ step }),
+      });
+      return readJson<LocalZImageStatus>(response);
+    },
+    startLocalZImageServer: async () => {
+      const response = await fetch(`${normalizedBaseUrl}/api/v1/local-zimage/server/start`, {
+        method: 'POST',
+      });
+      return readJson<LocalZImageStatus>(response);
+    },
+    stopLocalZImageServer: async () => {
+      const response = await fetch(`${normalizedBaseUrl}/api/v1/local-zimage/server/stop`, {
+        method: 'POST',
+      });
+      return readJson<LocalZImageStatus>(response);
+    },
+    warmupLocalZImageModel: async () => {
+      const response = await fetch(`${normalizedBaseUrl}/api/v1/local-zimage/model/warmup`, {
+        method: 'POST',
+      });
+      return readJson<LocalZImageStatus>(response);
+    },
+    runExternalTech: async (payload: RunExternalTechPayload) => {
+      const response = await fetch(`${normalizedBaseUrl}/api/v1/external-tech/run`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider_id: payload.providerId,
+          prompt: payload.prompt,
+          inputs: payload.inputs,
+          project_id: payload.projectId ?? null,
+        }),
+      });
+      return readJson<RunExternalTechResult>(response);
     },
   };
 }

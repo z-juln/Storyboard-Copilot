@@ -1,5 +1,6 @@
 import type { NodeTypes } from '@xyflow/react';
 
+import { ExternalTechNode } from './ExternalTechNode';
 import { GroupNode } from './GroupNode';
 import { ImageEditNode } from './ImageEditNode';
 import { ImageNode } from './ImageNode';
@@ -18,6 +19,17 @@ export const nodeTypes: NodeTypes = {
   textAnnotationNode: TextAnnotationNode,
   textNode: TextNode,
   uploadNode: UploadNode,
+  externalTechNode: ExternalTechNode,
 };
 
-export { GroupNode, ImageEditNode, ImageNode, StoryboardGenNode, StoryboardNode, TextAnnotationNode, TextNode, UploadNode };
+export {
+  ExternalTechNode,
+  GroupNode,
+  ImageEditNode,
+  ImageNode,
+  StoryboardGenNode,
+  StoryboardNode,
+  TextAnnotationNode,
+  TextNode,
+  UploadNode,
+};

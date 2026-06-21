@@ -18,6 +18,7 @@ interface SettingsState {
   apiKeys: ProviderApiKeys;
   grsaiNanoBananaProModel: string;
   hideProviderGuidePopover: boolean;
+  hideLocalZImageHomePanel: boolean;
   downloadPresetPaths: string[];
   useUploadFilenameAsNodeTitle: boolean;
   storyboardGenKeepStyleConsistent: boolean;
@@ -40,6 +41,7 @@ interface SettingsState {
   setProviderApiKey: (providerId: string, key: string) => void;
   setGrsaiNanoBananaProModel: (model: string) => void;
   setHideProviderGuidePopover: (hide: boolean) => void;
+  setHideLocalZImageHomePanel: (hide: boolean) => void;
   setDownloadPresetPaths: (paths: string[]) => void;
   setUseUploadFilenameAsNodeTitle: (enabled: boolean) => void;
   setStoryboardGenKeepStyleConsistent: (enabled: boolean) => void;
@@ -165,6 +167,7 @@ export const useSettingsStore = create<SettingsState>()(
       apiKeys: {},
       grsaiNanoBananaProModel: DEFAULT_GRSAI_NANO_BANANA_PRO_MODEL,
       hideProviderGuidePopover: false,
+      hideLocalZImageHomePanel: false,
       downloadPresetPaths: [],
       useUploadFilenameAsNodeTitle: true,
       storyboardGenKeepStyleConsistent: true,
@@ -196,6 +199,7 @@ export const useSettingsStore = create<SettingsState>()(
           grsaiNanoBananaProModel: normalizeGrsaiNanoBananaProModel(model),
         }),
       setHideProviderGuidePopover: (hide) => set({ hideProviderGuidePopover: hide }),
+      setHideLocalZImageHomePanel: (hide) => set({ hideLocalZImageHomePanel: hide }),
       setDownloadPresetPaths: (paths) => {
         const uniquePaths = Array.from(
           new Set(paths.map((path) => path.trim()).filter((path) => path.length > 0))
@@ -254,6 +258,7 @@ export const useSettingsStore = create<SettingsState>()(
           ignoreAtTagWhenCopyingAndGenerating?: boolean;
           grsaiNanoBananaProModel?: string;
           hideProviderGuidePopover?: boolean;
+          hideLocalZImageHomePanel?: boolean;
           canvasEdgeRoutingMode?: CanvasEdgeRoutingMode | string;
           autoCheckAppUpdateOnLaunch?: boolean;
           enableUpdateDialog?: boolean;
@@ -280,6 +285,7 @@ export const useSettingsStore = create<SettingsState>()(
               state.grsaiNanoBananaProModel
             ),
             hideProviderGuidePopover: state.hideProviderGuidePopover ?? false,
+            hideLocalZImageHomePanel: state.hideLocalZImageHomePanel ?? false,
             canvasEdgeRoutingMode: normalizeCanvasEdgeRoutingMode(state.canvasEdgeRoutingMode),
             autoCheckAppUpdateOnLaunch: state.autoCheckAppUpdateOnLaunch ?? true,
             enableUpdateDialog: state.enableUpdateDialog ?? true,
@@ -307,6 +313,7 @@ export const useSettingsStore = create<SettingsState>()(
             state.grsaiNanoBananaProModel
           ),
           hideProviderGuidePopover: state.hideProviderGuidePopover ?? false,
+          hideLocalZImageHomePanel: state.hideLocalZImageHomePanel ?? false,
           canvasEdgeRoutingMode: normalizeCanvasEdgeRoutingMode(state.canvasEdgeRoutingMode),
           autoCheckAppUpdateOnLaunch: state.autoCheckAppUpdateOnLaunch ?? true,
           enableUpdateDialog: state.enableUpdateDialog ?? true,

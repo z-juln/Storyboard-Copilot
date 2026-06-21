@@ -1,5 +1,5 @@
 import { useMemo, useCallback, useEffect, useRef, useState } from 'react';
-import { Image, Upload, Sparkles, LayoutGrid, Type } from 'lucide-react';
+import { Image, Upload, Sparkles, LayoutGrid, Type, Globe } from 'lucide-react';
 import { UI_POPOVER_TRANSITION_MS } from '@/components/ui/motion';
 
 import type { CanvasNodeType } from '@/features/canvas/domain/canvasNodes';
@@ -18,6 +18,7 @@ const iconMap: Record<MenuIconKey, typeof Upload> = {
   sparkles: Sparkles,
   layout: LayoutGrid,
   text: Type,
+  globe: Globe,
 };
 
 const MENU_LABELS: Record<string, string> = {
@@ -27,6 +28,7 @@ const MENU_LABELS: Record<string, string> = {
   'node.menu.storyboardGen': '分镜生成',
   'node.menu.textAnnotation': '文本注释',
   'node.menu.textAsset': '文本节点',
+  'node.menu.externalTech': '外部科技',
 };
 
 export function NodeSelectionMenu({

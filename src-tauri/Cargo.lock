@@ -6018,6 +6018,7 @@ dependencies = [
  "image",
  "imageproc",
  "inventory",
+ "libc",
  "md5",
  "objc",
  "png 0.17.16",

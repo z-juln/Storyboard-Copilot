@@ -9,6 +9,7 @@ export const CANVAS_NODE_TYPES = {
   group: 'groupNode',
   storyboardSplit: 'storyboardNode',
   storyboardGen: 'storyboardGenNode',
+  externalTech: 'externalTechNode',
 } as const;
 
 export type CanvasNodeType = (typeof CANVAS_NODE_TYPES)[keyof typeof CANVAS_NODE_TYPES];
@@ -155,6 +156,16 @@ export interface StoryboardGenNodeData {
   [key: string]: unknown;
 }
 
+export interface ExternalTechNodeData extends NodeDisplayData {
+  providerId: string;
+  prompt: string;
+  imageSize?: number;
+  isRunning?: boolean;
+  generationStartedAt?: number | null;
+  generationDurationMs?: number;
+  [key: string]: unknown;
+}
+
 export type CanvasNodeData =
   | UploadImageNodeData
   | ExportImageNodeData
@@ -163,7 +174,8 @@ export type CanvasNodeData =
   | GroupNodeData
   | ImageEditNodeData
   | StoryboardSplitNodeData
-  | StoryboardGenNodeData;
+  | StoryboardGenNodeData
+  | ExternalTechNodeData;
 
 export type CanvasNode = Node<CanvasNodeData, CanvasNodeType>;
 export type CanvasEdge = Edge;
@@ -240,6 +252,12 @@ export function isStoryboardGenNode(
   node: CanvasNode | null | undefined
 ): node is Node<StoryboardGenNodeData, typeof CANVAS_NODE_TYPES.storyboardGen> {
   return node?.type === CANVAS_NODE_TYPES.storyboardGen;
+}
+
+export function isExternalTechNode(
+  node: CanvasNode | null | undefined
+): node is Node<ExternalTechNodeData, typeof CANVAS_NODE_TYPES.externalTech> {
+  return node?.type === CANVAS_NODE_TYPES.externalTech;
 }
 
 export function nodeHasImage(node: CanvasNode | null | undefined): boolean {
