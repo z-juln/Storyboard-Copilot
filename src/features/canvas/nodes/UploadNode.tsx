@@ -49,7 +49,6 @@ import { useProjectStore } from '@/stores/projectStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { resolveFileAssetDisplayUrl } from '@/features/project/asset';
 import { fetchAssetTextContent } from '@/features/project/asset/assetPreviewUtils';
-import { isProjectRelativeAssetPath } from '@/features/project/projectPaths';
 
 type UploadNodeProps = NodeProps & {
   id: string;
@@ -154,10 +153,6 @@ export const UploadNode = memo(({ id, data, selected, width, height }: UploadNod
           nextData.displayName = file.name;
         }
         updateNodeData(id, nextData);
-
-        if (isProjectRelativeAssetPath(prepared.imageUrl)) {
-          canvasEventBus.publish('asset-explorer/reveal-asset', { path: prepared.imageUrl });
-        }
 
         console.info(
           `[upload-perf][node] processFile success nodeId=${id} name="${file.name}" size=${file.size}B elapsed=${Math.round(performance.now() - started)}ms`

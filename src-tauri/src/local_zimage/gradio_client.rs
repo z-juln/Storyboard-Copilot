@@ -1,3 +1,4 @@
+use futures_util::StreamExt;
 use serde_json::json;
 
 pub async fn probe_server(base_url: &str) -> bool {
@@ -28,7 +29,7 @@ fn gradio_api(base_url: &str, path: &str) -> String {
 pub async fn call_generate(base_url: &str, prompt: &str, size: u32) -> Result<String, String> {
     let normalized_size = normalize_size(size);
     let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(600))
+        .timeout(std::time::Duration::from_secs(900))
         .build()
         .map_err(|err| format!("创建 HTTP 客户端失败: {err}"))?;
 
@@ -71,12 +72,7 @@ pub async fn call_generate(base_url: &str, prompt: &str, size: u32) -> Result<St
         ));
     }
 
-    let body = response
-        .text()
-        .await
-        .map_err(|err| format!("读取 Gradio 结果失败: {err}"))?;
-
-    parse_gradio_result_body(&body)
+    read_gradio_sse(response).await
 }
 
 pub async fn call_warmup(base_url: &str) -> Result<(), String> {
@@ -109,46 +105,94 @@ fn normalize_size(size: u32) -> u32 {
     }
 }
 
+async fn read_gradio_sse(response: reqwest::Response) -> Result<String, String> {
+    let mut current_event: Option<String> = None;
+    let mut line_buffer = String::new();
+    let mut raw_body = String::new();
+    let mut stream = response.bytes_stream();
+
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk.map_err(|err| format!("读取 Gradio 结果失败: {err}"))?;
+        let chunk_text = String::from_utf8_lossy(&chunk);
+        raw_body.push_str(&chunk_text);
+        line_buffer.push_str(&chunk_text);
+
+        while let Some(newline_index) = line_buffer.find('\n') {
+            let line = line_buffer[..newline_index]
+                .trim_end_matches('\r')
+                .to_string();
+            line_buffer = line_buffer[newline_index + 1..].to_string();
+            if let Some(path) = process_sse_line(&mut current_event, &line)? {
+                return Ok(path);
+            }
+        }
+    }
+
+    if !line_buffer.trim().is_empty() {
+        if let Some(path) = process_sse_line(&mut current_event, line_buffer.trim())? {
+            return Ok(path);
+        }
+    }
+
+    parse_gradio_result_body(&raw_body)
+}
+
+fn process_sse_line(
+    current_event: &mut Option<String>,
+    line: &str,
+) -> Result<Option<String>, String> {
+    if line.is_empty() {
+        return Ok(None);
+    }
+
+    if let Some(event) = line.strip_prefix("event: ") {
+        *current_event = Some(event.trim().to_string());
+        return Ok(None);
+    }
+
+    let Some(data) = line.strip_prefix("data: ") else {
+        return Ok(None);
+    };
+    let data = data.trim();
+
+    match current_event.as_deref() {
+        Some("complete") | Some("completed") => {
+            let payload: serde_json::Value = serde_json::from_str(data)
+                .map_err(|err| format!("解析 Gradio complete 数据失败: {err}"))?;
+            Ok(Some(extract_image_path(&payload)?))
+        }
+        Some("error") => {
+            let message = if data.is_empty() || data == "null" {
+                "Gradio 生成失败，请确认 Z-Image 服务已重启（设置中停止后再启动）"
+                    .to_string()
+            } else {
+                serde_json::from_str::<String>(data)
+                    .unwrap_or_else(|_| data.trim_matches('"').to_string())
+            };
+            Err(if message.trim().is_empty() {
+                "Gradio 生成失败".to_string()
+            } else {
+                message
+            })
+        }
+        Some("heartbeat") | Some("generating") | None => Ok(None),
+        Some(other) => Err(format!("Gradio 返回未知事件: {other}")),
+    }
+}
+
 fn parse_gradio_result_body(body: &str) -> Result<String, String> {
     let trimmed = body.trim();
+    if trimmed.is_empty() {
+        return Err("Gradio 未返回任何结果".to_string());
+    }
     if trimmed.starts_with('{') {
         return parse_gradio_legacy_json(trimmed);
     }
 
-    let mut current_event: Option<&str> = None;
+    let mut current_event: Option<String> = None;
     for line in body.lines() {
-        if let Some(event) = line.strip_prefix("event: ") {
-            current_event = Some(event.trim());
-            continue;
-        }
-        let Some(data) = line.strip_prefix("data: ") else {
-            continue;
-        };
-        let data = data.trim();
-        match current_event {
-            Some("complete") | Some("completed") => {
-                let payload: serde_json::Value = serde_json::from_str(data)
-                    .map_err(|err| format!("解析 Gradio complete 数据失败: {err}"))?;
-                return extract_image_path(&payload);
-            }
-            Some("error") => {
-                let message = if data.is_empty() || data == "null" {
-                    "Gradio 生成失败，请确认 Z-Image 服务已重启（设置中停止后再启动）"
-                        .to_string()
-                } else {
-                    serde_json::from_str::<String>(data)
-                        .unwrap_or_else(|_| data.trim_matches('"').to_string())
-                };
-                return Err(if message.trim().is_empty() {
-                    "Gradio 生成失败".to_string()
-                } else {
-                    message
-                });
-            }
-            Some("heartbeat") | Some("generating") | None => {}
-            Some(other) => {
-                return Err(format!("Gradio 返回未知事件: {other}"));
-            }
+        if let Some(path) = process_sse_line(&mut current_event, line.trim_end())? {
+            return Ok(path);
         }
     }
 
@@ -211,7 +255,7 @@ fn extract_image_path(payload: &serde_json::Value) -> Result<String, String> {
 
 #[cfg(test)]
 mod tests {
-    use super::parse_gradio_result_body;
+    use super::{parse_gradio_result_body, process_sse_line};
 
     #[test]
     fn parses_gradio6_complete_sse() {
@@ -232,5 +276,17 @@ data: "something went wrong"
 "#;
         let err = parse_gradio_result_body(body).expect_err("should error");
         assert!(err.contains("something went wrong"));
+    }
+
+    #[test]
+    fn process_sse_line_returns_complete_early() {
+        let mut current_event = Some("complete".to_string());
+        let path = process_sse_line(
+            &mut current_event,
+            r#"data: [{"path":"/tmp/early.png","url":"http://127.0.0.1:7860/file=/tmp/early.png"}]"#,
+        )
+        .expect("should parse")
+        .expect("should return path");
+        assert_eq!(path, "/tmp/early.png");
     }
 }

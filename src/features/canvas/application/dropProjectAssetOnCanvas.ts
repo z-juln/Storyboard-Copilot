@@ -1,6 +1,6 @@
 import type { XYPosition } from '@xyflow/react';
 
-import { canvasEventBus } from '@/features/canvas/application/canvasServices';
+import { revealProjectAsset } from '@/features/canvas/application/assetExplorerRevealBridge';
 import { CANVAS_NODE_TYPES, type CanvasNodeType } from '@/features/canvas/domain/canvasNodes';
 import type { AssetManifest } from '@/features/project/asset';
 import { createEmptyAssetManifest } from '@/features/project/asset';
@@ -68,6 +68,6 @@ export async function dropProjectAssetOnCanvas(
 
   const nodeId = input.addNode(CANVAS_NODE_TYPES.upload, input.position, nodeData);
   input.setSelectedNode(nodeId);
-  canvasEventBus.publish('asset-explorer/reveal-asset', { path: input.payload.path });
+  revealProjectAsset(input.payload.path);
   return nodeId;
 }

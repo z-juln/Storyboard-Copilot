@@ -1,6 +1,6 @@
 import type { XYPosition } from '@xyflow/react';
 
-import { canvasEventBus } from '@/features/canvas/application/canvasServices';
+import { revealProjectAsset } from '@/features/canvas/application/assetExplorerRevealBridge';
 import { CANVAS_NODE_TYPES, type CanvasNodeType } from '@/features/canvas/domain/canvasNodes';
 import type { AssetManifest } from '@/features/project/asset';
 
@@ -49,6 +49,6 @@ export async function placeBoundTextNodeOnCanvas(
   const layout = resolveTextNodeInitialSize(nodeData.textContent ?? '');
   const nodeId = input.addNode(CANVAS_NODE_TYPES.text, input.position, nodeData, layout);
   input.setSelectedNode(nodeId);
-  canvasEventBus.publish('asset-explorer/reveal-asset', { path: input.path });
+  revealProjectAsset(input.path);
   return nodeId;
 }

@@ -13,7 +13,7 @@ import {
 } from '@/features/canvas/application/graphTextResolver';
 import { resolveErrorContent, showErrorDialog } from '@/features/canvas/application/errorDialog';
 import {
-  prepareNodeImage,
+  prepareNodeImageForCanvas,
   toPreparedNodeImageFields,
 } from '@/features/canvas/application/imageData';
 import { runExternalTech } from '@/features/canvas/application/runExternalTech';
@@ -192,7 +192,7 @@ export const ExternalTechNode = memo(({
         throw new Error('外部科技未返回图片结果');
       }
 
-      const prepared = await prepareNodeImage(
+      const prepared = await prepareNodeImageForCanvas(
         imageOutput.startsWith('/') ? `file://${imageOutput}` : imageOutput
       );
       updateNodeData(newNodeId, {

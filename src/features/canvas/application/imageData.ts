@@ -11,6 +11,7 @@ import {
 } from '@/features/project/projectPaths';
 import { resolveFileAssetDisplayUrl } from '@/features/project/asset';
 import { useProjectStore } from '@/stores/projectStore';
+import { revealProjectAsset } from '@/features/canvas/application/assetExplorerRevealBridge';
 
 function requireCurrentProjectId(): string {
   const projectId = useProjectStore.getState().currentProjectId;
@@ -353,10 +354,28 @@ function resolveFileExtension(file: File): string {
   return 'png';
 }
 
+export interface PrepareNodeImageForCanvasOptions {
+  maxPreviewDimension?: number;
+  /** 默认 true：落盘后刷新资产树并高亮 */
+  revealInExplorer?: boolean;
+}
+
+function maybeRevealPreparedAsset(
+  prepared: PreparedNodeImage,
+  revealInExplorer: boolean
+): PreparedNodeImage {
+  if (revealInExplorer && isProjectRelativeAssetPath(prepared.imageUrl)) {
+    revealProjectAsset(prepared.imageUrl);
+  }
+  return prepared;
+}
+
 export async function prepareNodeImageFromFile(
   file: File,
-  maxPreviewDimension = DEFAULT_PREVIEW_MAX_DIMENSION
+  maxPreviewDimension = DEFAULT_PREVIEW_MAX_DIMENSION,
+  options?: Pick<PrepareNodeImageForCanvasOptions, 'revealInExplorer'>
 ): Promise<PreparedNodeImage> {
+  const revealInExplorer = options?.revealInExplorer ?? true;
   const started = performance.now();
   const tauriFilePath = (file as File & { path?: string }).path;
   const normalizedPath = typeof tauriFilePath === 'string' ? tauriFilePath.trim() : '';
@@ -364,7 +383,10 @@ export async function prepareNodeImageFromFile(
     normalizedPath.length > 0
     && (isLikelyLocalImagePath(normalizedPath) || normalizedPath.toLowerCase().startsWith('file://'));
   if (canUseLocalPath) {
-    const prepared = await prepareNodeImage(normalizedPath, maxPreviewDimension);
+    const prepared = await prepareNodeImageForCanvas(normalizedPath, {
+      maxPreviewDimension,
+      revealInExplorer,
+    });
     console.info(
       `[upload-perf][imageData] prepareNodeImageFromFile path-mode name="${file.name}" size=${file.size}B elapsed=${Math.round(performance.now() - started)}ms`
     );
@@ -374,13 +396,16 @@ export async function prepareNodeImageFromFile(
   const safeMaxDimension = Math.max(64, Math.floor(maxPreviewDimension));
   const extension = resolveFileExtension(file);
   const prepareStarted = performance.now();
-  const prepared = mapPreparedResult(
-    await rustApiClient.prepareNodeImageFromBlob(
-      requireCurrentProjectId(),
-      file,
-      extension,
-      safeMaxDimension
-    )
+  const prepared = maybeRevealPreparedAsset(
+    mapPreparedResult(
+      await rustApiClient.prepareNodeImageFromBlob(
+        requireCurrentProjectId(),
+        file,
+        extension,
+        safeMaxDimension
+      )
+    ),
+    revealInExplorer
   );
   const prepareElapsed = Math.round(performance.now() - prepareStarted);
   console.info(
@@ -485,6 +510,15 @@ export async function prepareNodeImage(
       error
     );
   }
+}
+
+/** 落盘并可选刷新资产树；用户可见的新增图片入口应优先使用此函数。 */
+export async function prepareNodeImageForCanvas(
+  imageUrl: string,
+  options?: PrepareNodeImageForCanvasOptions
+): Promise<PreparedNodeImage> {
+  const prepared = await prepareNodeImage(imageUrl, options?.maxPreviewDimension);
+  return maybeRevealPreparedAsset(prepared, options?.revealInExplorer ?? true);
 }
 
 export { buildProjectAssetPreviewUrl };
