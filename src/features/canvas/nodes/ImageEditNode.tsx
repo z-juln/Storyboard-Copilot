@@ -793,11 +793,6 @@ export const ImageEditNode = memo(({ id, data, selected, width, height }: ImageE
               {...bindField()}
             />
           ) : null}
-          {upstreamTexts.length > 0 ? (
-            <div className="mt-1 px-1 text-[10px] text-text-muted">
-              已连接 {upstreamTexts.length} 个文本输入
-            </div>
-          ) : null}
         </div>
 
         {showImagePicker && incomingImageItems.length > 0 && (
