@@ -54,8 +54,8 @@ import {
   buildGenerationErrorReport,
   CURRENT_RUNTIME_SESSION_ID,
 } from '@/features/canvas/application/generationErrorReport';
+import { pollGenerationJobStatus } from '@/features/canvas/application/pollGenerationJobStatus';
 import { ZIMAGE_LOCAL_PROVIDER_ID } from '@/features/canvas/external-tech/providers/zimageLocal';
-import { rustApiClient } from '@/infrastructure/rustApiClient';
 import { showErrorDialog } from '@/features/canvas/application/errorDialog';
 import {
   getConnectMenuNodeTypes,
@@ -461,9 +461,8 @@ export function Canvas() {
             const generationProviderId = typeof currentData.generationProviderId === 'string'
               ? currentData.generationProviderId
               : '';
-            const isZImageJob = generationProviderId === ZIMAGE_LOCAL_PROVIDER_ID;
 
-            if (generationProviderId && !isZImageJob) {
+            if (generationProviderId && generationProviderId !== ZIMAGE_LOCAL_PROVIDER_ID) {
               const providerApiKey = apiKeys[generationProviderId] ?? '';
               if (providerApiKey) {
                 await canvasAiGateway.setApiKey(generationProviderId, providerApiKey).catch((error) => {
@@ -476,19 +475,13 @@ export function Canvas() {
               }
             }
 
-            const status = isZImageJob
-              ? await rustApiClient.getLocalZImageJob(jobId).catch((error) => {
-                console.warn('[GenerationJob] zimage poll failed', { nodeId: pendingNode.id, jobId, error });
-                return null;
-              })
-              : await canvasAiGateway.getGenerateImageJob(jobId).catch((error) => {
-                console.warn('[GenerationJob] poll failed', { nodeId: pendingNode.id, jobId, error });
-                return null;
-              });
-            if (!status) {
+            const polled = await pollGenerationJobStatus(jobId, generationProviderId);
+            if (!polled) {
               await sleep(GENERATION_JOB_POLL_INTERVAL_MS);
               continue;
             }
+
+            const { status, isZImageJob } = polled;
 
             if (status.status === 'queued' || status.status === 'running') {
               await sleep(GENERATION_JOB_POLL_INTERVAL_MS);

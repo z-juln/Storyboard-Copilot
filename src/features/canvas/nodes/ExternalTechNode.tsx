@@ -160,6 +160,51 @@ export const ExternalTechNode = memo(({
     const generationStartedAt = Date.now();
     const resultNodeTitle = buildResultNodeTitle(mergedPrompt);
 
+    if (isLocalZImage) {
+      updateNodeData(id, { isRunning: true, generationStartedAt });
+      try {
+        const { job_id: jobId } = await rustApiClient.submitLocalZImageJob({
+          prompt: mergedPrompt,
+          size: imageSize,
+          projectId: currentProjectId,
+        });
+
+        const newNodePosition = findNodePosition(
+          id,
+          EXPORT_RESULT_NODE_DEFAULT_WIDTH,
+          EXPORT_RESULT_NODE_LAYOUT_HEIGHT
+        );
+        const newNodeId = addNode(
+          CANVAS_NODE_TYPES.exportImage,
+          newNodePosition,
+          {
+            isGenerating: true,
+            generationStartedAt,
+            generationDurationMs,
+            resultKind: 'generic',
+            displayName: resultNodeTitle,
+            generationJobId: jobId,
+            generationProviderId: ZIMAGE_LOCAL_PROVIDER_ID,
+            generationClientSessionId: CURRENT_RUNTIME_SESSION_ID,
+          }
+        );
+        addEdge(id, newNodeId);
+        updateNodeData(id, {
+          prompt: promptDraft,
+          isRunning: false,
+          generationStartedAt: null,
+        });
+      } catch (error) {
+        const resolvedError = resolveErrorContent(error, '提交 Z-Image 生成任务失败');
+        void showErrorDialog(resolvedError.message, '错误', resolvedError.details);
+        updateNodeData(id, {
+          isRunning: false,
+          generationStartedAt: null,
+        });
+      }
+      return;
+    }
+
     updateNodeData(id, {
       isRunning: true,
       generationStartedAt,
@@ -182,37 +227,6 @@ export const ExternalTechNode = memo(({
       }
     );
     addEdge(id, newNodeId);
-
-    if (isLocalZImage) {
-      try {
-        const { job_id: jobId } = await rustApiClient.submitLocalZImageJob({
-          prompt: mergedPrompt,
-          size: imageSize,
-          projectId: currentProjectId,
-        });
-        updateNodeData(newNodeId, {
-          generationJobId: jobId,
-          generationProviderId: ZIMAGE_LOCAL_PROVIDER_ID,
-          generationClientSessionId: CURRENT_RUNTIME_SESSION_ID,
-        });
-        updateNodeData(id, { prompt: promptDraft });
-      } catch (error) {
-        const resolvedError = resolveErrorContent(error, '提交 Z-Image 生成任务失败');
-        updateNodeData(newNodeId, {
-          isGenerating: false,
-          generationStartedAt: null,
-          generationError: resolvedError.message,
-          generationErrorDetails: resolvedError.details,
-        });
-        void showErrorDialog(resolvedError.message, '错误', resolvedError.details);
-      } finally {
-        updateNodeData(id, {
-          isRunning: false,
-          generationStartedAt: null,
-        });
-      }
-      return;
-    }
 
     try {
       const result = await runExternalTech({

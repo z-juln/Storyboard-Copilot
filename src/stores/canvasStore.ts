@@ -253,6 +253,13 @@ function normalizeNodes(rawNodes: CanvasNode[]): CanvasNode[] {
           if ('generationStartedAt' in mergedData) {
             mergedData.generationStartedAt = null;
           }
+          if (
+            node.type === CANVAS_NODE_TYPES.exportImage
+            && !(mergedData as { imageUrl?: string | null }).imageUrl
+            && !(mergedData as { generationError?: string | null }).generationError
+          ) {
+            (mergedData as { generationError?: string }).generationError = '生成已中断，请重新生成';
+          }
         }
       }
 

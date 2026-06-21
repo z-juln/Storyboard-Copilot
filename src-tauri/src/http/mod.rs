@@ -106,6 +106,7 @@ pub async fn start_http_server_with_app_data(app_data_dir: PathBuf) -> Result<()
     let _ = cleanup_stale_upload_sessions(&app_data_dir);
 
     let local_zimage = LocalZImageService::new(app_data_dir.clone());
+    local_zimage.resume_running_jobs();
     let state = HttpState {
         ai: Arc::new(AiService::new(ai_db_path)),
         project: Arc::new(ProjectService::new(app_data_dir.clone())),

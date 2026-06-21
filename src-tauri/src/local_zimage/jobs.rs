@@ -98,6 +98,43 @@ fn open_jobs_db(app_data_dir: &Path) -> Result<Connection, String> {
 }
 
 impl LocalZImageService {
+    fn list_running_job_ids(&self) -> Result<Vec<String>, String> {
+        let conn = open_jobs_db(&self.app_data_dir)?;
+        let mut stmt = conn
+            .prepare(
+                "SELECT job_id FROM local_zimage_jobs WHERE status IN ('queued', 'running') ORDER BY created_at ASC",
+            )
+            .map_err(|err| format!("查询运行中任务失败: {err}"))?;
+        let rows = stmt
+            .query_map([], |row| row.get(0))
+            .map_err(|err| format!("读取运行中任务失败: {err}"))?;
+        let mut job_ids = Vec::new();
+        for row in rows {
+            job_ids.push(row.map_err(|err| format!("读取运行中任务失败: {err}"))?);
+        }
+        Ok(job_ids)
+    }
+
+    pub fn resume_running_jobs(self: &Arc<Self>) {
+        let service = Arc::clone(self);
+        tokio::spawn(async move {
+            let job_ids = match service.list_running_job_ids() {
+                Ok(ids) => ids,
+                Err(error) => {
+                    service.push_log(format!("恢复 Z-Image 任务失败: {error}"));
+                    return;
+                }
+            };
+            if job_ids.is_empty() {
+                return;
+            }
+            service.push_log(format!("恢复 {} 个进行中的 Z-Image 生成任务", job_ids.len()));
+            for job_id in job_ids {
+                service.spawn_job_worker(job_id);
+            }
+        });
+    }
+
     pub fn count_active_jobs(&self) -> Result<usize, String> {
         let conn = open_jobs_db(&self.app_data_dir)?;
         let count: i64 = conn
