@@ -61,6 +61,7 @@ interface UiModalProps {
   children: ReactNode;
   footer?: ReactNode;
   widthClassName?: string;
+  bodyClassName?: string;
   containerClassName?: string;
 }
 
@@ -465,6 +466,7 @@ export function UiModal({
   children,
   footer,
   widthClassName = 'w-[460px]',
+  bodyClassName = 'px-4 py-4',
   containerClassName = '',
 }: UiModalProps) {
   const { shouldRender, isVisible } = useDialogTransition(isOpen, UI_DIALOG_TRANSITION_MS);
@@ -491,7 +493,7 @@ export function UiModal({
           </UiIconButton>
         </div>
 
-        <div className="px-4 py-4">{children}</div>
+        <div className={bodyClassName}>{children}</div>
 
         {footer && (
           <div className="flex justify-end gap-2 border-t border-[rgba(255,255,255,0.1)] px-4 py-3">

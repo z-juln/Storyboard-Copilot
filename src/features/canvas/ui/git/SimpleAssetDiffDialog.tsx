@@ -7,6 +7,10 @@ import {
 } from '@/features/git/application/projectGitService';
 import type { ProjectGitBlob } from '@/features/git/types';
 import { buildProjectAssetUrl } from '@/features/project/projectPaths';
+import {
+  FULLSCREEN_MODAL_BODY_CLASS,
+  FULLSCREEN_MODAL_PANEL_CLASS,
+} from '@/features/canvas/ui/fullscreenModalLayout';
 
 import {
   resolveGitBlobMime,
@@ -38,9 +42,9 @@ function DiffColumn({
   children: ReactNode;
 }) {
   return (
-    <div className="min-h-0 min-w-0">
-      <div className="mb-2 text-xs text-text-muted">{label}</div>
-      {children}
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+      <div className="mb-2 shrink-0 text-xs text-text-muted">{label}</div>
+      <div className="min-h-0 flex-1">{children}</div>
     </div>
   );
 }
@@ -60,8 +64,8 @@ function MediaPane({
 
   if (kind === 'image') {
     return (
-      <div className="flex max-h-80 items-center justify-center overflow-hidden rounded-lg bg-black/20">
-        <img src={src} alt="" className="max-h-80 w-full object-contain" />
+      <div className="flex h-full min-h-0 items-center justify-center overflow-hidden rounded-lg bg-black/20">
+        <img src={src} alt="" className="max-h-full max-w-full object-contain" />
       </div>
     );
   }
@@ -72,13 +76,13 @@ function MediaPane({
         src={src}
         controls
         playsInline
-        className="max-h-80 w-full rounded-lg bg-black object-contain"
+        className="max-h-full max-w-full rounded-lg bg-black object-contain"
       />
     );
   }
 
   return (
-    <div className="rounded-lg border border-border-dark bg-bg-dark/30 px-3 py-4">
+    <div className="flex h-full min-h-0 items-center rounded-lg border border-border-dark bg-bg-dark/30 px-3 py-4">
       <audio src={src} controls className="w-full" />
     </div>
   );
@@ -86,7 +90,7 @@ function MediaPane({
 
 function TextPane({ content }: { content: string }) {
   return (
-    <pre className="ui-scrollbar max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-black/25 p-3 text-xs">
+    <pre className="ui-scrollbar h-full min-h-0 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-black/25 p-3 text-xs">
       {content}
     </pre>
   );
@@ -191,14 +195,15 @@ export const SimpleAssetDiffDialog = memo(({
       isOpen={open}
       onClose={onClose}
       title={`对比 · ${path}`}
-      widthClassName="max-w-5xl"
+      widthClassName={FULLSCREEN_MODAL_PANEL_CLASS}
+      bodyClassName={FULLSCREEN_MODAL_BODY_CLASS}
     >
       {loading ? (
-        <div className="py-8 text-center text-sm text-text-muted">加载中…</div>
+        <div className="flex flex-1 items-center justify-center text-sm text-text-muted">加载中…</div>
       ) : !previewKind ? (
-        <div className="py-8 text-center text-sm text-text-muted">该文件类型暂不支持对比预览</div>
+        <div className="flex flex-1 items-center justify-center text-sm text-text-muted">该文件类型暂不支持对比预览</div>
       ) : previewKind === 'text' ? (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid min-h-0 flex-1 grid-cols-2 gap-3">
           <DiffColumn label={beforeLabel}>
             <TextPane content={beforeText ?? '（无内容）'} />
           </DiffColumn>
@@ -207,7 +212,7 @@ export const SimpleAssetDiffDialog = memo(({
           </DiffColumn>
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid min-h-0 flex-1 grid-cols-2 gap-3">
           <DiffColumn label={beforeLabel}>
             <MediaPane
               kind={previewKind}

@@ -1,4 +1,8 @@
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkBreaks from 'remark-breaks';
+import remarkGfm from 'remark-gfm';
+import { openUrl } from '@tauri-apps/plugin-opener';
 
 import { UiButton, UiModal } from '@/components/ui';
 import { useSyncedTextAssetContent } from '@/features/canvas/hooks/useSyncedTextAssetContent';
@@ -9,9 +13,14 @@ import {
   createEmptyAssetManifest,
   fetchAssetTextContent,
   isBindableTextAssetFileName,
+  isMarkdownTextAssetFileName,
   type AssetPreviewKind,
 } from '@/features/project/asset';
 import { buildProjectAssetUrl } from '@/features/project/projectPaths';
+import {
+  FULLSCREEN_MODAL_BODY_CLASS,
+  FULLSCREEN_MODAL_PANEL_CLASS,
+} from '@/features/canvas/ui/fullscreenModalLayout';
 import { useCanvasStore } from '@/stores/canvasStore';
 import { useProjectStore } from '@/stores/projectStore';
 
@@ -26,6 +35,48 @@ interface AssetPreviewDialogProps {
   onClose: () => void;
 }
 
+type MarkdownViewMode = 'preview' | 'markdown';
+
+const PREVIEW_MEDIA_FRAME_CLASS =
+  'flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-lg bg-bg-dark/40';
+const MARKDOWN_BODY_CLASS =
+  'markdown-body break-words text-sm leading-relaxed text-text-dark [&_a]:text-accent [&_blockquote]:border-l-2 [&_blockquote]:border-white/20 [&_blockquote]:pl-3 [&_code]:rounded [&_code]:bg-white/10 [&_code]:px-1 [&_code]:py-0.5 [&_h1]:text-base [&_h1]:font-semibold [&_h2]:text-[15px] [&_h2]:font-semibold [&_h3]:text-sm [&_h3]:font-semibold [&_hr]:border-white/10 [&_li]:my-0.5 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:my-0 [&_p+_p]:mt-4 [&_pre]:overflow-auto [&_pre]:rounded-md [&_pre]:bg-black/30 [&_pre]:p-2 [&_table]:w-full [&_table]:border-collapse [&_table]:text-xs [&_td]:border [&_td]:border-white/10 [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:border-white/10 [&_th]:px-2 [&_th]:py-1 [&_ul]:list-disc [&_ul]:pl-5';
+
+function MarkdownViewModeToggle({
+  value,
+  onChange,
+}: {
+  value: MarkdownViewMode;
+  onChange: (next: MarkdownViewMode) => void;
+}) {
+  return (
+    <div className="inline-flex items-center gap-0.5 rounded-lg p-0.5">
+      <button
+        type="button"
+        className={`rounded-md px-2.5 py-1 text-xs transition-colors ${
+          value === 'preview'
+            ? 'bg-bg-dark/80 font-medium text-text-dark'
+            : 'text-text-muted hover:text-text-dark'
+        }`}
+        onClick={() => onChange('preview')}
+      >
+        预览
+      </button>
+      <button
+        type="button"
+        className={`rounded-md px-2.5 py-1 text-xs transition-colors ${
+          value === 'markdown'
+            ? 'bg-bg-dark/80 font-medium text-text-dark'
+            : 'text-text-muted hover:text-text-dark'
+        }`}
+        onClick={() => onChange('markdown')}
+      >
+        Markdown
+      </button>
+    </div>
+  );
+}
+
 export const AssetPreviewDialog = memo(({ projectId, state, onClose }: AssetPreviewDialogProps) => {
   const [loadedContent, setLoadedContent] = useState('');
   const [loadedSyncedAt, setLoadedSyncedAt] = useState<number | null>(null);
@@ -33,6 +84,7 @@ export const AssetPreviewDialog = memo(({ projectId, state, onClose }: AssetPrev
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [saveHint, setSaveHint] = useState<string | null>(null);
   const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
+  const [markdownViewMode, setMarkdownViewMode] = useState<MarkdownViewMode>('preview');
 
   const nodes = useCanvasStore((store) => store.nodes);
   const assetManifest = useProjectStore((store) => store.currentProject?.assetManifest);
@@ -43,6 +95,7 @@ export const AssetPreviewDialog = memo(({ projectId, state, onClose }: AssetPrev
   const isOpen = Boolean(entry && kind);
   const assetUrl = entry ? buildProjectAssetUrl(projectId, entry.path) : '';
   const isEditableText = Boolean(entry && isBindableTextAssetFileName(entry.name));
+  const isMarkdown = Boolean(entry && isMarkdownTextAssetFileName(entry.name));
 
   const boundNodeCount = useMemo(() => {
     if (!entry || !assetManifest) {
@@ -54,6 +107,19 @@ export const AssetPreviewDialog = memo(({ projectId, state, onClose }: AssetPrev
     }
     return countRefsForFileAssetId(assetManifest, nodes, fileAssetId);
   }, [assetManifest, entry, nodes]);
+
+  useEffect(() => {
+    if (isOpen) {
+      setMarkdownViewMode('preview');
+    }
+  }, [entryPath, isOpen]);
+
+  const handleMarkdownLinkClick = useCallback((href?: string) => {
+    if (!href) {
+      return;
+    }
+    void openUrl(href);
+  }, []);
 
   useEffect(() => {
     if (!isOpen || kind !== 'text' || !entryPath) {
@@ -149,7 +215,8 @@ export const AssetPreviewDialog = memo(({ projectId, state, onClose }: AssetPrev
         isOpen={isOpen}
         title={entry ? `预览 · ${entry.name}` : '预览'}
         onClose={onClose}
-        widthClassName="w-[min(760px,calc(100vw-2rem))]"
+        widthClassName={FULLSCREEN_MODAL_PANEL_CLASS}
+        bodyClassName={FULLSCREEN_MODAL_BODY_CLASS}
         footer={(
           <>
             {kind === 'text' && isEditableText ? (
@@ -180,42 +247,80 @@ export const AssetPreviewDialog = memo(({ projectId, state, onClose }: AssetPrev
         )}
       >
         {kind === 'image' ? (
-          <div className="flex max-h-[min(70vh,640px)] items-center justify-center overflow-hidden rounded-lg bg-bg-dark/40">
+          <div className={PREVIEW_MEDIA_FRAME_CLASS}>
             <img
               src={assetUrl}
               alt={entry?.name ?? 'preview'}
-              className="max-h-[min(70vh,640px)] max-w-full object-contain"
+              className="max-h-full max-w-full object-contain"
             />
           </div>
         ) : null}
 
         {kind === 'video' ? (
-          <video
-            src={assetUrl}
-            controls
-            playsInline
-            className="max-h-[min(70vh,640px)] w-full rounded-lg bg-black"
-          />
+          <div className={PREVIEW_MEDIA_FRAME_CLASS}>
+            <video
+              src={assetUrl}
+              controls
+              playsInline
+              className="max-h-full max-w-full rounded-lg bg-black object-contain"
+            />
+          </div>
         ) : null}
 
         {kind === 'audio' ? (
-          <div className="rounded-lg border border-border-dark bg-bg-dark/30 px-4 py-6">
-            <audio src={assetUrl} controls className="w-full" />
+          <div className="flex min-h-0 flex-1 items-center justify-center rounded-lg border border-border-dark bg-bg-dark/30 px-4 py-6">
+            <audio src={assetUrl} controls className="w-full max-w-2xl" />
           </div>
         ) : null}
 
         {kind === 'text' ? (
-          <div className="rounded-lg border border-border-dark bg-bg-dark/30">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-border-dark bg-bg-dark/30">
+            {isMarkdown && !loadingText && !previewError ? (
+              <div className="flex justify-end border-b border-border-dark px-3 py-2">
+                <MarkdownViewModeToggle
+                  value={markdownViewMode}
+                  onChange={setMarkdownViewMode}
+                />
+              </div>
+            ) : null}
             {loadingText ? (
               <div className="px-4 py-8 text-center text-sm text-text-muted">加载中…</div>
             ) : previewError ? (
               <div className="px-4 py-8 text-center text-sm text-red-400">{previewError}</div>
+            ) : isMarkdown && markdownViewMode === 'preview' ? (
+              <div className={`ui-scrollbar min-h-0 flex-1 overflow-auto px-4 py-3 ${MARKDOWN_BODY_CLASS}`}>
+                {content ? (
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm, remarkBreaks]}
+                    components={{
+                      a: ({ href, children, ...props }) => (
+                        <a
+                          {...props}
+                          href={href}
+                          target="_blank"
+                          rel="noreferrer"
+                          onClick={(event) => {
+                            event.preventDefault();
+                            handleMarkdownLinkClick(href);
+                          }}
+                        >
+                          {children}
+                        </a>
+                      ),
+                    }}
+                  >
+                    {content}
+                  </ReactMarkdown>
+                ) : (
+                  <span className="text-text-muted">（空文件）</span>
+                )}
+              </div>
             ) : isEditableText ? (
               <>
                 <textarea
                   value={content}
                   onChange={(event) => updateContent(event.target.value)}
-                  className="ui-scrollbar max-h-[min(70vh,640px)] min-h-[240px] w-full resize-y border-none bg-transparent px-4 py-3 font-mono text-xs leading-relaxed text-text-dark outline-none"
+                  className="ui-scrollbar min-h-0 flex-1 w-full resize-none border-none bg-transparent px-4 py-3 font-mono text-xs leading-relaxed text-text-dark outline-none"
                   placeholder="（空文件）"
                 />
                 {saveHint ? (
@@ -225,7 +330,7 @@ export const AssetPreviewDialog = memo(({ projectId, state, onClose }: AssetPrev
                 ) : null}
               </>
             ) : (
-              <pre className="ui-scrollbar max-h-[min(70vh,640px)] overflow-auto whitespace-pre-wrap break-words px-4 py-3 font-mono text-xs leading-relaxed text-text-dark">
+              <pre className="ui-scrollbar min-h-0 flex-1 overflow-auto whitespace-pre-wrap break-words px-4 py-3 font-mono text-xs leading-relaxed text-text-dark">
                 {content || '（空文件）'}
               </pre>
             )}
