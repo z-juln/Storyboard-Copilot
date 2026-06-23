@@ -371,7 +371,7 @@ export interface RustApiClient {
   listProjectGitCommits: (projectId: string, limit?: number) => Promise<ProjectGitCommit[]>;
   listProjectGitChanges: (projectId: string) => Promise<ProjectGitChange[]>;
   commitProjectGit: (projectId: string, message: string) => Promise<void>;
-  resetLatestProjectGitCommit: (projectId: string) => Promise<void>;
+  keepCurrentProjectGitVersion: (projectId: string) => Promise<void>;
   checkoutProjectGitCommit: (projectId: string, commit: string) => Promise<void>;
   revertProjectGitChange: (
     projectId: string,
@@ -752,9 +752,9 @@ export function createRustApiClient(baseUrl = resolveBaseUrl()): RustApiClient {
       );
       await readJson(response);
     },
-    resetLatestProjectGitCommit: async (projectId) => {
+    keepCurrentProjectGitVersion: async (projectId) => {
       const response = await fetch(
-        `${normalizedBaseUrl}/api/v1/projects/${encodeURIComponent(projectId)}/git/reset-latest`,
+        `${normalizedBaseUrl}/api/v1/projects/${encodeURIComponent(projectId)}/git/keep-current`,
         { method: 'POST' }
       );
       await readJson(response);

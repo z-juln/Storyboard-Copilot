@@ -11,7 +11,7 @@ interface GitHistorySectionProps {
   readOnly: boolean;
   busy: boolean;
   onCheckout: (hash: string) => void;
-  onResetLatest: () => void;
+  onKeepCurrent: () => void;
 }
 
 export const GitHistorySection = memo(({
@@ -20,9 +20,10 @@ export const GitHistorySection = memo(({
   readOnly,
   busy,
   onCheckout,
-  onResetLatest,
+  onKeepCurrent,
 }: GitHistorySectionProps) => {
   const [expanded, setExpanded] = useState(true);
+  const canKeepCurrent = commits.length > 1;
 
   return (
     <section>
@@ -44,14 +45,14 @@ export const GitHistorySection = memo(({
             </span>
           ) : null}
         </button>
-        {!readOnly && commits.length > 0 ? (
+        {!readOnly && canKeepCurrent ? (
           <UiChipButton
             type="button"
             className="h-6 shrink-0 px-2 text-[10px]"
             disabled={busy}
-            onClick={onResetLatest}
+            onClick={onKeepCurrent}
           >
-            删除最新
+            保留当前版本
           </UiChipButton>
         ) : null}
       </div>

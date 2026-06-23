@@ -298,8 +298,8 @@ pub async fn start_http_server_with_app_data(app_data_dir: PathBuf) -> Result<()
             post(project_git_commit),
         )
         .route(
-            "/api/v1/projects/:project_id/git/reset-latest",
-            post(project_git_reset_latest),
+            "/api/v1/projects/:project_id/git/keep-current",
+            post(project_git_keep_current),
         )
         .route(
             "/api/v1/projects/:project_id/git/checkout",
@@ -1065,7 +1065,7 @@ async fn project_git_commit(
     }
 }
 
-async fn project_git_reset_latest(
+async fn project_git_keep_current(
     State(state): State<HttpState>,
     Path(project_id): Path<String>,
 ) -> Response {
@@ -1073,7 +1073,7 @@ async fn project_git_reset_latest(
     let project_id_for_task = project_id.clone();
     match tokio::task::spawn_blocking(move || {
         let project_dir = file_store::resolve_project_dir(&app_data_dir, &project_id_for_task);
-        git::reset_latest(&project_id_for_task, &project_dir)
+        git::keep_current_version(&project_id_for_task, &project_dir)
     })
     .await
     {
@@ -1081,7 +1081,7 @@ async fn project_git_reset_latest(
         Ok(Err(err)) => api_error(StatusCode::BAD_REQUEST, err),
         Err(err) => api_error(
             StatusCode::INTERNAL_SERVER_ERROR,
-            format!("删除版本失败: {err}"),
+            format!("保留当前版本失败: {err}"),
         ),
     }
 }

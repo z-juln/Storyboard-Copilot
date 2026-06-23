@@ -2,6 +2,10 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use super::commit_history_cache::{
+    clear_commit_history_cache, load_cached_commits, merge_commit_lists,
+    save_commit_history_cache,
+};
 use super::git_dto::{
     GitPluginStatusDto, ProjectGitBlobDto, ProjectGitChangeDto, ProjectGitCommitDto,
     ProjectGitCommitsDto, ProjectGitChangesDto, ProjectGitStatusDto,
@@ -90,32 +94,43 @@ pub fn project_status(project_dir: &Path) -> Result<ProjectGitStatusDto, String>
 
 pub fn list_commits(project_dir: &Path, limit: u32) -> Result<ProjectGitCommitsDto, String> {
     ensure_repo(project_dir)?;
+    let git_commits = fetch_git_log_commits(project_dir)?;
+    let cached_commits = load_cached_commits(project_dir);
+    let merged = merge_commit_lists(git_commits, cached_commits);
+    let limit = limit.clamp(1, 200) as usize;
+    let commits = merged.into_iter().take(limit).collect();
+    Ok(ProjectGitCommitsDto { commits })
+}
+
+fn fetch_git_log_commits(project_dir: &Path) -> Result<Vec<ProjectGitCommitDto>, String> {
     let count = run_git_optional(project_dir, &["rev-list", "--count", "HEAD"])
         .ok()
         .flatten()
         .and_then(|value| value.parse::<u32>().ok())
         .unwrap_or(0);
     if count == 0 {
-        return Ok(ProjectGitCommitsDto { commits: vec![] });
+        return Ok(vec![]);
     }
 
-    let limit = limit.clamp(1, 200);
-    let limit_text = limit.to_string();
     let output = run_git(
         project_dir,
-        &[
-            "log",
-            "-n",
-            &limit_text,
-            "--pretty=format:%H|%s|%cI",
-        ],
+        &["log", "--pretty=format:%H|%s|%cI"],
     )?;
-    let commits = output
+    Ok(output
         .lines()
         .filter(|line| !line.trim().is_empty())
         .filter_map(parse_commit_line)
-        .collect();
-    Ok(ProjectGitCommitsDto { commits })
+        .collect())
+}
+
+fn snapshot_commit_history(project_dir: &Path) -> Result<(), String> {
+    let git_commits = fetch_git_log_commits(project_dir)?;
+    let cached_commits = load_cached_commits(project_dir);
+    let merged = merge_commit_lists(git_commits, cached_commits);
+    if merged.is_empty() {
+        return Ok(());
+    }
+    save_commit_history_cache(project_dir, &merged)
 }
 
 fn parse_commit_line(line: &str) -> Option<ProjectGitCommitDto> {
@@ -281,23 +296,52 @@ pub fn commit_all(project_id: &str, project_dir: &Path, message: &str) -> Result
     Ok(())
 }
 
-pub fn reset_latest(project_id: &str, project_dir: &Path) -> Result<(), String> {
+pub fn keep_current_version(project_id: &str, project_dir: &Path) -> Result<(), String> {
     ensure_repo(project_dir)?;
     let count = run_git(project_dir, &["rev-list", "--count", "HEAD"])?
         .trim()
         .parse::<u32>()
         .unwrap_or(0);
     if count == 0 {
-        return Err("暂无可删除的版本".to_string());
+        return Err("尚无提交记录".to_string());
     }
-    if count == 1 {
-        run_git(project_dir, &["update-ref", "-d", "HEAD"])?;
-        let _ = run_git(project_dir, &["reset"]);
-    } else {
-        run_git(project_dir, &["reset", "--hard", "HEAD~1"])?;
+
+    let cached = load_cached_commits(project_dir);
+    if count == 1 && cached.is_empty() {
+        return Err("当前已仅有一个版本".to_string());
     }
+
+    if count > 1 {
+        squash_history_to_current(project_dir)?;
+    }
+    clear_commit_history_cache(project_dir)?;
+    prune_unreachable_git_objects(project_dir);
     invalidate_project_storage_cache(project_id);
     Ok(())
+}
+
+fn squash_history_to_current(project_dir: &Path) -> Result<(), String> {
+    const TEMP_BRANCH: &str = "__keep_current__";
+    let branch = run_git_optional(project_dir, &["branch", "--show-current"])?
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| "main".to_string());
+    let message = run_git_optional(project_dir, &["log", "-1", "--pretty=%s"])?
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| "保留当前版本".to_string());
+
+    run_git(project_dir, &["checkout", "--orphan", TEMP_BRANCH])?;
+    run_git(project_dir, &["add", "-A"])?;
+    run_git(project_dir, &["commit", "-m", &message])?;
+    if branch != TEMP_BRANCH {
+        let _ = run_git(project_dir, &["branch", "-D", &branch]);
+    }
+    run_git(project_dir, &["branch", "-m", &branch])?;
+    Ok(())
+}
+
+fn prune_unreachable_git_objects(project_dir: &Path) {
+    let _ = run_git(project_dir, &["reflog", "expire", "--expire=now", "--all"]);
+    let _ = run_git(project_dir, &["gc", "--prune=now", "--quiet"]);
 }
 
 pub fn checkout_commit(project_id: &str, project_dir: &Path, commit: &str) -> Result<(), String> {
@@ -305,6 +349,10 @@ pub fn checkout_commit(project_id: &str, project_dir: &Path, commit: &str) -> Re
     let commit = commit.trim();
     if commit.is_empty() {
         return Err("commit 不能为空".to_string());
+    }
+    let head = run_git_optional(project_dir, &["rev-parse", "HEAD"])?.unwrap_or_default();
+    if !head.is_empty() && head != commit {
+        snapshot_commit_history(project_dir)?;
     }
     run_git(project_dir, &["reset", "--hard", commit])?;
     invalidate_project_storage_cache(project_id);

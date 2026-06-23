@@ -36,7 +36,7 @@ pub struct ProjectGitChangeDto {
     pub old_path: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectGitCommitDto {
     pub hash: String,

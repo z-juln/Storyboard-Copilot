@@ -89,8 +89,8 @@ export function useProjectGitController({
     await refreshAll();
   }, [projectId, refreshAll]);
 
-  const resetLatest = useCallback(async () => {
-    await rustApiClient.resetLatestProjectGitCommit(projectId);
+  const keepCurrentVersion = useCallback(async () => {
+    await rustApiClient.keepCurrentProjectGitVersion(projectId);
     await refreshAll();
   }, [projectId, refreshAll]);
 
@@ -115,7 +115,7 @@ export function useProjectGitController({
     setDismissStorageWarning,
     refreshAll,
     commit,
-    resetLatest,
+    keepCurrentVersion,
     checkout,
     revertChange,
   };

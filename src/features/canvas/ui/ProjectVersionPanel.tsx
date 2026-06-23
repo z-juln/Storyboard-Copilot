@@ -36,7 +36,7 @@ interface DiffState {
 
 type PendingConfirmAction =
   | { type: 'checkout'; commitHash: string }
-  | { type: 'reset-latest' };
+  | { type: 'keep-current' };
 
 export const ProjectVersionPanel = memo(({
   projectId,
@@ -56,7 +56,7 @@ export const ProjectVersionPanel = memo(({
     setDismissStorageWarning,
     refreshAll,
     commit,
-    resetLatest,
+    keepCurrentVersion,
     checkout,
     revertChange,
   } = useProjectGitController({ projectId, enabled: enabled && Boolean(gitPluginStatus?.available) });
@@ -140,12 +140,12 @@ export const ProjectVersionPanel = memo(({
     );
   }, [showConfirm]);
 
-  const handleResetLatest = useCallback(() => {
+  const handleKeepCurrent = useCallback(() => {
     showConfirm(
-      '删除最新版本',
-      '将删除最新版本并回退到上一版，此操作不可撤销。是否继续？',
-      '删除',
-      { type: 'reset-latest' },
+      '保留当前版本',
+      '将丢弃所有历史版本，仅保留当前项目状态为唯一版本，此操作不可撤销。是否继续？',
+      '保留',
+      { type: 'keep-current' },
     );
   }, [showConfirm]);
 
@@ -169,19 +169,19 @@ export const ProjectVersionPanel = memo(({
 
     setDialogState(null);
     setPendingConfirm(null);
-    void runAction('reset-latest', async () => {
-      await resetLatest();
+    void runAction('keep-current', async () => {
+      await keepCurrentVersion();
       openProject(projectId);
       notifyAssetManagerRefresh();
     });
   }, [
     checkout,
     closeDialog,
+    keepCurrentVersion,
     notifyAssetManagerRefresh,
     openProject,
     pendingConfirm,
     projectId,
-    resetLatest,
     runAction,
   ]);
 
@@ -283,7 +283,7 @@ export const ProjectVersionPanel = memo(({
         <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-100">
           <div className="font-medium">项目已超过 1 GB</div>
           <p className="mt-1 leading-5 text-amber-100/90">
-            大体积多来自 assets 与 Git 历史中的重复快照。建议删除无用的旧版本 commit，历史仅保留一个版本即可。
+            大体积多来自 assets 与 Git 历史中的重复快照。建议使用「保留当前版本」清理历史，仅保留当前状态。
           </p>
           <div className="mt-2 flex flex-wrap gap-2">
             <UiChipButton
@@ -301,8 +301,7 @@ export const ProjectVersionPanel = memo(({
           </div>
           {showCleanupHint ? (
             <ul className="mt-2 list-disc space-y-1 pl-4 text-amber-100/85">
-              <li>在下方历史列表中对最新版本使用「删除最新」，可逐步回退。</li>
-              <li>建议仅保留当前工作区与至多 1 条历史 commit。</li>
+              <li>在历史版本区域点击「保留当前版本」，可将 Git 历史精简为单一版本。</li>
               <li>清理前请先提交或确认未提交改动已不需要。</li>
             </ul>
           ) : null}
@@ -340,7 +339,7 @@ export const ProjectVersionPanel = memo(({
         readOnly={readOnly}
         busy={busy}
         onCheckout={handleCheckout}
-        onResetLatest={handleResetLatest}
+        onKeepCurrent={handleKeepCurrent}
       />
 
       {diffState ? (
