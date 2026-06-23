@@ -1,10 +1,12 @@
 import { memo, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import { UiModal } from '@/components/ui/primitives';
+import {
+  readGitChangeCurrentText,
+  readGitCommittedBlob,
+} from '@/features/git/application/projectGitService';
 import type { ProjectGitBlob } from '@/features/git/types';
-import { fetchAssetTextContent } from '@/features/project/asset/assetPreviewUtils';
 import { buildProjectAssetUrl } from '@/features/project/projectPaths';
-import { rustApiClient } from '@/infrastructure/rustApiClient';
 
 import {
   resolveGitBlobMime,
@@ -26,18 +28,6 @@ function blobToDataUrl(blob: ProjectGitBlob, mime: string): string | null {
     return `data:${mime};base64,${blob.base64}`;
   }
   return null;
-}
-
-async function readCurrentText(projectId: string, path: string): Promise<string> {
-  if (path === 'project.json') {
-    const snapshot = await rustApiClient.getProjectSnapshot(projectId);
-    return snapshot ? JSON.stringify(snapshot, null, 2) : '（无法读取当前 project.json）';
-  }
-  if (path.startsWith('assets/')) {
-    const content = await fetchAssetTextContent(projectId, path);
-    return content ?? '（无法读取当前文件）';
-  }
-  return '（无法读取当前文件）';
 }
 
 function DiffColumn({
@@ -135,7 +125,7 @@ export const SimpleAssetDiffDialog = memo(({
     void (async () => {
       try {
         if (commit && !isAdded) {
-          const committed = await rustApiClient.readProjectGitBlob(projectId, commit, path);
+          const committed = await readGitCommittedBlob(projectId, commit, path);
           if (cancelled) {
             return;
           }
@@ -152,7 +142,7 @@ export const SimpleAssetDiffDialog = memo(({
         }
 
         if (!isDeleted && previewKind === 'text') {
-          const currentText = await readCurrentText(projectId, path);
+          const currentText = await readGitChangeCurrentText(projectId, path);
           if (!cancelled) {
             setAfterText(currentText);
           }

@@ -26,21 +26,6 @@ export function formatGitChangeKind(kind: string): string {
   }
 }
 
-export function gitChangeKindClassName(kind: string): string {
-  switch (kind) {
-    case 'added':
-      return 'text-emerald-300';
-    case 'modified':
-      return 'text-sky-300';
-    case 'deleted':
-      return 'text-rose-300';
-    case 'renamed':
-      return 'text-violet-300';
-    default:
-      return 'text-text-muted';
-  }
-}
-
 export function gitChangeStatusLetter(kind: string): string {
   switch (kind) {
     case 'added':

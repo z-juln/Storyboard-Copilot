@@ -83,6 +83,7 @@ pub struct ProjectGitCheckoutRequestDto {
 pub struct ProjectGitRevertRequestDto {
     pub path: String,
     pub kind: String,
+    pub old_path: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]

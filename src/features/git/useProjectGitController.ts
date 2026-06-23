@@ -1,20 +1,27 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import {
+  checkoutProjectVersion,
+  commitProjectVersion,
+  getProjectGitStatus,
+  initProjectGit,
+  keepCurrentProjectVersion,
+  loadProjectGitSnapshot,
+  loadProjectGitStorage,
+  revertProjectGitChange,
+} from '@/features/git/application/projectGitService';
 import type {
   ProjectGitChange,
   ProjectGitCommit,
   ProjectGitStatus,
   ProjectGitStorage,
 } from '@/features/git/types';
-import { persistActiveProjectGraphFromCanvas } from '@/stores/projectStore';
-import { rustApiClient } from '@/infrastructure/rustApiClient';
 
 const STORAGE_POLL_MS = 30_000;
 
 interface UseProjectGitControllerOptions {
   projectId: string;
   enabled: boolean;
-  readOnly?: boolean;
 }
 
 export function useProjectGitController({
@@ -38,25 +45,18 @@ export function useProjectGitController({
     setLoading(true);
     setError(null);
     try {
-      let nextStatus = await rustApiClient.getProjectGitStatus(projectId);
+      let nextStatus = await getProjectGitStatus(projectId);
       if (!nextStatus.initialized && !initAttemptedRef.current) {
         initAttemptedRef.current = true;
-        await rustApiClient.initProjectGit(projectId);
-        nextStatus = await rustApiClient.getProjectGitStatus(projectId);
+        await initProjectGit(projectId);
+        nextStatus = await getProjectGitStatus(projectId);
       }
 
-      const [nextStorage, nextChanges, nextCommits] = await Promise.all([
-        rustApiClient.getProjectGitStorage(projectId),
-        rustApiClient.listProjectGitChanges(projectId).catch(() => [] as ProjectGitChange[]),
-        nextStatus.commitCount > 0 || nextStatus.initialized
-          ? rustApiClient.listProjectGitCommits(projectId).catch(() => [] as ProjectGitCommit[])
-          : Promise.resolve([] as ProjectGitCommit[]),
-      ]);
-
-      setStatus(nextStatus);
-      setStorage(nextStorage);
-      setChanges(nextChanges);
-      setCommits(nextCommits);
+      const snapshot = await loadProjectGitSnapshot(projectId);
+      setStatus(snapshot.status);
+      setStorage(snapshot.storage);
+      setChanges(snapshot.changes);
+      setCommits(snapshot.commits);
     } catch (refreshError) {
       setError(refreshError instanceof Error ? refreshError.message : '加载版本信息失败');
     } finally {
@@ -73,7 +73,7 @@ export function useProjectGitController({
     void refreshAll();
 
     const timer = window.setInterval(() => {
-      void rustApiClient.getProjectGitStorage(projectId)
+      void loadProjectGitStorage(projectId)
         .then(setStorage)
         .catch(() => undefined);
     }, STORAGE_POLL_MS);
@@ -84,23 +84,22 @@ export function useProjectGitController({
   }, [enabled, projectId, refreshAll]);
 
   const commit = useCallback(async (message: string) => {
-    persistActiveProjectGraphFromCanvas();
-    await rustApiClient.commitProjectGit(projectId, message);
+    await commitProjectVersion(projectId, message);
     await refreshAll();
   }, [projectId, refreshAll]);
 
   const keepCurrentVersion = useCallback(async () => {
-    await rustApiClient.keepCurrentProjectGitVersion(projectId);
+    await keepCurrentProjectVersion(projectId);
     await refreshAll();
   }, [projectId, refreshAll]);
 
   const checkout = useCallback(async (commitHash: string) => {
-    await rustApiClient.checkoutProjectGitCommit(projectId, commitHash);
+    await checkoutProjectVersion(projectId, commitHash);
     await refreshAll();
   }, [projectId, refreshAll]);
 
-  const revertChange = useCallback(async (path: string, kind: string) => {
-    await rustApiClient.revertProjectGitChange(projectId, path, kind);
+  const revertChange = useCallback(async (change: ProjectGitChange) => {
+    await revertProjectGitChange(projectId, change);
     await refreshAll();
   }, [projectId, refreshAll]);
 

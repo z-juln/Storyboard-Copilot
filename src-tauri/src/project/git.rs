@@ -114,7 +114,7 @@ fn fetch_git_log_commits(project_dir: &Path) -> Result<Vec<ProjectGitCommitDto>,
 
     let output = run_git(
         project_dir,
-        &["log", "--pretty=format:%H|%s|%cI"],
+        &["log", "--pretty=format:%H%x1f%s%x1f%cI"],
     )?;
     Ok(output
         .lines()
@@ -134,7 +134,7 @@ fn snapshot_commit_history(project_dir: &Path) -> Result<(), String> {
 }
 
 fn parse_commit_line(line: &str) -> Option<ProjectGitCommitDto> {
-    let mut parts = line.splitn(3, '|');
+    let mut parts = line.splitn(3, '\x1f');
     let hash = parts.next()?.trim().to_string();
     if hash.is_empty() {
         return None;
@@ -327,7 +327,7 @@ fn squash_history_to_current(project_dir: &Path) -> Result<(), String> {
         .unwrap_or_else(|| "main".to_string());
     let message = run_git_optional(project_dir, &["log", "-1", "--pretty=%s"])?
         .filter(|value| !value.is_empty())
-        .unwrap_or_else(|| "保留当前版本".to_string());
+        .unwrap_or_else(|| "仅保留当前版本".to_string());
 
     run_git(project_dir, &["checkout", "--orphan", TEMP_BRANCH])?;
     run_git(project_dir, &["add", "-A"])?;
@@ -350,16 +350,24 @@ pub fn checkout_commit(project_id: &str, project_dir: &Path, commit: &str) -> Re
     if commit.is_empty() {
         return Err("commit 不能为空".to_string());
     }
+    let resolved = run_git(project_dir, &["rev-parse", commit])?;
     let head = run_git_optional(project_dir, &["rev-parse", "HEAD"])?.unwrap_or_default();
-    if !head.is_empty() && head != commit {
+    if !head.is_empty() && head != resolved {
         snapshot_commit_history(project_dir)?;
     }
-    run_git(project_dir, &["reset", "--hard", commit])?;
+    run_git(project_dir, &["reset", "--hard", &resolved])?;
+    let _ = run_git(project_dir, &["clean", "-fd"]);
     invalidate_project_storage_cache(project_id);
     Ok(())
 }
 
-pub fn revert_change(project_id: &str, project_dir: &Path, path: &str, kind: &str) -> Result<(), String> {
+pub fn revert_change(
+    project_id: &str,
+    project_dir: &Path,
+    path: &str,
+    kind: &str,
+    old_path: Option<&str>,
+) -> Result<(), String> {
     ensure_repo(project_dir)?;
     let relative = validate_repo_relative_path(path)?;
     let full_path = project_dir.join(&relative);
@@ -379,16 +387,64 @@ pub fn revert_change(project_id: &str, project_dir: &Path, path: &str, kind: &st
                         .map_err(|err| format!("删除文件失败: {err}"))?;
                 }
             }
-            let _ = run_git(project_dir, &["rm", "-r", "--cached", "--force", path]);
+            let path_arg = relative.to_string_lossy();
+            let _ = run_git(project_dir, &["rm", "-r", "--cached", "--force", path_arg.as_ref()]);
         }
         "deleted" if has_head => {
-            run_git(project_dir, &["restore", "--source=HEAD", "--worktree", "--", path])?;
+            let path_arg = relative.to_string_lossy();
+            run_git(
+                project_dir,
+                &["restore", "--source=HEAD", "--worktree", "--", path_arg.as_ref()],
+            )?;
         }
         "deleted" => {
             return Err("尚无提交记录，无法恢复已删除文件".to_string());
         }
+        "renamed" if has_head => {
+            let old = old_path
+                .map(validate_repo_relative_path)
+                .transpose()?
+                .ok_or_else(|| "移动变更缺少原路径".to_string())?;
+            if full_path.exists() {
+                if full_path.is_dir() {
+                    fs::remove_dir_all(&full_path)
+                        .map_err(|err| format!("删除目录失败: {err}"))?;
+                } else {
+                    fs::remove_file(&full_path)
+                        .map_err(|err| format!("删除文件失败: {err}"))?;
+                }
+            }
+            let new_path_arg = relative.to_string_lossy();
+            let _ = run_git(
+                project_dir,
+                &["rm", "-r", "--cached", "--force", new_path_arg.as_ref()],
+            );
+            let old_path_arg = old.to_string_lossy();
+            run_git(
+                project_dir,
+                &[
+                    "restore",
+                    "--source=HEAD",
+                    "--staged",
+                    "--worktree",
+                    "--",
+                    old_path_arg.as_ref(),
+                ],
+            )?;
+        }
         _ if has_head => {
-            run_git(project_dir, &["restore", "--source=HEAD", "--staged", "--worktree", "--", path])?;
+            let path_arg = relative.to_string_lossy();
+            run_git(
+                project_dir,
+                &[
+                    "restore",
+                    "--source=HEAD",
+                    "--staged",
+                    "--worktree",
+                    "--",
+                    path_arg.as_ref(),
+                ],
+            )?;
         }
         _ => {
             if full_path.exists() {

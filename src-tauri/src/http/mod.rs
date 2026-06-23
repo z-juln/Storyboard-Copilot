@@ -961,18 +961,34 @@ async fn external_tech_run(
     Ok(Json(response))
 }
 
-async fn plugins_git_status() -> Json<GitPluginStatusDto> {
-    Json(git::git_plugin_status())
+async fn plugins_git_status() -> Response {
+    match tokio::task::spawn_blocking(git::git_plugin_status).await {
+        Ok(status) => Json(status).into_response(),
+        Err(err) => api_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("检测 Git 失败: {err}"),
+        ),
+    }
 }
 
 async fn project_git_status(
     State(state): State<HttpState>,
     Path(project_id): Path<String>,
 ) -> Response {
-    let project_dir = file_store::resolve_project_dir(state.app_data_dir.as_path(), &project_id);
-    match git::project_status(&project_dir) {
-        Ok(status) => Json(status).into_response(),
-        Err(err) => api_error(StatusCode::BAD_REQUEST, err),
+    let app_data_dir = state.app_data_dir.clone();
+    let project_id_for_task = project_id.clone();
+    match tokio::task::spawn_blocking(move || {
+        let project_dir = file_store::resolve_project_dir(&app_data_dir, &project_id_for_task);
+        git::project_status(&project_dir)
+    })
+    .await
+    {
+        Ok(Ok(status)) => Json(status).into_response(),
+        Ok(Err(err)) => api_error(StatusCode::BAD_REQUEST, err),
+        Err(err) => api_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("读取 Git 状态失败: {err}"),
+        ),
     }
 }
 
@@ -1023,11 +1039,21 @@ async fn project_git_commits(
     Path(project_id): Path<String>,
     Query(query): Query<ProjectGitCommitsQuery>,
 ) -> Response {
-    let project_dir = file_store::resolve_project_dir(state.app_data_dir.as_path(), &project_id);
+    let app_data_dir = state.app_data_dir.clone();
+    let project_id_for_task = project_id.clone();
     let limit = query.limit.unwrap_or(50);
-    match git::list_commits(&project_dir, limit) {
-        Ok(commits) => Json(commits).into_response(),
-        Err(err) => api_error(StatusCode::BAD_REQUEST, err),
+    match tokio::task::spawn_blocking(move || {
+        let project_dir = file_store::resolve_project_dir(&app_data_dir, &project_id_for_task);
+        git::list_commits(&project_dir, limit)
+    })
+    .await
+    {
+        Ok(Ok(commits)) => Json(commits).into_response(),
+        Ok(Err(err)) => api_error(StatusCode::BAD_REQUEST, err),
+        Err(err) => api_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("读取提交历史失败: {err}"),
+        ),
     }
 }
 
@@ -1035,10 +1061,20 @@ async fn project_git_changes(
     State(state): State<HttpState>,
     Path(project_id): Path<String>,
 ) -> Response {
-    let project_dir = file_store::resolve_project_dir(state.app_data_dir.as_path(), &project_id);
-    match git::list_changes(&project_dir) {
-        Ok(changes) => Json(changes).into_response(),
-        Err(err) => api_error(StatusCode::BAD_REQUEST, err),
+    let app_data_dir = state.app_data_dir.clone();
+    let project_id_for_task = project_id.clone();
+    match tokio::task::spawn_blocking(move || {
+        let project_dir = file_store::resolve_project_dir(&app_data_dir, &project_id_for_task);
+        git::list_changes(&project_dir)
+    })
+    .await
+    {
+        Ok(Ok(changes)) => Json(changes).into_response(),
+        Ok(Err(err)) => api_error(StatusCode::BAD_REQUEST, err),
+        Err(err) => api_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("读取未提交变更失败: {err}"),
+        ),
     }
 }
 
@@ -1081,7 +1117,7 @@ async fn project_git_keep_current(
         Ok(Err(err)) => api_error(StatusCode::BAD_REQUEST, err),
         Err(err) => api_error(
             StatusCode::INTERNAL_SERVER_ERROR,
-            format!("保留当前版本失败: {err}"),
+            format!("仅保留当前版本失败: {err}"),
         ),
     }
 }
@@ -1118,9 +1154,16 @@ async fn project_git_revert(
     let project_id_for_task = project_id.clone();
     let path = request.path;
     let kind = request.kind;
+    let old_path = request.old_path;
     match tokio::task::spawn_blocking(move || {
         let project_dir = file_store::resolve_project_dir(&app_data_dir, &project_id_for_task);
-        git::revert_change(&project_id_for_task, &project_dir, &path, &kind)
+        git::revert_change(
+            &project_id_for_task,
+            &project_dir,
+            &path,
+            &kind,
+            old_path.as_deref(),
+        )
     })
     .await
     {

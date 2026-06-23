@@ -100,7 +100,7 @@ interface ProjectGitStorage {
 1. **1 GB 警告横幅**（条件显示，见下节）
 2. **提交区**：常驻多行输入 + 主按钮「提交」；`⌘/Ctrl+Enter` 快捷提交
 3. **更改**（可折叠）：标题 + 数量角标；右侧刷新图标；扁平文件行（图标 + 文件名 + 灰色父路径 + 状态字母 `U/M/D/R`）；悬停显示「打开 / 对比 / 撤销」（**无暂存区**，提交仍 `git add -A`）
-4. **历史版本**（可折叠）：扁平 commit 行；标题旁「删除最新」
+4. **历史版本**（可折叠）：扁平 commit 行；标题旁「仅保留当前版本」
 
 **不做暂存区**：不提供单文件 stage/unstage，不出现 VS Code 的「+」暂存按钮；提交时一次性 `git add -A`。
 
@@ -188,15 +188,15 @@ Diff 数据源：
 操作：
 
 - **查看**：进入「历史预览模式」（见下），不修改工作区文件直至用户确认切换。
-- **删除**（单条 commit）：二次确认；实现为 `git reset --hard <parent-of-selected>` **仅当该 commit 为当前分支 HEAD**；若非 HEAD 则提示「仅支持删除最新版本」或禁用（P0 简化：仅允许删除 **最新一条** commit，即 soft undo last commit 的反向 — `git reset --hard HEAD~1`）。
+- **删除**（单条 commit）：P0 不提供逐条删除；使用「仅保留当前版本」将历史精简为单一 commit。
 
-> P0 删除语义：**删除最新 commit** = `git reset --hard HEAD~1`，工作区与磁盘回退到上一版本；需强确认文案。
+> **仅保留当前版本**：`checkout --orphan` 压成单 commit + 清除 `.cache/commit-history` + `git gc`，丢弃其余历史；需强确认文案。
 
 #### 版本切换（查看历史）
 
 1. 用户选中历史 commit →「切换到此版本」。
 2. 二次确认：「将用该版本覆盖当前项目文件（含 project.json 与 assets），未提交改动会丢失。」
-3. 执行：`git checkout <commit> -- .` 或 `git reset --hard <commit>`（P0 用 `reset --hard` 到目标 commit，使 HEAD 指向该版本 — **或** detached checkout + copy tree；推荐 **`git reset --hard <commit>`** 使历史线性可理解，并禁止非快进后续扩展）。
+3. 执行：`git reset --hard <commit>`；切换前将完整 commit 列表快照至 `.cache/commit-history`；完成后 `git clean -fd` 清理未跟踪文件。
 4. 完成后：通知前端 `reload project`（`openProject(currentId)` 或专用 refresh），reconcile assets，重建画布。
 
 **历史预览（只读，可选 P0.5）**：若实现成本高，P0 可仅「切换」无预览；文档保留「查看 = 切换前弹 diff 摘要」为最低要求。
@@ -214,7 +214,8 @@ Diff 数据源：
 | GET | `/commits?limit=50` | commit 列表 |
 | GET | `/changes` | 未提交变更（含 status + paths + change kind） |
 | POST | `/commit` | body: `{ "message": "..." }` |
-| POST | `/reset-latest` | 删除最新 commit（`reset --hard HEAD~1`） |
+| POST | `/keep-current` | 仅保留当前版本（orphan 压成单 commit + gc） |
+| POST | `/revert` | body: `{ "path", "kind", "oldPath?" }` 单项回退 |
 | POST | `/checkout` | body: `{ "commit": "<hash>" }` → hard reset 到该 commit |
 | GET | `/blob?commit=<hash>&path=<path>` | 某 commit 下文件内容（供 diff / 预览） |
 
@@ -259,7 +260,7 @@ Diff 数据源：
 - [ ] 前端：`ProjectVersionPanel` + `AssetManagerPanel` 第三 Tab
 - [ ] 前端：占用摘要 30s 轮询 + 超 1GB 警告横幅与清理建议文案
 - [ ] 前端：未提交列表（新增/删除/移动标签）+ 单项回退 + 简单 diff 弹窗
-- [ ] 前端：提交 / 删除最新 commit / 切换版本 + 确认框
+- [ ] 前端：提交 / 仅保留当前版本 / 切换版本 + 确认框
 - [ ] 切换版本后 reload project + reconcile + 画布刷新
 - [ ] 提交前刷盘 `project.json`
 - [ ] 默认 `.gitignore` 含 `.cache/`
@@ -274,7 +275,8 @@ Diff 数据源：
 - [ ] 修改 `project.json` 或 `assets/` 后，未提交列表正确标注新增/修改/删除/移动。
 - [ ] 未提交项可单独回退；图片/文本可打开简单 diff（之前 vs 现在，无行级 diff）。
 - [ ] 「提交」后历史列表新增一条，工作区 clean。
-- [ ] 「删除最新版本」移除 HEAD commit 并恢复上一版文件内容。
+- [ ] 「仅保留当前版本」将 Git 历史精简为单一 commit，并回收 `.git` 占用。
+- [ ] 回退到较早版本后，较新的 commit 仍出现在历史列表（`.cache/commit-history`），可再次切换。
 - [ ] 「切换到此版本」将项目文件恢复到指定 commit，重开画布后节点与资产一致。
 - [ ] 版本 Tab 展示项目总占用（含 `.git`），Tab 可见时每 30s 自动更新；提交/删版本/手动刷新后立即更新。
 - [ ] 总占用 > 1 GB 时显示警告，提示可删除无用旧版本并建议历史仅保留一个版本。

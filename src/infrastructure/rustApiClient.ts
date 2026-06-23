@@ -376,7 +376,8 @@ export interface RustApiClient {
   revertProjectGitChange: (
     projectId: string,
     path: string,
-    kind: string
+    kind: string,
+    oldPath?: string | null
   ) => Promise<void>;
   readProjectGitBlob: (
     projectId: string,
@@ -770,13 +771,13 @@ export function createRustApiClient(baseUrl = resolveBaseUrl()): RustApiClient {
       );
       await readJson(response);
     },
-    revertProjectGitChange: async (projectId, path, kind) => {
+    revertProjectGitChange: async (projectId, path, kind, oldPath) => {
       const response = await fetch(
         `${normalizedBaseUrl}/api/v1/projects/${encodeURIComponent(projectId)}/git/revert`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ path, kind }),
+          body: JSON.stringify({ path, kind, oldPath: oldPath ?? undefined }),
         }
       );
       await readJson(response);

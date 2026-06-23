@@ -52,7 +52,7 @@ export const GitHistorySection = memo(({
             disabled={busy}
             onClick={onKeepCurrent}
           >
-            保留当前版本
+            仅保留当前版本
           </UiChipButton>
         ) : null}
       </div>

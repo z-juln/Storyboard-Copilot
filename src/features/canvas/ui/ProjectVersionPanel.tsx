@@ -142,7 +142,7 @@ export const ProjectVersionPanel = memo(({
 
   const handleKeepCurrent = useCallback(() => {
     showConfirm(
-      '保留当前版本',
+      '仅保留当前版本',
       '将丢弃所有历史版本，仅保留当前项目状态为唯一版本，此操作不可撤销。是否继续？',
       '保留',
       { type: 'keep-current' },
@@ -217,7 +217,7 @@ export const ProjectVersionPanel = memo(({
   }, [headCommit]);
 
   const handleRevertChange = useCallback((change: ProjectGitChange) => {
-    void runAction(`revert-${change.path}`, () => revertChange(change.path, change.kind));
+    void runAction(`revert-${change.path}`, () => revertChange(change));
   }, [revertChange, runAction]);
 
   const busy = Boolean(busyAction);
@@ -283,7 +283,7 @@ export const ProjectVersionPanel = memo(({
         <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-100">
           <div className="font-medium">项目已超过 1 GB</div>
           <p className="mt-1 leading-5 text-amber-100/90">
-            大体积多来自 assets 与 Git 历史中的重复快照。建议使用「保留当前版本」清理历史，仅保留当前状态。
+            大体积多来自 assets 与 Git 历史中的重复快照。建议使用「仅保留当前版本」清理历史，仅保留当前状态。
           </p>
           <div className="mt-2 flex flex-wrap gap-2">
             <UiChipButton
@@ -301,7 +301,7 @@ export const ProjectVersionPanel = memo(({
           </div>
           {showCleanupHint ? (
             <ul className="mt-2 list-disc space-y-1 pl-4 text-amber-100/85">
-              <li>在历史版本区域点击「保留当前版本」，可将 Git 历史精简为单一版本。</li>
+              <li>在历史版本区域点击「仅保留当前版本」，可将 Git 历史精简为单一版本。</li>
               <li>清理前请先提交或确认未提交改动已不需要。</li>
             </ul>
           ) : null}
