@@ -41,6 +41,13 @@ use crate::project::dto::{
     CreateAssetDirectoryRequestDto, ImportProjectAssetsRequestDto, MoveProjectAssetRequestDto,
     ProjectSnapshot, RenameProjectRequestDto, UpdateProjectViewportRequestDto,
 };
+use crate::project::file_store;
+use crate::project::git;
+use crate::project::git_dto::{
+    GitPluginStatusDto, ProjectGitBlobQuery, ProjectGitCheckoutRequestDto,
+    ProjectGitCommitRequestDto, ProjectGitCommitsQuery, ProjectGitRevertRequestDto,
+};
+use crate::project::storage;
 use crate::local_zimage::{
     ExternalTechRunRequestDto, ExternalTechRunResponseDto, LocalZImageService,
     LocalZImageStatusDto, RunInstallStepRequestDto, StopLocalZImageServerRequestDto,
@@ -265,6 +272,47 @@ pub async fn start_http_server_with_app_data(app_data_dir: PathBuf) -> Result<()
             get(local_zimage_get_job),
         )
         .route("/api/v1/external-tech/run", post(external_tech_run))
+        .route("/api/v1/plugins/git/status", get(plugins_git_status))
+        .route(
+            "/api/v1/projects/:project_id/git/status",
+            get(project_git_status),
+        )
+        .route(
+            "/api/v1/projects/:project_id/git/storage",
+            get(project_git_storage),
+        )
+        .route(
+            "/api/v1/projects/:project_id/git/init",
+            post(project_git_init),
+        )
+        .route(
+            "/api/v1/projects/:project_id/git/commits",
+            get(project_git_commits),
+        )
+        .route(
+            "/api/v1/projects/:project_id/git/changes",
+            get(project_git_changes),
+        )
+        .route(
+            "/api/v1/projects/:project_id/git/commit",
+            post(project_git_commit),
+        )
+        .route(
+            "/api/v1/projects/:project_id/git/reset-latest",
+            post(project_git_reset_latest),
+        )
+        .route(
+            "/api/v1/projects/:project_id/git/checkout",
+            post(project_git_checkout),
+        )
+        .route(
+            "/api/v1/projects/:project_id/git/revert",
+            post(project_git_revert),
+        )
+        .route(
+            "/api/v1/projects/:project_id/git/blob",
+            get(project_git_blob),
+        )
         .merge(upload_routes)
         .layer(cors)
         .with_state(state);
@@ -911,6 +959,202 @@ async fn external_tech_run(
     }
 
     Ok(Json(response))
+}
+
+async fn plugins_git_status() -> Json<GitPluginStatusDto> {
+    Json(git::git_plugin_status())
+}
+
+async fn project_git_status(
+    State(state): State<HttpState>,
+    Path(project_id): Path<String>,
+) -> Response {
+    let project_dir = file_store::resolve_project_dir(state.app_data_dir.as_path(), &project_id);
+    match git::project_status(&project_dir) {
+        Ok(status) => Json(status).into_response(),
+        Err(err) => api_error(StatusCode::BAD_REQUEST, err),
+    }
+}
+
+async fn project_git_storage(
+    State(state): State<HttpState>,
+    Path(project_id): Path<String>,
+) -> Response {
+    let app_data_dir = state.app_data_dir.clone();
+    let project_id_for_task = project_id.clone();
+    match tokio::task::spawn_blocking(move || {
+        let project_dir = file_store::resolve_project_dir(&app_data_dir, &project_id_for_task);
+        storage::measure_project_storage(&project_id_for_task, &project_dir)
+    })
+    .await
+    {
+        Ok(Ok(snapshot)) => Json(snapshot).into_response(),
+        Ok(Err(err)) => api_error(StatusCode::BAD_REQUEST, err),
+        Err(err) => api_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("计算项目占用失败: {err}"),
+        ),
+    }
+}
+
+async fn project_git_init(
+    State(state): State<HttpState>,
+    Path(project_id): Path<String>,
+) -> Response {
+    let app_data_dir = state.app_data_dir.clone();
+    let project_id_for_task = project_id.clone();
+    match tokio::task::spawn_blocking(move || {
+        let project_dir = file_store::resolve_project_dir(&app_data_dir, &project_id_for_task);
+        git::init_repo(&project_id_for_task, &project_dir)
+    })
+    .await
+    {
+        Ok(Ok(())) => Json(json!({ "ok": true })).into_response(),
+        Ok(Err(err)) => api_error(StatusCode::BAD_REQUEST, err),
+        Err(err) => api_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("初始化 Git 失败: {err}"),
+        ),
+    }
+}
+
+async fn project_git_commits(
+    State(state): State<HttpState>,
+    Path(project_id): Path<String>,
+    Query(query): Query<ProjectGitCommitsQuery>,
+) -> Response {
+    let project_dir = file_store::resolve_project_dir(state.app_data_dir.as_path(), &project_id);
+    let limit = query.limit.unwrap_or(50);
+    match git::list_commits(&project_dir, limit) {
+        Ok(commits) => Json(commits).into_response(),
+        Err(err) => api_error(StatusCode::BAD_REQUEST, err),
+    }
+}
+
+async fn project_git_changes(
+    State(state): State<HttpState>,
+    Path(project_id): Path<String>,
+) -> Response {
+    let project_dir = file_store::resolve_project_dir(state.app_data_dir.as_path(), &project_id);
+    match git::list_changes(&project_dir) {
+        Ok(changes) => Json(changes).into_response(),
+        Err(err) => api_error(StatusCode::BAD_REQUEST, err),
+    }
+}
+
+async fn project_git_commit(
+    State(state): State<HttpState>,
+    Path(project_id): Path<String>,
+    Json(request): Json<ProjectGitCommitRequestDto>,
+) -> Response {
+    let app_data_dir = state.app_data_dir.clone();
+    let project_id_for_task = project_id.clone();
+    let message = request.message;
+    match tokio::task::spawn_blocking(move || {
+        let project_dir = file_store::resolve_project_dir(&app_data_dir, &project_id_for_task);
+        git::commit_all(&project_id_for_task, &project_dir, &message)
+    })
+    .await
+    {
+        Ok(Ok(())) => Json(json!({ "ok": true })).into_response(),
+        Ok(Err(err)) => api_error(StatusCode::BAD_REQUEST, err),
+        Err(err) => api_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("提交失败: {err}"),
+        ),
+    }
+}
+
+async fn project_git_reset_latest(
+    State(state): State<HttpState>,
+    Path(project_id): Path<String>,
+) -> Response {
+    let app_data_dir = state.app_data_dir.clone();
+    let project_id_for_task = project_id.clone();
+    match tokio::task::spawn_blocking(move || {
+        let project_dir = file_store::resolve_project_dir(&app_data_dir, &project_id_for_task);
+        git::reset_latest(&project_id_for_task, &project_dir)
+    })
+    .await
+    {
+        Ok(Ok(())) => Json(json!({ "ok": true })).into_response(),
+        Ok(Err(err)) => api_error(StatusCode::BAD_REQUEST, err),
+        Err(err) => api_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("删除版本失败: {err}"),
+        ),
+    }
+}
+
+async fn project_git_checkout(
+    State(state): State<HttpState>,
+    Path(project_id): Path<String>,
+    Json(request): Json<ProjectGitCheckoutRequestDto>,
+) -> Response {
+    let app_data_dir = state.app_data_dir.clone();
+    let project_id_for_task = project_id.clone();
+    let commit = request.commit;
+    match tokio::task::spawn_blocking(move || {
+        let project_dir = file_store::resolve_project_dir(&app_data_dir, &project_id_for_task);
+        git::checkout_commit(&project_id_for_task, &project_dir, &commit)
+    })
+    .await
+    {
+        Ok(Ok(())) => Json(json!({ "ok": true })).into_response(),
+        Ok(Err(err)) => api_error(StatusCode::BAD_REQUEST, err),
+        Err(err) => api_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("切换版本失败: {err}"),
+        ),
+    }
+}
+
+async fn project_git_revert(
+    State(state): State<HttpState>,
+    Path(project_id): Path<String>,
+    Json(request): Json<ProjectGitRevertRequestDto>,
+) -> Response {
+    let app_data_dir = state.app_data_dir.clone();
+    let project_id_for_task = project_id.clone();
+    let path = request.path;
+    let kind = request.kind;
+    match tokio::task::spawn_blocking(move || {
+        let project_dir = file_store::resolve_project_dir(&app_data_dir, &project_id_for_task);
+        git::revert_change(&project_id_for_task, &project_dir, &path, &kind)
+    })
+    .await
+    {
+        Ok(Ok(())) => Json(json!({ "ok": true })).into_response(),
+        Ok(Err(err)) => api_error(StatusCode::BAD_REQUEST, err),
+        Err(err) => api_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("回退失败: {err}"),
+        ),
+    }
+}
+
+async fn project_git_blob(
+    State(state): State<HttpState>,
+    Path(project_id): Path<String>,
+    Query(query): Query<ProjectGitBlobQuery>,
+) -> Response {
+    let app_data_dir = state.app_data_dir.clone();
+    let project_id_for_task = project_id.clone();
+    let commit = query.commit;
+    let path = query.path;
+    match tokio::task::spawn_blocking(move || {
+        let project_dir = file_store::resolve_project_dir(&app_data_dir, &project_id_for_task);
+        git::read_blob(&project_dir, &commit, &path)
+    })
+    .await
+    {
+        Ok(Ok(blob)) => Json(blob).into_response(),
+        Ok(Err(err)) => api_error(StatusCode::BAD_REQUEST, err),
+        Err(err) => api_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("读取版本文件失败: {err}"),
+        ),
+    }
 }
 
 fn api_error(status: StatusCode, error: String) -> Response {

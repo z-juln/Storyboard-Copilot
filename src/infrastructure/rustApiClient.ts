@@ -9,6 +9,14 @@ import type {
 import type { ProjectDirectoryEntry, ProjectSnapshot } from '@/features/project/types';
 import type { ProjectSummaryRecord } from '@/commands/projectState';
 import type { LocalZImageStatus } from '@/features/canvas/external-tech/types';
+import type {
+  GitPluginStatus,
+  ProjectGitBlob,
+  ProjectGitChange,
+  ProjectGitCommit,
+  ProjectGitStatus,
+  ProjectGitStorage,
+} from '@/features/git/types';
 
 const DEFAULT_BASE_URL = 'http://127.0.0.1:1421';
 const DEFAULT_UPLOAD_CHUNK_SIZE = 4 * 1024 * 1024;
@@ -356,6 +364,25 @@ export interface RustApiClient {
   getLocalZImageActiveJobs: () => Promise<LocalZImageActiveJobsResult>;
   runExternalTech: (payload: RunExternalTechPayload) => Promise<RunExternalTechResult>;
   runLocalZImageInstallStep: (step: string) => Promise<LocalZImageStatus>;
+  getGitPluginStatus: () => Promise<GitPluginStatus>;
+  getProjectGitStatus: (projectId: string) => Promise<ProjectGitStatus>;
+  getProjectGitStorage: (projectId: string) => Promise<ProjectGitStorage>;
+  initProjectGit: (projectId: string) => Promise<void>;
+  listProjectGitCommits: (projectId: string, limit?: number) => Promise<ProjectGitCommit[]>;
+  listProjectGitChanges: (projectId: string) => Promise<ProjectGitChange[]>;
+  commitProjectGit: (projectId: string, message: string) => Promise<void>;
+  resetLatestProjectGitCommit: (projectId: string) => Promise<void>;
+  checkoutProjectGitCommit: (projectId: string, commit: string) => Promise<void>;
+  revertProjectGitChange: (
+    projectId: string,
+    path: string,
+    kind: string
+  ) => Promise<void>;
+  readProjectGitBlob: (
+    projectId: string,
+    commit: string,
+    path: string
+  ) => Promise<ProjectGitBlob>;
 }
 
 export function createRustApiClient(baseUrl = resolveBaseUrl()): RustApiClient {
@@ -676,6 +703,93 @@ export function createRustApiClient(baseUrl = resolveBaseUrl()): RustApiClient {
         }),
       });
       return readJson<RunExternalTechResult>(response);
+    },
+    getGitPluginStatus: async () => {
+      const response = await fetch(`${normalizedBaseUrl}/api/v1/plugins/git/status`);
+      return readJson<GitPluginStatus>(response);
+    },
+    getProjectGitStatus: async (projectId) => {
+      const response = await fetch(
+        `${normalizedBaseUrl}/api/v1/projects/${encodeURIComponent(projectId)}/git/status`
+      );
+      return readJson<ProjectGitStatus>(response);
+    },
+    getProjectGitStorage: async (projectId) => {
+      const response = await fetch(
+        `${normalizedBaseUrl}/api/v1/projects/${encodeURIComponent(projectId)}/git/storage`
+      );
+      return readJson<ProjectGitStorage>(response);
+    },
+    initProjectGit: async (projectId) => {
+      const response = await fetch(
+        `${normalizedBaseUrl}/api/v1/projects/${encodeURIComponent(projectId)}/git/init`,
+        { method: 'POST' }
+      );
+      await readJson(response);
+    },
+    listProjectGitCommits: async (projectId, limit = 50) => {
+      const response = await fetch(
+        `${normalizedBaseUrl}/api/v1/projects/${encodeURIComponent(projectId)}/git/commits?limit=${limit}`
+      );
+      const payload = await readJson<{ commits: ProjectGitCommit[] }>(response);
+      return payload.commits;
+    },
+    listProjectGitChanges: async (projectId) => {
+      const response = await fetch(
+        `${normalizedBaseUrl}/api/v1/projects/${encodeURIComponent(projectId)}/git/changes`
+      );
+      const payload = await readJson<{ changes: ProjectGitChange[] }>(response);
+      return payload.changes;
+    },
+    commitProjectGit: async (projectId, message) => {
+      const response = await fetch(
+        `${normalizedBaseUrl}/api/v1/projects/${encodeURIComponent(projectId)}/git/commit`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message }),
+        }
+      );
+      await readJson(response);
+    },
+    resetLatestProjectGitCommit: async (projectId) => {
+      const response = await fetch(
+        `${normalizedBaseUrl}/api/v1/projects/${encodeURIComponent(projectId)}/git/reset-latest`,
+        { method: 'POST' }
+      );
+      await readJson(response);
+    },
+    checkoutProjectGitCommit: async (projectId, commit) => {
+      const response = await fetch(
+        `${normalizedBaseUrl}/api/v1/projects/${encodeURIComponent(projectId)}/git/checkout`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ commit }),
+        }
+      );
+      await readJson(response);
+    },
+    revertProjectGitChange: async (projectId, path, kind) => {
+      const response = await fetch(
+        `${normalizedBaseUrl}/api/v1/projects/${encodeURIComponent(projectId)}/git/revert`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path, kind }),
+        }
+      );
+      await readJson(response);
+    },
+    readProjectGitBlob: async (projectId, commit, path) => {
+      const params = new URLSearchParams({
+        commit,
+        path,
+      });
+      const response = await fetch(
+        `${normalizedBaseUrl}/api/v1/projects/${encodeURIComponent(projectId)}/git/blob?${params.toString()}`
+      );
+      return readJson<ProjectGitBlob>(response);
     },
   };
 }

@@ -94,12 +94,15 @@ interface ProjectGitStorage {
 
 ### 版本 Tab · 插件已就绪
 
-**布局（自上而下）：**
+**布局（自上而下，对齐 VS Code Source Control 风格）：**
 
-0. **占用摘要**（插件已就绪且 Tab 可见时展示，见下节）
-1. **工具栏**：`提交…` | `刷新` | （可选）`初始化仓库`（仅无 `.git` 时）
-2. **未提交变更**（工作区相对 HEAD）
-3. **历史版本列表**（commit 列表，新 → 旧）
+0. **占用摘要**（可折叠单行；展开显示工作区 / Git 历史 / 更新时间）
+1. **1 GB 警告横幅**（条件显示，见下节）
+2. **提交区**：常驻多行输入 + 主按钮「提交」；`⌘/Ctrl+Enter` 快捷提交
+3. **更改**（可折叠）：标题 + 数量角标；右侧刷新图标；扁平文件行（图标 + 文件名 + 灰色父路径 + 状态字母 `U/M/D/R`）；悬停显示「打开 / 对比 / 撤销」（**无暂存区**，提交仍 `git add -A`）
+4. **历史版本**（可折叠）：扁平 commit 行；标题旁「删除最新」
+
+**不做暂存区**：不提供单文件 stage/unstage，不出现 VS Code 的「+」暂存按钮；提交时一次性 `git add -A`。
 
 #### 项目占用与容量提醒
 
@@ -135,21 +138,22 @@ interface ProjectGitStorage {
 
 #### 未提交变更列表
 
-数据源：`git status --porcelain` + `git diff --name-status HEAD`（Rust 侧解析）。
+数据源：`git status --porcelain`（Rust 侧解析）。
 
-| 状态标记 | Git 含义 | UI 展示 |
+**行展示**：`文件名` + 截断父路径；右侧状态字母 `U`（新增/未跟踪）、`M`、`D`、`R`（颜色区分）。
+
+**悬停操作**：
+
+- **打开**：`assets/...` → 切到资产目录 Tab 并 reveal；`project.json`（有 HEAD 时）→ 简单 diff
+- **对比**：有 HEAD 且非纯新增 → `SimpleAssetDiffDialog`
+- **撤销**：`git restore` / 删除未跟踪文件（同原逻辑）
+
+| 状态字母 | Git 含义 | 原 kind |
 |----------|----------|---------|
-| `A` | 新增 | 绿色「新增」 |
-| `M` | 修改 | 蓝色「修改」 |
-| `D` | 删除 | 红色「删除」 |
-| `R` | 重命名/移动 | 紫色「移动」+ `旧路径 → 新路径` |
-
-每项操作（仅**未提交**项）：
-
-- **回退**：`git restore --source=HEAD -- <path>`（删除类还原为 HEAD 版本；新增类 `git clean -f` / 从 index 移除，按类型区分）。
-- **对比**：打开简单 diff 面板（见下）。
-
-路径展示：相对项目根（含 `project.json`、`assets/...`）。
+| `U` | 未跟踪/新增 | `added` |
+| `M` | 修改 | `modified` |
+| `D` | 删除 | `deleted` |
+| `R` | 重命名/移动 | `renamed` |
 
 #### 简单 Diff（P0）
 
@@ -169,7 +173,7 @@ Diff 数据源：
 
 #### 提交
 
-- 点击「提交…」→ 弹窗输入 **提交说明**（必填，默认 `更新项目`）。
+- 顶部常驻 **提交说明** 输入（默认 `更新项目`）；`⌘/Ctrl+Enter` 或主按钮「提交」。
 - 流程：刷盘 → `git add -A`（respect `.gitignore`）→ `git commit -m "..."`。
 - 成功后刷新变更列表与 commit 列表。
 
@@ -228,6 +232,10 @@ Diff 数据源：
 | `src/features/git/useGitPluginStatus.ts` | 轮询全局 git 状态（仿 `useLocalZImageStatus`） |
 | `src/features/git/useProjectGitController.ts` | 项目级 commit/changes/checkout + 占用轮询 |
 | `src/features/canvas/ui/ProjectVersionPanel.tsx` | 版本 Tab 主 UI（占用摘要、超 1GB 横幅） |
+| `src/features/canvas/ui/git/GitCommitForm.tsx` | 提交输入 + 主按钮 |
+| `src/features/canvas/ui/git/GitChangesSection.tsx` | 「更改」列表 |
+| `src/features/canvas/ui/git/GitChangeRow.tsx` | 单行变更 + 悬停操作 |
+| `src/features/canvas/ui/git/GitHistorySection.tsx` | 历史 commit 列表 |
 | `src/features/canvas/ui/git/SimpleAssetDiffDialog.tsx` | 图片/文本简单 diff |
 | `src-tauri/src/project/git.rs` | git 子进程封装 |
 | `src-tauri/src/project/storage.rs` | 项目目录递归计大小（含 `.git`） |

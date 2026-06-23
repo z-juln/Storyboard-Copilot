@@ -523,10 +523,6 @@ fn build_directory_entry(project_dir: &Path, relative_path: &str) -> Result<Proj
     for entry_result in entries {
         let entry = entry_result.map_err(|err| format!("Failed to read directory entry: {err}"))?;
         let file_name = entry.file_name().to_string_lossy().to_string();
-        if file_name.starts_with('.') {
-            continue;
-        }
-
         let child_relative = format!("{relative_path}/{file_name}").replace('\\', "/");
         let file_type = entry
             .file_type()
