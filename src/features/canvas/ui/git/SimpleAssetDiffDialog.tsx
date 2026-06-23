@@ -12,6 +12,7 @@ import {
   FULLSCREEN_MODAL_PANEL_CLASS,
 } from '@/features/canvas/ui/fullscreenModalLayout';
 
+import { GitTextDiffViewer } from './GitTextDiffViewer';
 import {
   resolveGitBlobMime,
   resolveGitChangePreviewKind,
@@ -88,14 +89,6 @@ function MediaPane({
   );
 }
 
-function TextPane({ content }: { content: string }) {
-  return (
-    <pre className="ui-scrollbar h-full min-h-0 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-black/25 p-3 text-xs">
-      {content}
-    </pre>
-  );
-}
-
 export const SimpleAssetDiffDialog = memo(({
   projectId,
   path,
@@ -105,8 +98,8 @@ export const SimpleAssetDiffDialog = memo(({
   onClose,
 }: SimpleAssetDiffDialogProps) => {
   const [beforeBlob, setBeforeBlob] = useState<ProjectGitBlob | null>(null);
-  const [beforeText, setBeforeText] = useState<string | null>(null);
-  const [afterText, setAfterText] = useState<string | null>(null);
+  const [beforeText, setBeforeText] = useState('');
+  const [afterText, setAfterText] = useState('');
   const [loading, setLoading] = useState(false);
 
   const previewKind = useMemo(() => resolveGitChangePreviewKind(path), [path]);
@@ -123,8 +116,8 @@ export const SimpleAssetDiffDialog = memo(({
     let cancelled = false;
     setLoading(true);
     setBeforeBlob(null);
-    setBeforeText(null);
-    setAfterText(null);
+    setBeforeText('');
+    setAfterText('');
 
     void (async () => {
       try {
@@ -136,13 +129,9 @@ export const SimpleAssetDiffDialog = memo(({
           setBeforeBlob(committed);
           if (previewKind === 'text') {
             setBeforeText(
-              committed.kind === 'missing'
-                ? '（该版本无此文件）'
-                : committed.text ?? '（无内容）'
+              committed.kind === 'missing' ? '' : committed.text ?? '',
             );
           }
-        } else if (previewKind === 'text') {
-          setBeforeText(isAdded ? '（新文件）' : '（无历史版本）');
         }
 
         if (!isDeleted && previewKind === 'text') {
@@ -203,14 +192,13 @@ export const SimpleAssetDiffDialog = memo(({
       ) : !previewKind ? (
         <div className="flex flex-1 items-center justify-center text-sm text-text-muted">该文件类型暂不支持对比预览</div>
       ) : previewKind === 'text' ? (
-        <div className="grid min-h-0 flex-1 grid-cols-2 gap-3">
-          <DiffColumn label={beforeLabel}>
-            <TextPane content={beforeText ?? '（无内容）'} />
-          </DiffColumn>
-          <DiffColumn label={afterLabel}>
-            <TextPane content={isDeleted ? afterEmptyMessage : afterText ?? '（无内容）'} />
-          </DiffColumn>
-        </div>
+        <GitTextDiffViewer
+          path={path}
+          oldValue={beforeText}
+          newValue={afterText}
+          leftTitle={beforeLabel}
+          rightTitle={afterLabel}
+        />
       ) : (
         <div className="grid min-h-0 flex-1 grid-cols-2 gap-3">
           <DiffColumn label={beforeLabel}>

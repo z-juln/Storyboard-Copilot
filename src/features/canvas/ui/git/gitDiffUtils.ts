@@ -73,3 +73,36 @@ export function canDiffGitChange(
   }
   return Boolean(headCommit);
 }
+
+export type GitDiffCompareMethod = 'json' | 'yaml' | 'lines';
+
+export function resolveGitDiffCompareMethod(path: string): GitDiffCompareMethod {
+  if (path === 'project.json' || path.endsWith('.json')) {
+    return 'json';
+  }
+  if (path.endsWith('.yaml') || path.endsWith('.yml')) {
+    return 'yaml';
+  }
+  return 'lines';
+}
+
+export function normalizeGitDiffValues(
+  path: string,
+  oldValue: string,
+  newValue: string,
+): { oldValue: string | Record<string, unknown>; newValue: string | Record<string, unknown>; compareMethod: GitDiffCompareMethod } {
+  const compareMethod = resolveGitDiffCompareMethod(path);
+  if (compareMethod !== 'json') {
+    return { oldValue, newValue, compareMethod };
+  }
+
+  try {
+    return {
+      oldValue: oldValue.trim() ? JSON.parse(oldValue) as Record<string, unknown> : {},
+      newValue: newValue.trim() ? JSON.parse(newValue) as Record<string, unknown> : {},
+      compareMethod,
+    };
+  } catch {
+    return { oldValue, newValue, compareMethod: 'lines' };
+  }
+}
