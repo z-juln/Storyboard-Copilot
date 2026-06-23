@@ -1,4 +1,4 @@
-import { memo, useEffect, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import {
   ChevronDown,
   ChevronRight,
@@ -97,6 +97,12 @@ export const AssetManagerPanel = memo(({
   const [explorerKey, setExplorerKey] = useState(0);
   const [refreshSignal, setRefreshSignal] = useState(0);
   const readOnly = isComponentDocProjectId(projectId);
+  const skipTabRefreshRef = useRef(true);
+
+  const handleRefresh = useCallback(() => {
+    setExplorerKey((value) => value + 1);
+    setRefreshSignal((value) => value + 1);
+  }, []);
 
   useEffect(() => {
     return canvasEventBus.subscribe('asset-explorer/reveal-asset', () => {
@@ -104,12 +110,29 @@ export const AssetManagerPanel = memo(({
     });
   }, []);
 
+  useEffect(() => {
+    return canvasEventBus.subscribe('asset-manager/refresh', () => {
+      handleRefresh();
+    });
+  }, [handleRefresh]);
+
+  useEffect(() => {
+    if (skipTabRefreshRef.current) {
+      skipTabRefreshRef.current = false;
+      return;
+    }
+    if (activeTab === 'assets') {
+      setExplorerKey((value) => value + 1);
+    } else if (activeTab === 'version') {
+      setRefreshSignal((value) => value + 1);
+    }
+  }, [activeTab]);
+
   const nodeTree = buildCanvasNodeTree(nodes);
 
-  const handleRefresh = () => {
-    setExplorerKey((value) => value + 1);
-    setRefreshSignal((value) => value + 1);
-  };
+  const selectTab = useCallback((tab: 'assets' | 'nodes' | 'version') => {
+    setActiveTab(tab);
+  }, []);
 
   return (
     <div className="pointer-events-none absolute left-4 top-[4.75rem] z-20 w-[min(22rem,calc(100vw-2rem))]">
@@ -143,7 +166,7 @@ export const AssetManagerPanel = memo(({
                 ? 'bg-bg-dark/50 font-medium text-text-dark'
                 : 'text-text-muted hover:text-text-dark'
             }`}
-            onClick={() => setActiveTab('assets')}
+            onClick={() => selectTab('assets')}
           >
             资产目录
           </button>
@@ -154,7 +177,7 @@ export const AssetManagerPanel = memo(({
                 ? 'bg-bg-dark/50 font-medium text-text-dark'
                 : 'text-text-muted hover:text-text-dark'
             }`}
-            onClick={() => setActiveTab('nodes')}
+            onClick={() => selectTab('nodes')}
           >
             画布节点
           </button>
@@ -165,7 +188,7 @@ export const AssetManagerPanel = memo(({
                 ? 'bg-bg-dark/50 font-medium text-text-dark'
                 : 'text-text-muted hover:text-text-dark'
             }`}
-            onClick={() => setActiveTab('version')}
+            onClick={() => selectTab('version')}
           >
             版本
           </button>

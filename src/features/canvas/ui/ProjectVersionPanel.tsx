@@ -2,10 +2,12 @@ import { memo, useCallback, useEffect, useState } from 'react';
 import { AlertTriangle, ChevronDown, ChevronRight } from 'lucide-react';
 
 import { revealProjectAsset } from '@/features/canvas/application/assetExplorerRevealBridge';
+import { canvasEventBus } from '@/features/canvas/application/canvasServices';
 import { SimpleAssetDiffDialog } from '@/features/canvas/ui/git/SimpleAssetDiffDialog';
 import { GitChangesSection } from '@/features/canvas/ui/git/GitChangesSection';
 import { GitCommitForm } from '@/features/canvas/ui/git/GitCommitForm';
 import { GitHistorySection } from '@/features/canvas/ui/git/GitHistorySection';
+import { GitPanelDialog, type GitPanelDialogState } from '@/features/canvas/ui/git/GitPanelDialog';
 import {
   canOpenGitChangeInExplorer,
   isGitChangeAssetPath,
@@ -31,6 +33,10 @@ interface DiffState {
   commit: string | null;
   changeKind: string;
 }
+
+type PendingConfirmAction =
+  | { type: 'checkout'; commitHash: string }
+  | { type: 'reset-latest' };
 
 export const ProjectVersionPanel = memo(({
   projectId,
@@ -59,55 +65,125 @@ export const ProjectVersionPanel = memo(({
   const [showCleanupHint, setShowCleanupHint] = useState(false);
   const [storageExpanded, setStorageExpanded] = useState(false);
   const [diffState, setDiffState] = useState<DiffState | null>(null);
+  const [dialogState, setDialogState] = useState<GitPanelDialogState | null>(null);
+  const [pendingConfirm, setPendingConfirm] = useState<PendingConfirmAction | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
 
   const headCommit = status?.head;
+
+  const notifyAssetManagerRefresh = useCallback(() => {
+    canvasEventBus.publish('asset-manager/refresh', undefined);
+  }, []);
+
+  const showAlert = useCallback((title: string, message: string) => {
+    setPendingConfirm(null);
+    setDialogState({ kind: 'alert', title, message });
+  }, []);
+
+  const showConfirm = useCallback((
+    title: string,
+    message: string,
+    confirmLabel: string,
+    action: PendingConfirmAction,
+  ) => {
+    setPendingConfirm(action);
+    setDialogState({
+      kind: 'confirm',
+      title,
+      message,
+      confirmLabel,
+    });
+  }, []);
+
+  const closeDialog = useCallback(() => {
+    if (busyAction) {
+      return;
+    }
+    setDialogState(null);
+    setPendingConfirm(null);
+  }, [busyAction]);
 
   const runAction = useCallback(async (key: string, action: () => Promise<void>) => {
     setBusyAction(key);
     try {
       await action();
     } catch (actionError) {
-      window.alert(actionError instanceof Error ? actionError.message : '操作失败');
+      showAlert('操作失败', actionError instanceof Error ? actionError.message : '操作失败');
     } finally {
       setBusyAction(null);
     }
-  }, []);
+  }, [showAlert]);
 
   const handleCommit = useCallback(async () => {
     const message = commitMessage.trim();
     if (!message) {
-      window.alert('请输入提交说明');
+      showAlert('无法提交', '请输入提交说明');
+      return;
+    }
+    if (changes.length === 0) {
+      showAlert('无法提交', '暂无未提交变更，无需提交');
       return;
     }
     await runAction('commit', async () => {
       await commit(message);
+      setCommitMessage('');
+      notifyAssetManagerRefresh();
     });
-  }, [commit, commitMessage, runAction]);
+  }, [changes.length, commit, commitMessage, notifyAssetManagerRefresh, runAction, showAlert]);
 
-  const handleCheckout = useCallback(async (commitHash: string) => {
-    const confirmed = window.confirm(
-      '将用该版本覆盖当前项目文件（含 project.json 与 assets），未提交改动会丢失。是否继续？'
+  const handleCheckout = useCallback((commitHash: string) => {
+    showConfirm(
+      '切换到此版本',
+      '将用该版本覆盖当前项目文件（含 project.json 与 assets），未提交改动会丢失。是否继续？',
+      '切换',
+      { type: 'checkout', commitHash },
     );
-    if (!confirmed) {
-      return;
-    }
-    await runAction(`checkout-${commitHash}`, async () => {
-      await checkout(commitHash);
-      openProject(projectId);
-    });
-  }, [checkout, openProject, projectId, runAction]);
+  }, [showConfirm]);
 
-  const handleResetLatest = useCallback(async () => {
-    const confirmed = window.confirm('将删除最新版本并回退到上一版，此操作不可撤销。是否继续？');
-    if (!confirmed) {
+  const handleResetLatest = useCallback(() => {
+    showConfirm(
+      '删除最新版本',
+      '将删除最新版本并回退到上一版，此操作不可撤销。是否继续？',
+      '删除',
+      { type: 'reset-latest' },
+    );
+  }, [showConfirm]);
+
+  const handleDialogConfirm = useCallback(() => {
+    if (!pendingConfirm) {
+      closeDialog();
       return;
     }
-    await runAction('reset-latest', async () => {
+
+    if (pendingConfirm.type === 'checkout') {
+      const commitHash = pendingConfirm.commitHash;
+      setDialogState(null);
+      setPendingConfirm(null);
+      void runAction(`checkout-${commitHash}`, async () => {
+        await checkout(commitHash);
+        openProject(projectId);
+        notifyAssetManagerRefresh();
+      });
+      return;
+    }
+
+    setDialogState(null);
+    setPendingConfirm(null);
+    void runAction('reset-latest', async () => {
       await resetLatest();
       openProject(projectId);
+      notifyAssetManagerRefresh();
     });
-  }, [openProject, projectId, resetLatest, runAction]);
+  }, [
+    checkout,
+    closeDialog,
+    notifyAssetManagerRefresh,
+    openProject,
+    pendingConfirm,
+    projectId,
+    resetLatest,
+    runAction,
+  ]);
 
   const canOpenChange = useCallback((change: ProjectGitChange) => {
     if (isGitChangeAssetPath(change.path)) {
@@ -263,8 +339,8 @@ export const ProjectVersionPanel = memo(({
         headHash={headCommit}
         readOnly={readOnly}
         busy={busy}
-        onCheckout={(hash) => void handleCheckout(hash)}
-        onResetLatest={() => void handleResetLatest()}
+        onCheckout={handleCheckout}
+        onResetLatest={handleResetLatest}
       />
 
       {diffState ? (
@@ -277,6 +353,13 @@ export const ProjectVersionPanel = memo(({
           onClose={() => setDiffState(null)}
         />
       ) : null}
+
+      <GitPanelDialog
+        state={dialogState}
+        busy={busy}
+        onClose={closeDialog}
+        onConfirm={handleDialogConfirm}
+      />
     </div>
   );
 });
