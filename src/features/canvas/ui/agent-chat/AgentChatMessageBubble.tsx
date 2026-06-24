@@ -1,14 +1,16 @@
 import type { AgentChatMessage } from '@/features/canvas/agentChat';
 
+import { AgentChatMarkdown } from '@/features/canvas/ui/agent-chat/AgentChatMarkdown';
+
 export function AgentChatMessageBubble({ message }: { message: AgentChatMessage }) {
   const isUser = message.role === 'user';
 
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
       <div
-        className={`max-w-[92%] rounded-lg px-3 py-2 text-xs leading-relaxed whitespace-pre-wrap ${
+        className={`max-w-[92%] rounded-lg px-3 py-2 text-xs leading-relaxed ${
           isUser
-            ? 'bg-accent/20 text-text-dark'
+            ? 'whitespace-pre-wrap bg-accent/20 text-text-dark'
             : 'bg-bg-dark/80 text-text-dark'
         }`}
       >
@@ -20,7 +22,7 @@ export function AgentChatMessageBubble({ message }: { message: AgentChatMessage 
         {!isUser && message.webSearchUsed ? (
           <div className="mb-1.5 text-[10px] font-medium text-emerald-400/90">已联网搜索</div>
         ) : null}
-        {message.content}
+        {isUser ? message.content : <AgentChatMarkdown content={message.content} />}
       </div>
     </div>
   );
