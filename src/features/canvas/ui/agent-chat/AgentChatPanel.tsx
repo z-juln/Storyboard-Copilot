@@ -31,6 +31,7 @@ export const AgentChatPanel = memo(({
     isLoading,
     startNewConversation,
     selectConversation,
+    deleteConversation,
   } = useAgentChatSession(projectId);
   const [draft, setDraft] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -201,6 +202,11 @@ export const AgentChatPanel = memo(({
           setDraft('');
           setError(null);
           selectConversation(conversationId);
+        }}
+        onDelete={(conversationId) => {
+          deleteConversation(conversationId);
+          setDraft('');
+          setError(null);
         }}
         onClose={() => setHistoryOpen(false)}
       />

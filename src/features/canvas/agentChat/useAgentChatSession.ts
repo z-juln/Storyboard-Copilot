@@ -4,6 +4,7 @@ import {
   buildConversationFromMessages,
   createEmptyConversation,
   groupConversationsByRecency,
+  removeConversation,
   resolveActiveMessages,
   upsertConversation,
 } from './conversationDomain';
@@ -17,6 +18,8 @@ export function useAgentChatSession(projectId: string | null) {
   const [isLoading, setIsLoading] = useState(Boolean(projectId));
   const conversationsRef = useRef(conversations);
   conversationsRef.current = conversations;
+  const activeConversationIdRef = useRef(activeConversationId);
+  activeConversationIdRef.current = activeConversationId;
 
   useEffect(() => {
     if (!projectId) {
@@ -112,6 +115,26 @@ export function useAgentChatSession(projectId: string | null) {
     [persistSnapshot],
   );
 
+  const deleteConversation = useCallback(
+    (conversationId: string) => {
+      setConversations((current) => {
+        const next = removeConversation(current, conversationId);
+
+        if (conversationId === activeConversationIdRef.current) {
+          const empty = createEmptyConversation();
+          setActiveConversationId(empty.id);
+          setMessages([]);
+          persistSnapshot(empty.id, next);
+        } else {
+          persistSnapshot(activeConversationIdRef.current, next);
+        }
+
+        return next;
+      });
+    },
+    [persistSnapshot],
+  );
+
   const historyGroups = useMemo(
     () => groupConversationsByRecency(conversations),
     [conversations],
@@ -125,5 +148,6 @@ export function useAgentChatSession(projectId: string | null) {
     isLoading,
     startNewConversation,
     selectConversation,
+    deleteConversation,
   };
 }

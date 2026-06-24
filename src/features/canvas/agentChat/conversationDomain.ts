@@ -48,6 +48,13 @@ export function upsertConversation(
   return next.sort((left, right) => right.updatedAt - left.updatedAt);
 }
 
+export function removeConversation(
+  conversations: AgentChatConversation[],
+  conversationId: string,
+): AgentChatConversation[] {
+  return conversations.filter((conversation) => conversation.id !== conversationId);
+}
+
 export function listPersistedConversations(
   conversations: AgentChatConversation[],
 ): AgentChatConversation[] {

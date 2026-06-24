@@ -1,7 +1,8 @@
 import { memo, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, Trash2 } from 'lucide-react';
 
+import { UiIconButton } from '@/components/ui';
 import { UI_POPOVER_TRANSITION_MS } from '@/components/ui/motion';
 import type { AgentChatHistoryGroup } from '@/features/canvas/agentChat';
 
@@ -11,6 +12,7 @@ interface AgentChatHistoryMenuProps {
   groups: AgentChatHistoryGroup[];
   activeConversationId: string;
   onSelect: (conversationId: string) => void;
+  onDelete: (conversationId: string) => void;
   onClose: () => void;
 }
 
@@ -20,6 +22,7 @@ export const AgentChatHistoryMenu = memo(({
   groups,
   activeConversationId,
   onSelect,
+  onDelete,
   onClose,
 }: AgentChatHistoryMenuProps) => {
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -112,30 +115,44 @@ export const AgentChatHistoryMenu = memo(({
               {group.items.map((conversation) => {
                 const isActive = conversation.id === activeConversationId;
                 return (
-                  <button
+                  <div
                     key={conversation.id}
-                    type="button"
-                    className={`flex w-full items-center gap-2.5 px-2.5 py-2 text-left transition-colors hover:bg-bg-dark/70 ${
+                    className={`group flex w-full items-center pr-1 transition-colors hover:bg-bg-dark/70 ${
                       isActive ? 'bg-accent/10' : ''
                     }`}
-                    onClick={() => {
-                      onSelect(conversation.id);
-                      onClose();
-                    }}
                   >
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-bg-dark/80 text-text-muted">
-                      <Sparkles className="h-4 w-4" />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span
-                        className={`block truncate text-xs ${
-                          isActive ? 'font-medium text-accent' : 'text-text-dark'
-                        }`}
-                      >
-                        {conversation.title}
+                    <button
+                      type="button"
+                      className="flex min-w-0 flex-1 items-center gap-2.5 px-2.5 py-2 text-left"
+                      onClick={() => {
+                        onSelect(conversation.id);
+                        onClose();
+                      }}
+                    >
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-bg-dark/80 text-text-muted">
+                        <Sparkles className="h-4 w-4" />
                       </span>
-                    </span>
-                  </button>
+                      <span className="min-w-0 flex-1">
+                        <span
+                          className={`block truncate text-xs ${
+                            isActive ? 'font-medium text-accent' : 'text-text-dark'
+                          }`}
+                        >
+                          {conversation.title}
+                        </span>
+                      </span>
+                    </button>
+                    <UiIconButton
+                      className="h-7 w-7 shrink-0 text-text-muted opacity-0 transition-opacity hover:text-red-400 group-hover:opacity-100"
+                      title="删除对话"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onDelete(conversation.id);
+                      }}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </UiIconButton>
+                  </div>
                 );
               })}
             </section>
