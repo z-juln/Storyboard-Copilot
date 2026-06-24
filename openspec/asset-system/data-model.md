@@ -7,7 +7,9 @@
 ├── project.json       # nodes, edges, viewport, history, assetManifest
 ├── assets/            # 二进制资源（可嵌套子目录）
 └── .cache/
-    └── previews/      # 按内容 hash 缓存的缩略图（不入 project.json、不进 manifest）
+    ├── previews/      # 按内容 hash 缓存的缩略图（不入 project.json、不进 manifest）
+    ├── commit-history/ # Git 提交列表缓存（可选）
+    └── chat-history/  # Agent 对话会话缓存（sessions.json）
 ```
 
 `.cache/` 为派生数据，可整目录删除后按需重建；不参与备份/同步的业务真相。

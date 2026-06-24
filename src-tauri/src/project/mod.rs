@@ -1,3 +1,4 @@
+pub mod chat_history_cache;
 pub mod commit_history_cache;
 pub mod dto;
 pub mod file_store;

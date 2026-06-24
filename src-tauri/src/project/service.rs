@@ -107,6 +107,25 @@ impl ProjectService {
             imports: imports.into_iter().map(map_imported_asset_item).collect(),
         })
     }
+
+    pub fn get_chat_history(
+        &self,
+        project_id: &str,
+    ) -> Result<super::dto::ProjectChatHistorySnapshotDto, String> {
+        super::chat_history_cache::load_chat_history_for_project(&self.app_data_dir, project_id)
+    }
+
+    pub fn save_chat_history(
+        &self,
+        project_id: &str,
+        snapshot: super::dto::ProjectChatHistorySnapshotDto,
+    ) -> Result<(), String> {
+        super::chat_history_cache::save_chat_history_for_project(
+            &self.app_data_dir,
+            project_id,
+            &snapshot,
+        )
+    }
 }
 
 fn map_imported_asset_item(item: ImportedAssetItem) -> ImportedAssetItemDto {

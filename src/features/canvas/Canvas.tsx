@@ -70,6 +70,7 @@ import { NodeSelectionMenu } from './NodeSelectionMenu';
 import { SelectedNodeOverlay } from './ui/SelectedNodeOverlay';
 import { NodeToolDialog } from './ui/NodeToolDialog';
 import { CanvasWorkspaceToolbar } from './ui/CanvasWorkspaceToolbar';
+import { AgentChatPanel } from './ui/agent-chat/AgentChatPanel';
 import { AssetManagerPanel } from './ui/AssetManagerPanel';
 import { ImageViewerModal } from './ui/ImageViewerModal';
 import { MissingApiKeyHint } from '@/features/settings/MissingApiKeyHint';
@@ -263,6 +264,7 @@ export function Canvas() {
   const [previewConnectionVisual, setPreviewConnectionVisual] =
     useState<PreviewConnectionVisual | null>(null);
   const [showAssetManager, setShowAssetManager] = useState(true);
+  const [showAgentChat, setShowAgentChat] = useState(false);
 
   const isRestoringCanvasRef = useRef(true);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1786,7 +1788,9 @@ export function Canvas() {
     <div ref={wrapperRef} className="relative h-full w-full">
       <CanvasWorkspaceToolbar
         showAssetManager={showAssetManager}
+        showAgentChat={showAgentChat}
         onToggleAssetManager={() => setShowAssetManager((value) => !value)}
+        onToggleAgentChat={() => setShowAgentChat((value) => !value)}
       />
       {showAssetManager && currentProjectId ? (
         <AssetManagerPanel
@@ -1794,6 +1798,13 @@ export function Canvas() {
           selectedNodeId={selectedNodeId}
           onFocusNode={handleFocusNodeFromAssetManager}
           onClose={() => setShowAssetManager(false)}
+        />
+      ) : null}
+      {showAgentChat ? (
+        <AgentChatPanel
+          projectId={currentProjectId}
+          offsetForAssetManager={showAssetManager && Boolean(currentProjectId)}
+          onClose={() => setShowAgentChat(false)}
         />
       ) : null}
       <ReactFlow

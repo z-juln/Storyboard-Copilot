@@ -1,3 +1,4 @@
+import type { AgentChatSessionSnapshot } from '@/features/canvas/agentChat/types';
 import type { Viewport } from '@xyflow/react';
 
 import type {
@@ -292,6 +293,11 @@ export interface RustApiClient {
   getProjectSnapshot: (projectId: string) => Promise<ProjectSnapshot | null>;
   upsertProjectSnapshot: (snapshot: ProjectSnapshot) => Promise<void>;
   updateProjectViewportRecord: (projectId: string, viewport: Viewport) => Promise<void>;
+  getProjectChatHistory: (projectId: string) => Promise<AgentChatSessionSnapshot>;
+  saveProjectChatHistory: (
+    projectId: string,
+    snapshot: AgentChatSessionSnapshot
+  ) => Promise<void>;
   renameProjectRecord: (projectId: string, name: string, updatedAt: number) => Promise<void>;
   deleteProjectRecord: (projectId: string) => Promise<void>;
   listProjectDirectory: (projectId: string) => Promise<ProjectDirectoryEntry>;
@@ -453,6 +459,23 @@ export function createRustApiClient(baseUrl = resolveBaseUrl()): RustApiClient {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ viewportJson: JSON.stringify(viewport) }),
       });
+      await readEmpty(response);
+    },
+    getProjectChatHistory: async (projectId) => {
+      const response = await fetch(
+        `${normalizedBaseUrl}/api/v1/projects/${encodeURIComponent(projectId)}/chat-history`
+      );
+      return readJson<AgentChatSessionSnapshot>(response);
+    },
+    saveProjectChatHistory: async (projectId, snapshot) => {
+      const response = await fetch(
+        `${normalizedBaseUrl}/api/v1/projects/${encodeURIComponent(projectId)}/chat-history`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(snapshot),
+        }
+      );
       await readEmpty(response);
     },
     renameProjectRecord: async (projectId, name, updatedAt) => {

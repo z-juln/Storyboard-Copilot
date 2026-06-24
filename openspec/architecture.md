@@ -21,6 +21,7 @@ Source Node -> Process Node / Tool / AI -> Derived Output Node
 | App Shell | 项目页、画布页、全局对话框 | `src/App.tsx` |
 | Project | 项目列表、打开/关闭、自动保存 | `src/stores/projectStore.ts` |
 | Canvas | 节点、连线、视口、选择、快捷键 | `src/features/canvas/Canvas.tsx`, `src/stores/canvasStore.ts` |
+| Agent Chat | 画布 Agent 对话、会话历史、内置 DeepSeek | `src/features/canvas/agentChat/`, `ui/agent-chat/` |
 | Node Domain | 节点类型、默认数据、菜单、连线能力 | `src/features/canvas/domain/` |
 | Tools | 裁剪、标注、分镜切割等工具 | `src/features/canvas/tools/`, `toolProcessor.ts` |
 | AI Models | 模型定义、供应商、请求映射 | `src/features/canvas/models/`, `src-tauri/src/ai/` |
@@ -34,6 +35,7 @@ Source Node -> Process Node / Tool / AI -> Derived Output Node
 | 变更类型 | 优先查看 |
 |----------|----------|
 | UI / 交互 | `Canvas.tsx`, `nodes/*.tsx`, `ui/`, `components/ui/primitives.tsx` |
+| Agent 对话 | `agentChat/`, `ui/agent-chat/` |
 | 新节点 | `canvasNodes.ts`, `nodeRegistry.ts`, `nodes/index.ts` |
 | 新工具 | `tools/types.ts`, `builtInTools.ts`, `ui/tool-editors/`, `toolProcessor.ts` |
 | 新模型 | `models/image/<provider>/`, `models/providers/`, Rust provider |
@@ -53,6 +55,7 @@ Source Node -> Process Node / Tool / AI -> Derived Output Node
 | 图片分片上传 / prepare | HTTP | 落盘 + 注册 manifest |
 | 分镜合并 / metadata | HTTP | 需 `projectId` |
 | 内置 Adapter | HTTP | `/api/v1/adapters/*` |
+| Agent 对话历史 | HTTP | `GET/PUT /api/v1/projects/:id/chat-history` → `.cache/chat-history/sessions.json` |
 | 插件（Z-Image / Git 等） | HTTP | `/api/v1/local-zimage/*`、`/api/v1/plugins/git/status`、`/api/v1/projects/:id/git/*` |
 | 画布 AI 生图 / 部分图片处理 | Tauri `invoke` | 迁移中，见 `roadmap.md` |
 | API Key | HTTP + SQLite | `projects.db` |

@@ -98,3 +98,30 @@ pub struct ImportedAssetItemDto {
 pub struct ImportProjectAssetsResponseDto {
     pub imports: Vec<ImportedAssetItemDto>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectChatHistoryMessageDto {
+    pub id: String,
+    pub role: String,
+    pub content: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectChatHistoryConversationDto {
+    pub id: String,
+    pub title: String,
+    pub messages: Vec<ProjectChatHistoryMessageDto>,
+    pub updated_at: i64,
+    pub created_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectChatHistorySnapshotDto {
+    #[serde(default)]
+    pub active_conversation_id: String,
+    #[serde(default)]
+    pub conversations: Vec<ProjectChatHistoryConversationDto>,
+}

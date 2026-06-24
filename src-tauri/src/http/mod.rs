@@ -39,7 +39,8 @@ use crate::media::upload::{
 };
 use crate::project::dto::{
     CreateAssetDirectoryRequestDto, ImportProjectAssetsRequestDto, MoveProjectAssetRequestDto,
-    ProjectSnapshot, RenameProjectRequestDto, UpdateProjectViewportRequestDto,
+    ProjectChatHistorySnapshotDto, ProjectSnapshot, RenameProjectRequestDto,
+    UpdateProjectViewportRequestDto,
 };
 use crate::project::file_store;
 use crate::project::git;
@@ -161,6 +162,10 @@ pub async fn start_http_server_with_app_data(app_data_dir: PathBuf) -> Result<()
         .route(
             "/api/v1/projects/:project_id/viewport",
             put(update_project_viewport),
+        )
+        .route(
+            "/api/v1/projects/:project_id/chat-history",
+            get(get_project_chat_history).put(save_project_chat_history),
         )
         .route("/api/v1/projects/:project_id/rename", put(rename_project))
         .route(
@@ -445,6 +450,27 @@ async fn update_project_viewport(
     };
 
     match state.project.update_viewport(&project_id, viewport) {
+        Ok(()) => StatusCode::NO_CONTENT.into_response(),
+        Err(err) => api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
+    }
+}
+
+async fn get_project_chat_history(
+    State(state): State<HttpState>,
+    Path(project_id): Path<String>,
+) -> Response {
+    match state.project.get_chat_history(&project_id) {
+        Ok(snapshot) => Json(snapshot).into_response(),
+        Err(err) => api_error(StatusCode::BAD_REQUEST, err),
+    }
+}
+
+async fn save_project_chat_history(
+    State(state): State<HttpState>,
+    Path(project_id): Path<String>,
+    Json(snapshot): Json<ProjectChatHistorySnapshotDto>,
+) -> Response {
+    match state.project.save_chat_history(&project_id, snapshot) {
         Ok(()) => StatusCode::NO_CONTENT.into_response(),
         Err(err) => api_error(StatusCode::INTERNAL_SERVER_ERROR, err),
     }
