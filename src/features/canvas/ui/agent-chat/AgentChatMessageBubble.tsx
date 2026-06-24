@@ -12,6 +12,14 @@ export function AgentChatMessageBubble({ message }: { message: AgentChatMessage 
             : 'bg-bg-dark/80 text-text-dark'
         }`}
       >
+        {!isUser && message.offlineReply ? (
+          <div className="mb-1.5 text-[10px] font-medium text-amber-400/90">
+            未走联网通道（请重启应用以加载最新后端）
+          </div>
+        ) : null}
+        {!isUser && message.webSearchUsed ? (
+          <div className="mb-1.5 text-[10px] font-medium text-emerald-400/90">已联网搜索</div>
+        ) : null}
         {message.content}
       </div>
     </div>
