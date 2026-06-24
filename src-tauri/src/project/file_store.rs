@@ -51,7 +51,17 @@ pub fn list_project_summaries(app_data_dir: &Path) -> Result<Vec<ProjectSummaryR
             continue;
         }
 
-        let snapshot = read_project_snapshot_file(&json_path)?;
+        let snapshot = match read_project_snapshot_file(&json_path) {
+            Ok(snapshot) => snapshot,
+            Err(err) => {
+                tracing::warn!(
+                    project = %entry.file_name().to_string_lossy(),
+                    path = %json_path.display(),
+                    "{err}; skip listing this project"
+                );
+                continue;
+            }
+        };
         summaries.push(ProjectSummaryRecord {
             id: snapshot.id,
             name: snapshot.name,
@@ -140,7 +150,43 @@ pub fn delete_project(app_data_dir: &Path, project_id: &str) -> Result<(), Strin
 fn read_project_snapshot_file(json_path: &Path) -> Result<ProjectSnapshot, String> {
     let raw = fs::read_to_string(json_path)
         .map_err(|err| format!("Failed to read project.json: {err}"))?;
-    serde_json::from_str(&raw).map_err(|err| format!("Failed to parse project.json: {err}"))
+    parse_project_snapshot_json(&raw)
+}
+
+fn parse_project_snapshot_json(raw: &str) -> Result<ProjectSnapshot, String> {
+    let mut value: Value = serde_json::from_str(raw)
+        .map_err(|err| format!("Failed to parse project.json: {err}"))?;
+
+    let Some(obj) = value.as_object_mut() else {
+        return Err("Failed to parse project.json: root must be an object".to_string());
+    };
+
+    let created_at = obj
+        .get("createdAt")
+        .and_then(|item| item.as_i64())
+        .ok_or_else(|| "Failed to parse project.json: missing field `createdAt`".to_string())?;
+
+    if !obj.contains_key("updatedAt") {
+        obj.insert("updatedAt".to_string(), Value::Number(created_at.into()));
+    }
+
+    if !obj.contains_key("viewport") {
+        obj.insert(
+            "viewport".to_string(),
+            serde_json::json!({ "x": 0.0, "y": 0.0, "zoom": 1.0 }),
+        );
+    }
+
+    if !obj.contains_key("nodeCount") {
+        let node_count = obj
+            .get("nodes")
+            .and_then(|item| item.as_array())
+            .map(|nodes| nodes.len() as i64)
+            .unwrap_or(0);
+        obj.insert("nodeCount".to_string(), Value::Number(node_count.into()));
+    }
+
+    serde_json::from_value(value).map_err(|err| format!("Failed to parse project.json: {err}"))
 }
 
 pub fn normalize_asset_relative_path(path: &str) -> Result<String, String> {
