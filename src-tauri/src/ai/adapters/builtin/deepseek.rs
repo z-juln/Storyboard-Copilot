@@ -9,7 +9,8 @@ use crate::ai::error::AIError;
 
 const OPENAI_BASE_URL: &str = "https://api.deepseek.com";
 const ANTHROPIC_BASE_URL: &str = "https://api.deepseek.com/anthropic/v1";
-const MODEL_NAME: &str = "deepseek-v4-flash";
+const DEFAULT_MODEL_NAME: &str = "deepseek-v4-flash";
+const PRO_MODEL_NAME: &str = "deepseek-v4-pro";
 const WEB_SEARCH_TOOL_TYPE: &str = "web_search_20250305";
 const DEFAULT_MAX_WEB_SEARCH_USES: u32 = 5;
 const DEFAULT_MAX_TOKENS: u32 = 4096;
@@ -57,6 +58,30 @@ struct AnthropicErrorBody {
 struct AnthropicConversation {
     system: Option<String>,
     messages: Vec<Value>,
+}
+
+fn resolve_model_name(params: &Option<HashMap<String, Value>>) -> String {
+    params
+        .as_ref()
+        .and_then(|extra| extra.get("model"))
+        .and_then(|value| value.as_str())
+        .filter(|name| *name == PRO_MODEL_NAME || *name == DEFAULT_MODEL_NAME)
+        .map(str::to_string)
+        .unwrap_or_else(|| DEFAULT_MODEL_NAME.to_string())
+}
+
+fn apply_extra_params(
+    body: &mut serde_json::Map<String, Value>,
+    params: Option<HashMap<String, Value>>,
+) {
+    if let Some(extra) = params {
+        for (key, value) in extra {
+            if key == "enable_web_search" || key == "model" {
+                continue;
+            }
+            body.insert(key, value);
+        }
+    }
 }
 
 fn build_messages(input: ModelInvokeInputDto) -> Result<Vec<serde_json::Value>, AIError> {
@@ -159,8 +184,9 @@ async fn invoke_chat_openai(
     params: Option<HashMap<String, Value>>,
 ) -> Result<ModelCallResultDto, AIError> {
     let messages = build_messages(input)?;
+    let model_name = resolve_model_name(&params);
     let mut body = serde_json::Map::new();
-    body.insert("model".to_string(), Value::String(MODEL_NAME.to_string()));
+    body.insert("model".to_string(), Value::String(model_name));
     body.insert("messages".to_string(), Value::Array(messages));
     body.insert("stream".to_string(), Value::Bool(false));
     body.insert(
@@ -168,14 +194,7 @@ async fn invoke_chat_openai(
         json!({ "type": "disabled" }),
     );
 
-    if let Some(extra) = params {
-        for (key, value) in extra {
-            if key == "enable_web_search" {
-                continue;
-            }
-            body.insert(key, value);
-        }
-    }
+    apply_extra_params(&mut body, params);
 
     let client = Client::new();
     let response = client
@@ -232,10 +251,12 @@ async fn invoke_chat_openai(
 async fn invoke_chat_with_web_search(
     api_key: &str,
     input: ModelInvokeInputDto,
+    params: Option<HashMap<String, Value>>,
 ) -> Result<ModelCallResultDto, AIError> {
     let conversation = build_anthropic_conversation(input)?;
+    let model_name = resolve_model_name(&params);
     let mut body = serde_json::Map::new();
-    body.insert("model".to_string(), Value::String(MODEL_NAME.to_string()));
+    body.insert("model".to_string(), Value::String(model_name));
     body.insert(
         "max_tokens".to_string(),
         Value::Number(DEFAULT_MAX_TOKENS.into()),
@@ -317,5 +338,5 @@ pub async fn invoke_chat(
     }
 
     tracing::info!("deepseek chat: using anthropic web_search path");
-    invoke_chat_with_web_search(api_key, input).await
+    invoke_chat_with_web_search(api_key, input, params).await
 }

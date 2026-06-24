@@ -3,6 +3,7 @@ import { rustApiClient } from '@/infrastructure/rustApiClient';
 
 import { AGENT_CHAT_ADAPTER_ID, AGENT_CHAT_ENABLE_WEB_SEARCH, AGENT_CHAT_SYSTEM_PROMPT } from './constants';
 import { createAgentChatId } from './id';
+import type { AgentChatModelId } from './modelOptions';
 import type { AgentChatMessage } from './types';
 
 const SHANGHAI_TIME_ZONE = 'Asia/Shanghai';
@@ -61,6 +62,7 @@ export function isOpenAiChatResponse(raw: unknown): boolean {
 export async function invokeAgentChatReply(
   history: AgentChatMessage[],
   userContent: string,
+  modelId: AgentChatModelId,
 ): Promise<
   | { assistantMessage: AgentChatMessage }
   | { error: string }
@@ -76,7 +78,9 @@ export async function invokeAgentChatReply(
       input: {
         messages: buildInvokeMessages(history, trimmed),
       },
-      params: AGENT_CHAT_ENABLE_WEB_SEARCH ? { enable_web_search: true } : undefined,
+      params: AGENT_CHAT_ENABLE_WEB_SEARCH
+        ? { enable_web_search: true, model: modelId }
+        : { model: modelId },
     });
 
     if (result.status === 'succeeded') {

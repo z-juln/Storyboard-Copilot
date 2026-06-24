@@ -5,6 +5,4 @@ export const AGENT_CHAT_SYSTEM_PROMPT =
 
 export const AGENT_CHAT_ADAPTER_ID = DEEPSEEK_FLASH_ADAPTER_ID;
 
-export const AGENT_CHAT_MODEL_LABEL = 'DeepSeek V4 Flash · 联网';
-
 export const AGENT_CHAT_ENABLE_WEB_SEARCH = true;
