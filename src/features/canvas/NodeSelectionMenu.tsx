@@ -101,7 +101,7 @@ export function NodeSelectionMenu({
     <div
       ref={menuRef}
       className={`
-        absolute z-50 min-w-[220px] overflow-hidden rounded-lg border border-border-dark bg-surface-dark shadow-xl
+        absolute z-50 w-fit min-w-[110px] overflow-hidden rounded-md border border-border-dark bg-surface-dark py-1 shadow-xl
         transition-opacity duration-150
         ${isVisible ? 'opacity-100' : 'opacity-0'}
       `}
@@ -112,17 +112,17 @@ export function NodeSelectionMenu({
         return (
           <button
             key={item.type}
-            className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-bg-dark"
+            className="flex w-full items-center gap-2 px-2 py-1.5 text-left transition-colors hover:bg-bg-dark whitespace-nowrap"
             style={{ transitionDelay: isVisible ? `${index * 30}ms` : '0ms' }}
             onClick={() => {
               handleClose();
               setTimeout(() => onSelect(item.type), UI_POPOVER_TRANSITION_MS + 10);
             }}
           >
-            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-bg-dark">
-              <Icon className="h-4 w-4 text-accent" />
+            <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-bg-dark">
+              <Icon className="h-3.5 w-3.5 text-accent" />
             </div>
-            <span className="text-sm text-text-dark">{MENU_LABELS[item.menuLabelKey] ?? item.menuLabelKey}</span>
+            <span className="text-xs text-text-dark">{MENU_LABELS[item.menuLabelKey] ?? item.menuLabelKey}</span>
           </button>
         );
       })}
