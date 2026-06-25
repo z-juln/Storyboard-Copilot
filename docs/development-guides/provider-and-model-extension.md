@@ -5,7 +5,7 @@
 ## 1. 适用范围
 
 - 前端模型注册：`src/features/canvas/models/**`
-- 前端密钥配置：`src/stores/settingsStore.ts`、`src/components/SettingsDialog.tsx`
+- 前端密钥配置：`src/stores/settingsStore.ts`、`src/components/settings/SettingsDialog/`
 - Tauri AI 命令与供应商：`src-tauri/src/commands/ai.rs`、`src-tauri/src/ai/**`
 
 ## 2. 扩展原则
