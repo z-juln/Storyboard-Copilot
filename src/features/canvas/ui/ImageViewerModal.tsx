@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, RotateCcw, X } from 'lucide-react';
 import { UI_CONTENT_OVERLAY_INSET_CLASS } from '@/components/ui/motion';
+import { UiBodyPortal } from '@/components/ui/portalToBody';
 import { useImageViewerTransform } from '../hooks/useImageViewerTransform';
 
 export interface ImageViewerModalProps {
@@ -116,8 +117,9 @@ export function ImageViewerModal({
   if (!isVisible) return null;
 
   return (
-    <div
-      className={`fixed ${UI_CONTENT_OVERLAY_INSET_CLASS} z-[100] overflow-hidden bg-black/90 backdrop-blur-lg`}
+    <UiBodyPortal>
+      <div
+        className={`fixed ${UI_CONTENT_OVERLAY_INSET_CLASS} z-[100] overflow-hidden bg-black/90 backdrop-blur-lg`}
       style={{
         opacity: overlayOpacity,
         transition: 'opacity 400ms ease',
@@ -214,5 +216,6 @@ export function ImageViewerModal({
         </div>
       </div>
     </div>
+    </UiBodyPortal>
   );
 }

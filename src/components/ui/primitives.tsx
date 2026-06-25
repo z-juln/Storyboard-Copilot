@@ -16,6 +16,7 @@ import {
   type TextareaHTMLAttributes,
 } from 'react';
 import { createPortal } from 'react-dom';
+import { UiBodyPortal } from './portalToBody';
 import { Check, ChevronDown, X } from 'lucide-react';
 import {
   UI_CONTENT_OVERLAY_INSET_CLASS,
@@ -475,7 +476,7 @@ export function UiModal({
     return null;
   }
 
-  return (
+  const modal = (
     <div className={`fixed ${UI_CONTENT_OVERLAY_INSET_CLASS} z-50 flex items-center justify-center ${containerClassName}`} data-ui-modal>
       <div
         className={`absolute inset-0 bg-black/55 transition-opacity duration-200 ${isVisible ? 'opacity-100' : 'opacity-0'}`}
@@ -503,4 +504,6 @@ export function UiModal({
       </UiPanel>
     </div>
   );
+
+  return <UiBodyPortal>{modal}</UiBodyPortal>;
 }

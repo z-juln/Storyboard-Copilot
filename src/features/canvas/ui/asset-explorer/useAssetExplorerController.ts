@@ -57,6 +57,7 @@ import {
 import { resolveReplaceableAssetKind } from '@/features/project/asset/assetReplaceUtils';
 import { createEmptyAssetManifest, type AssetManifest } from '@/features/project/asset';
 import { resolveAssetPreviewKind } from '@/features/project/asset/assetPreviewUtils';
+import { buildProjectAssetUrl } from '@/features/project/projectPaths';
 import {
   PROJECT_ASSET_DRAG_MIME,
   serializeProjectAssetDragPayload,
@@ -81,6 +82,7 @@ export function useAssetExplorerController({
   readOnly,
 }: UseAssetExplorerControllerOptions) {
   const nodes = useCanvasStore((state) => state.nodes);
+  const openImageViewer = useCanvasStore((state) => state.openImageViewer);
   const assetManifest = useProjectStore((state) => state.currentProject?.assetManifest);
   const commitAssetManifest = useProjectStore((state) => state.commitAssetManifest);
   const markAssetPathsAvailable = useProjectStore((state) => state.markAssetPathsAvailable);
@@ -323,8 +325,21 @@ export function useAssetExplorerController({
     if (!kind) {
       return;
     }
+    if (kind === 'image') {
+      const imageUrl = buildProjectAssetUrl(projectId, entry.path);
+      const parentPath = getAssetParentPath(entry.path);
+      let parentEntry = tree;
+      if (parentPath && tree) {
+        parentEntry = findEntryInTree(tree, parentPath) ?? tree;
+      }
+      const imageList = (parentEntry?.children ?? [])
+        .filter((item) => item.kind === 'file' && resolveAssetPreviewKind(item.name) === 'image')
+        .map((item) => buildProjectAssetUrl(projectId, item.path));
+      openImageViewer(imageUrl, imageList.length > 0 ? imageList : [imageUrl]);
+      return;
+    }
     setPreviewState({ entry, kind });
-  }, []);
+  }, [openImageViewer, projectId, tree]);
 
   const requestDeleteEntries = useCallback(
     (entries: ProjectDirectoryEntry[]) => {

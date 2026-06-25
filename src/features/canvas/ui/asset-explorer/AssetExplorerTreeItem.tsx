@@ -1,11 +1,15 @@
 import { useEffect, useRef, useState, type DragEvent, type MouseEvent } from 'react';
-import { ChevronDown, ChevronRight, File, Image as ImageIcon } from 'lucide-react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 
 import type { ProjectDirectoryEntry } from '@/features/project/types';
 import { isDescendantAssetPath } from '@/features/project/asset/assetExplorerPathUtils';
 import { normalizeAssetPath } from '@/features/project/asset/assetManifest';
 
-import { formatBytes, focusRenameInput, isImageFileName } from './formatBytes';
+import {
+  AssetExplorerFileIcon,
+  AssetExplorerTruncatedFileName,
+} from './assetExplorerFileDisplay';
+import { formatBytes, focusRenameInput } from './formatBytes';
 
 export interface AssetExplorerTreeItemProps {
   entry: ProjectDirectoryEntry;
@@ -102,13 +106,9 @@ export function AssetExplorerTreeItem({
         <ChevronRight className="h-3 w-3 text-text-muted" />
       )}
     </button>
-  ) : isImageFileName(entry.name) ? (
-    <span className={leadingIconClass}>
-      <ImageIcon className="h-3.5 w-3.5 text-text-muted" />
-    </span>
   ) : (
     <span className={leadingIconClass}>
-      <File className="h-3.5 w-3.5 text-text-muted" />
+      <AssetExplorerFileIcon fileName={entry.name} />
     </span>
   );
 
@@ -165,7 +165,7 @@ export function AssetExplorerTreeItem({
             }}
           />
         ) : (
-          <span className="min-w-0 flex-1 truncate">{entry.name}</span>
+          <AssetExplorerTruncatedFileName name={entry.name} />
         )}
         {!isDirectory && entry.size ? (
           <span className="shrink-0 text-[10px] text-text-muted">{formatBytes(entry.size)}</span>

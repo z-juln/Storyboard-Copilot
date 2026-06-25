@@ -11,10 +11,6 @@ export function formatBytes(size?: number): string {
   return `${(size / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function isImageFileName(name: string): boolean {
-  return /\.(png|jpe?g|webp|gif|bmp|avif|tiff?)$/i.test(name);
-}
-
 /** 进入重命名时：有后缀的文件只选中主文件名，目录或无后缀则全选。 */
 export function focusRenameInput(
   input: HTMLInputElement,

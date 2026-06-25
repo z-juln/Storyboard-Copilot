@@ -9,6 +9,7 @@ import { openUrl } from '@tauri-apps/plugin-opener';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { UiCheckbox, UiSelect } from '@/components/ui';
 import { UI_CONTENT_OVERLAY_INSET_CLASS, UI_DIALOG_TRANSITION_MS } from '@/components/ui/motion';
+import { UiBodyPortal } from '@/components/ui/portalToBody';
 import { useDialogTransition } from '@/components/ui/useDialogTransition';
 import { listModelProviders } from '@/features/canvas/models';
 import { GRSAI_NANO_BANANA_PRO_MODEL_OPTIONS } from '@/features/canvas/models/providers/grsai';
@@ -377,7 +378,8 @@ export function SettingsDialog({
   if (!shouldRender) return null;
 
   return (
-    <div className={`fixed ${UI_CONTENT_OVERLAY_INSET_CLASS} z-50 flex items-center justify-center`}>
+    <UiBodyPortal>
+      <div className={`fixed ${UI_CONTENT_OVERLAY_INSET_CLASS} z-50 flex items-center justify-center`}>
       <div
         className={`absolute inset-0 bg-black/90 transition-opacity duration-200 ${isVisible ? 'opacity-100' : 'opacity-0'}`}
         onClick={onClose}
@@ -1177,5 +1179,6 @@ export function SettingsDialog({
         )}
       </div>
     </div>
+    </UiBodyPortal>
   );
 }

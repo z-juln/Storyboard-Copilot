@@ -44,6 +44,7 @@ import {
   shouldUseOriginalImageByZoom,
   toPreparedNodeImageFields,
 } from '@/features/canvas/application/imageData';
+import { resolveMediaPreviewTitle } from '@/features/canvas/ui/mediaPreviewShared';
 import { UploadNodeMediaBody } from '@/features/canvas/nodes/UploadNodeMediaBody';
 import { useCanvasStore } from '@/stores/canvasStore';
 import { useProjectStore } from '@/stores/projectStore';
@@ -409,6 +410,9 @@ export const UploadNode = memo(({ id, data, selected, width, height }: UploadNod
             preferOriginal: true,
           })}
           textContent={data.textContent}
+          previewTitle={resolveMediaPreviewTitle(
+            typeof data.sourceFileName === 'string' ? data.sourceFileName : null
+          )}
           onImageLoad={handleImageLoad}
           nodeSelected={selected}
         />

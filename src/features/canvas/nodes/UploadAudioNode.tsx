@@ -39,6 +39,7 @@ import {
 import { NodeAssetBindingMeta } from '@/features/canvas/ui/NodeAssetBindingMeta';
 import { NodeHeader, NODE_HEADER_FLOATING_POSITION_CLASS } from '@/features/canvas/ui/NodeHeader';
 import { NodeResizeHandle } from '@/features/canvas/ui/NodeResizeHandle';
+import { resolveMediaPreviewTitle } from '@/features/canvas/ui/mediaPreviewShared';
 import { UploadNodeMediaBody } from '@/features/canvas/nodes/UploadNodeMediaBody';
 import { useCanvasStore } from '@/stores/canvasStore';
 import { useProjectStore } from '@/stores/projectStore';
@@ -294,6 +295,10 @@ export const UploadAudioNode = memo(({ id, data, selected, width, height }: Uplo
           imageSource={null}
           imageViewerSourceUrl={null}
           textContent={null}
+          previewTitle={resolveMediaPreviewTitle(
+            typeof data.sourceFileName === 'string' ? data.sourceFileName : null,
+            '音频预览'
+          )}
           onImageLoad={() => {}}
           nodeSelected={selected}
         />

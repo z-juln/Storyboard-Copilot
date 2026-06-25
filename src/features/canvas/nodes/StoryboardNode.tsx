@@ -7,6 +7,7 @@ import {
   useRef,
 } from 'react';
 import { createPortal } from 'react-dom';
+import { UiBodyPortal } from '@/components/ui/portalToBody';
 import {
   Handle,
   Position,
@@ -1327,8 +1328,8 @@ export const StoryboardNode = memo(({ id, data, selected, width, height }: Story
         maxHeight={1600}
       />
 
-      {typeof document !== 'undefined' && isPackDoneDialogOpen
-        ? createPortal(
+      {isPackDoneDialogOpen ? (
+        <UiBodyPortal>
           <div className="fixed inset-0 z-[220] flex items-center justify-center">
             <div className="absolute inset-0 bg-black/55" />
             <UiPanel className="relative w-[440px] p-4">
@@ -1356,10 +1357,9 @@ export const StoryboardNode = memo(({ id, data, selected, width, height }: Story
                 </UiButton>
               </div>
             </UiPanel>
-          </div>,
-          document.body
-        )
-        : null}
+          </div>
+        </UiBodyPortal>
+      ) : null}
     </div>
   );
 });

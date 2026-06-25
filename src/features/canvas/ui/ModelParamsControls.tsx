@@ -789,7 +789,7 @@ export const ModelParamsControls = memo(({
         document.body
       )}
 
-      {typeof document !== 'undefined' && createPortal(
+      {typeof document !== 'undefined' && (
         <UiModal
           isOpen={Boolean(missingKeyProviderName)}
           title="需要配置供应商密钥"
@@ -822,8 +822,7 @@ export const ModelParamsControls = memo(({
           <p className="text-sm text-text-muted">
             {`当前尚未配置 ${missingKeyProviderName ?? ''} 的 API Key，请先到设置中完成配置后再使用该供应商。`}
           </p>
-        </UiModal>,
-        document.body
+        </UiModal>
       )}
     </div>
   );
