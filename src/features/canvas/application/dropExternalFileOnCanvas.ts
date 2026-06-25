@@ -1,8 +1,7 @@
 import type { XYPosition } from '@xyflow/react';
 
 import { publishUploadNodePasteImage } from '@/features/canvas/application/uploadNodePasteBridge';
-import { isVideoUploadFile } from '@/features/canvas/application/importNodeVideoFromFile';
-import { isAudioUploadFile } from '@/features/canvas/application/importNodeAudioFromFile';
+import { isVideoUploadFile, isAudioUploadFile } from '@/features/canvas/application/importNodeMediaFromFile';
 import { CANVAS_NODE_TYPES, type CanvasNodeType } from '@/features/canvas/domain/canvasNodes';
 import type { AssetManifest } from '@/features/project/asset';
 import { createEmptyAssetManifest } from '@/features/project/asset';

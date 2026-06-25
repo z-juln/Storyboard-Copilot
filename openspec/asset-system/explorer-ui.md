@@ -17,6 +17,8 @@
 - **批量操作**：多选后支持统一复制/剪切/删除/拖拽移动；若同时选中目录与其子孙，操作前自动保留顶层项。
 - **展开 / 折叠**：目录 chevron；**双击目录**切换展开。
 - **双击文件**：打开预览（同右键「预览」）。
+- **文件图标**：按类型区分（图片 / 视频 / 音频 / 文本 / 其他），见 `assetExplorerFileDisplay.tsx`。
+- **长文件名**：主文件名截断省略，**后缀始终完整显示**（`AssetExplorerTruncatedFileName`）。
 - **右键**：新建文件/文件夹、复制/剪切/粘贴、重命名、删除、预览、在文件夹中查找；右键项已在选区时保留多选。
 - **根目录空白右键**：`assets/` 根（无重命名/删除）。
 - **树内 DnD**：拖到目录 = move；多选时拖任一选中项移动全部；`effectAllowed = copyMove`。
@@ -28,8 +30,10 @@
 ## 预览
 
 - 支持：图片、视频、音频、文本（后缀规则见 `assetPreviewUtils.ts`）。
-- 组件：`AssetPreviewDialog.tsx`。
+- **图片**：`canvasStore.openImageViewer` → `ImageViewerModal`（与画布图片节点双击同一组件；同目录图片可左右切换）。
+- **视频 / 音频 / 文本**：`AssetPreviewDialog`（视频音频用 `MediaPreviewBody`；文本可编辑 / Markdown）。
 - URL：`buildProjectAssetUrl(projectId, path)`。
+- 弹窗经 `UiBodyPortal` 挂载 `document.body`。
 
 ## 只读
 

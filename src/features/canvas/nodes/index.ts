@@ -9,8 +9,7 @@ import { StoryboardNode } from './StoryboardNode';
 import { TextAnnotationNode } from './TextAnnotationNode';
 import { TextNode } from './TextNode';
 import { UploadNode } from './UploadNode';
-import { UploadVideoNode } from './UploadVideoNode';
-import { UploadAudioNode } from './UploadAudioNode';
+import { UploadVideoNode, UploadAudioNode } from './UploadMediaNode';
 
 export const nodeTypes: NodeTypes = {
   exportImageNode: ImageNode,

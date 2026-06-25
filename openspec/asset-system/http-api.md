@@ -18,8 +18,14 @@
 | `POST` | `/projects/:id/clipboard/assets` | `{ relativePaths, cut }` 写入系统剪贴板（Finder 同格式） |
 | `POST` | `/clipboard/assets/clear-cut` | 清除 Explorer 剪切标记 |
 | `DELETE` | `/projects/:id/assets?path=` | 删除文件或空目录 |
-| `GET` | `/projects/:id/assets?path=&v=` | 读原图（`v` 为 cache bust） |
+| `GET` | `/projects/:id/assets?path=&v=` | 读原文件（`v` 为 cache bust）；支持 `Range` 请求（206 Partial Content，音视频 seek） |
 | `GET` | `/projects/:id/assets/preview?path=&max=` | 读缩略图（按内容 hash 缓存于 `.cache/previews/`） |
+
+### 媒体 Range
+
+`GET /projects/:id/assets?path=…` 对视频 / 音频响应 `Accept-Ranges: bytes`；带 `Range` 头时返回 **206** 与 `Content-Range`。实现：`src-tauri/src/media/serve.rs`。
+
+CORS 暴露 `Content-Range`、`Accept-Ranges`，供 `<video>` / `<audio>` 进度 seek。
 
 ## 本地 Z-Image / 外部科技
 

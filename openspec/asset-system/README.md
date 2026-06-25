@@ -26,7 +26,9 @@
 | `AssetExplorerPanel` IDE 式目录 | 已实现 |
 | 双击 / 右键预览 | 已实现 |
 | 拖文件到画布创建 upload 节点 | 已实现 |
-| 图片 / 视频 / 音频 / 文本节点展示 | 已实现（扩展 `UploadNode`） |
+| 图片 / 视频 / 音频 / 文本节点展示 | 已实现（`uploadNode` + `uploadVideoNode` / `uploadAudioNode`） |
+| 音视频 HTTP Range（seek） | 已实现 |
+| 统一媒体预览弹窗 | 已实现（`MediaPreviewModal` / `ImageViewerModal`） |
 
 迭代验收清单：[`../changes/editable-asset-explorer.md`](../changes/editable-asset-explorer.md)
 

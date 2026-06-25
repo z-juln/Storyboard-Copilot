@@ -36,7 +36,7 @@ Source Node -> Process Node / Tool / AI -> Derived Output Node
 |----------|----------|
 | UI / 交互 | `Canvas.tsx`, `nodes/*.tsx`, `ui/`, `components/ui/primitives.tsx` |
 | Agent 对话 | `agentChat/`, `ui/agent-chat/` |
-| 新节点 | `canvasNodes.ts`, `nodeRegistry.ts`, `nodes/index.ts` |
+| 新节点 | `canvasNodes.ts`, `nodeRegistry.ts`, `nodes/index.ts`（含 `uploadVideoNode` / `uploadAudioNode`） |
 | 新工具 | `tools/types.ts`, `builtInTools.ts`, `ui/tool-editors/`, `toolProcessor.ts` |
 | 新模型 | `models/image/<provider>/`, `models/providers/`, Rust provider |
 | 持久化 | `projectStore.ts`, `features/project/projectCodec.ts`, `projectState.ts`, `file_store.rs` |
@@ -73,7 +73,7 @@ Web 与 Tauri 共用 React 前端；完整体验需本地 `:1421`。
 - **`fileAssetId`** 是 `assets/` 下文件的稳定 id（manifest 键），**不是**画布 `nodeId`。
 - 节点通过 `fileAssetId` 引用文件；rename/move 只改 manifest.path。
 - 打开项目必须 **reconcile**；展示走 fileAssetId → path → HTTP（`v=updatedAt`）。
-- 资产目录 UI 虚拟根为 `assets/`；可预览文件支持双击预览、拖到画布创建 upload 节点。
+- 资产目录 UI 虚拟根为 `assets/`；可预览文件支持双击预览、拖到画布创建对应 upload 节点；弹窗统一 `UiBodyPortal`。
 
 迭代验收：[`changes/editable-asset-explorer.md`](changes/editable-asset-explorer.md)
 
