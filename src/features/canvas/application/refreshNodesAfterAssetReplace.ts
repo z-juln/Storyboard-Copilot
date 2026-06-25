@@ -108,7 +108,7 @@ export async function refreshCanvasNodesAfterAssetReplace(input: {
     return;
   }
 
-  if (input.kind === 'video') {
+  if (input.kind === 'video' || input.kind === 'audio') {
     canvasEventBus.publish('asset-file/replaced', {
       path: normalizedPath,
       fileAssetId: input.fileAssetId,

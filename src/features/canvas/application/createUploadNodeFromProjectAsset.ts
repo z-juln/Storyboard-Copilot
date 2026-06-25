@@ -1,4 +1,9 @@
-import type { UploadImageNodeData, UploadMediaKind } from '@/features/canvas/domain/canvasNodes';
+import {
+  CANVAS_NODE_TYPES,
+  type CanvasNodeType,
+  type UploadImageNodeData,
+  type UploadMediaKind,
+} from '@/features/canvas/domain/canvasNodes';
 import {
   findFileAssetIdByPath,
   registerFileAssetPath,
@@ -47,7 +52,20 @@ function resolveAspectRatioForMediaKind(mediaKind: UploadMediaKind): string {
   if (mediaKind === 'video') {
     return '16:9';
   }
+  if (mediaKind === 'audio') {
+    return '16:3';
+  }
   return '1:1';
+}
+
+export function resolveUploadNodeTypeForMediaKind(mediaKind: AssetPreviewKind): CanvasNodeType {
+  if (mediaKind === 'video') {
+    return CANVAS_NODE_TYPES.uploadVideo;
+  }
+  if (mediaKind === 'audio') {
+    return CANVAS_NODE_TYPES.uploadAudio;
+  }
+  return CANVAS_NODE_TYPES.upload;
 }
 
 export async function buildUploadNodeDataFromProjectAsset(input: {

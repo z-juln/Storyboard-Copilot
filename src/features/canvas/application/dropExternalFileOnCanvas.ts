@@ -2,6 +2,7 @@ import type { XYPosition } from '@xyflow/react';
 
 import { publishUploadNodePasteImage } from '@/features/canvas/application/uploadNodePasteBridge';
 import { isVideoUploadFile } from '@/features/canvas/application/importNodeVideoFromFile';
+import { isAudioUploadFile } from '@/features/canvas/application/importNodeAudioFromFile';
 import { CANVAS_NODE_TYPES, type CanvasNodeType } from '@/features/canvas/domain/canvasNodes';
 import type { AssetManifest } from '@/features/project/asset';
 import { createEmptyAssetManifest } from '@/features/project/asset';
@@ -65,6 +66,13 @@ export async function dropExternalFileOnCanvas(
 
   if (isVideoUploadFile(input.file)) {
     const nodeId = input.addNode(CANVAS_NODE_TYPES.uploadVideo, input.position, {});
+    input.setSelectedNode(nodeId);
+    publishUploadNodePasteImage(nodeId, input.file);
+    return nodeId;
+  }
+
+  if (isAudioUploadFile(input.file)) {
+    const nodeId = input.addNode(CANVAS_NODE_TYPES.uploadAudio, input.position, {});
     input.setSelectedNode(nodeId);
     publishUploadNodePasteImage(nodeId, input.file);
     return nodeId;

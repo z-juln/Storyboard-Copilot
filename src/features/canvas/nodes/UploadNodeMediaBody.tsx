@@ -3,6 +3,7 @@ import { memo, type SyntheticEvent } from 'react';
 import type { UploadMediaKind } from '@/features/canvas/domain/canvasNodes';
 import { CanvasNodeImage } from '@/features/canvas/ui/CanvasNodeImage';
 import { CanvasNodeVideo } from '@/features/canvas/ui/CanvasNodeVideo';
+import { CanvasNodeAudio } from '@/features/canvas/ui/CanvasNodeAudio';
 import { NodeAssetUnavailableNotice } from '@/features/canvas/ui/NodeAssetUnavailableNotice';
 import {
   PROJECT_ASSET_UNAVAILABLE_MESSAGE,
@@ -41,12 +42,7 @@ export const UploadNodeMediaBody = memo(({
       ) : mediaKind === 'video' && assetMediaUrl ? (
         <CanvasNodeVideo src={assetMediaUrl} selected={nodeSelected} />
       ) : mediaKind === 'audio' && assetMediaUrl ? (
-        <div
-          className="flex h-full w-full items-center justify-center px-4"
-          onClick={(event) => event.stopPropagation()}
-        >
-          <audio src={assetMediaUrl} controls className="w-full" />
-        </div>
+        <CanvasNodeAudio src={assetMediaUrl} selected={nodeSelected} />
       ) : mediaKind === 'text' ? (
         <pre
           className="h-full w-full overflow-auto whitespace-pre-wrap break-words p-3 text-left text-[11px] leading-5 text-text-dark"

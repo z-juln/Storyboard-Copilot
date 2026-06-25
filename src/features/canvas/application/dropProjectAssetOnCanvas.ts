@@ -1,7 +1,7 @@
 import type { XYPosition } from '@xyflow/react';
 
 import { notifyProjectAssetsImported } from '@/features/canvas/application/notifyProjectAssetsImported';
-import { CANVAS_NODE_TYPES, type CanvasNodeType } from '@/features/canvas/domain/canvasNodes';
+import { type CanvasNodeType } from '@/features/canvas/domain/canvasNodes';
 import type { AssetManifest } from '@/features/project/asset';
 import { createEmptyAssetManifest } from '@/features/project/asset';
 import { isBindableTextAssetFileName } from '@/features/project/asset/assetPreviewUtils';
@@ -11,6 +11,7 @@ import { placeBoundTextNodeOnCanvas } from './canvasNodePlacement';
 import type { NodeLayoutSize } from './textNodeSizing';
 import {
   buildUploadNodeDataFromProjectAsset,
+  resolveUploadNodeTypeForMediaKind,
   type ProjectAssetDragPayload,
 } from './createUploadNodeFromProjectAsset';
 
@@ -66,9 +67,7 @@ export async function dropProjectAssetOnCanvas(
 
   notifyProjectAssetsImported([input.payload.path]);
 
-  const nodeType = input.payload.mediaKind === 'video'
-    ? CANVAS_NODE_TYPES.uploadVideo
-    : CANVAS_NODE_TYPES.upload;
+  const nodeType = resolveUploadNodeTypeForMediaKind(input.payload.mediaKind);
 
   const nodeId = input.addNode(nodeType, input.position, nodeData);
   input.setSelectedNode(nodeId);

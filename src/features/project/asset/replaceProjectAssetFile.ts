@@ -32,7 +32,9 @@ export async function replaceProjectAssetFile(input: {
       ? '只能使用图片文件替换'
       : targetKind === 'video'
         ? '只能使用视频文件替换'
-        : '只能使用文本文件替换';
+        : targetKind === 'audio'
+          ? '只能使用音频文件替换'
+          : '只能使用文本文件替换';
     throw new Error(message);
   }
 
@@ -58,6 +60,9 @@ export function resolveReplaceFileAccept(kind: ReplaceableAssetKind): string {
   }
   if (kind === 'video') {
     return 'video/*';
+  }
+  if (kind === 'audio') {
+    return 'audio/*';
   }
   return '.txt,.md,.markdown,text/plain';
 }

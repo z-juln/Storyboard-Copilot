@@ -5,7 +5,7 @@ use std::sync::Arc;
 use axum::{
     body::Bytes,
     extract::{DefaultBodyLimit, Path, Query, State},
-    http::{header, Method, StatusCode},
+    http::{header, HeaderMap, Method, StatusCode},
     response::{IntoResponse, Response},
     routing::{delete, get, post, put},
     Json, Router,
@@ -30,6 +30,7 @@ use crate::media::dto::{
     CompleteAssetUploadRequestDto, CompleteImageUploadRequestDto,
     EmbedStoryboardMetadataRequestDto, MergeStoryboardImagesPayload, PrepareFromSourceRequestDto,
 };
+use crate::media::read_local_file_with_range;
 use crate::media::read_local_image;
 use crate::media::preview_cache::resolve_asset_preview_file;
 use crate::media::store::prepare_from_source;
@@ -135,7 +136,12 @@ pub async fn start_http_server_with_app_data(app_data_dir: PathBuf) -> Result<()
             Method::DELETE,
             Method::OPTIONS,
         ])
-        .allow_headers(Any);
+        .allow_headers(Any)
+        .expose_headers([
+            header::ACCEPT_RANGES,
+            header::CONTENT_RANGE,
+            header::CONTENT_LENGTH,
+        ]);
 
     let upload_routes = Router::new()
         .route(
@@ -827,36 +833,53 @@ async fn serve_project_asset(
     State(state): State<HttpState>,
     Path(project_id): Path<String>,
     Query(query): Query<ProjectAssetQuery>,
+    headers: HeaderMap,
 ) -> Response {
+    let range = headers
+        .get(header::RANGE)
+        .and_then(|value| value.to_str().ok());
     match crate::project::file_store::read_project_asset(
         &state.app_data_dir,
         &project_id,
         &query.path,
     ) {
-        Ok(path) => match read_local_image(&state.app_data_dir, &path.to_string_lossy()) {
-            Ok((bytes, mime)) => (
-                StatusCode::OK,
-                [(header::CONTENT_TYPE, mime)],
-                bytes,
-            )
-                .into_response(),
+        Ok(path) => match read_local_file_with_range(
+            &state.app_data_dir,
+            &path.to_string_lossy(),
+            range,
+        ) {
+            Ok(result) => local_file_into_response(result),
             Err(err) => api_error(StatusCode::NOT_FOUND, err),
         },
         Err(err) => api_error(StatusCode::NOT_FOUND, err),
     }
 }
 
+fn local_file_into_response(result: crate::media::LocalFileResponse) -> Response {
+    let status = StatusCode::from_u16(result.status_code).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
+    let mut response = Response::builder()
+        .status(status)
+        .header(header::CONTENT_TYPE, result.content_type)
+        .header(header::ACCEPT_RANGES, "bytes")
+        .header(header::CONTENT_LENGTH, result.body.len());
+    if let Some(content_range) = result.content_range {
+        response = response.header(header::CONTENT_RANGE, content_range);
+    }
+    response
+        .body(axum::body::Body::from(result.body))
+        .unwrap_or_else(|_| api_error(StatusCode::INTERNAL_SERVER_ERROR, "构建响应失败".to_string()))
+}
+
 async fn serve_image(
     State(state): State<HttpState>,
     Query(query): Query<ImagePathQuery>,
+    headers: HeaderMap,
 ) -> Response {
-    match read_local_image(&state.app_data_dir, &query.path) {
-        Ok((bytes, mime)) => (
-            StatusCode::OK,
-            [(header::CONTENT_TYPE, mime)],
-            bytes,
-        )
-            .into_response(),
+    let range = headers
+        .get(header::RANGE)
+        .and_then(|value| value.to_str().ok());
+    match read_local_file_with_range(&state.app_data_dir, &query.path, range) {
+        Ok(result) => local_file_into_response(result),
         Err(err) => api_error(StatusCode::NOT_FOUND, err),
     }
 }

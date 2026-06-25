@@ -42,6 +42,10 @@ export function resolveDroppedExternalFile(event: DragTransferEvent): File | nul
     return file;
   }
 
+  if (file.type.startsWith('audio/') || resolveAssetPreviewKind(file.name) === 'audio') {
+    return file;
+  }
+
   if (isBindableTextAssetFileName(file.name)) {
     return file;
   }

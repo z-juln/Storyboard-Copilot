@@ -14,6 +14,7 @@ import {
   type TextNodeData,
   type UploadImageNodeData,
   type UploadVideoNodeData,
+  type UploadAudioNodeData,
   type ExternalTechNodeData,
 } from './canvasNodes';
 import { DEFAULT_NODE_DISPLAY_NAME } from './nodeDisplay';
@@ -21,7 +22,7 @@ import { DEFAULT_IMAGE_MODEL_ID } from '../models';
 import { DEFAULT_ZIMAGE_SIZE, estimateZImageDurationMs } from '@/features/local-zimage/zimageOptions';
 import { getDefaultExternalTechProviderId } from '../external-tech/registry';
 
-export type MenuIconKey = 'upload' | 'video' | 'sparkles' | 'layout' | 'text' | 'globe';
+export type MenuIconKey = 'upload' | 'video' | 'audio' | 'sparkles' | 'layout' | 'text' | 'globe';
 
 export interface CanvasNodeCapabilities {
   toolbar: boolean;
@@ -97,6 +98,33 @@ const uploadVideoNodeDefinition: CanvasNodeDefinition<UploadVideoNodeData> = {
     isSizeManuallyAdjusted: false,
     sourceFileName: null,
     mediaKind: 'video',
+  }),
+};
+
+const uploadAudioNodeDefinition: CanvasNodeDefinition<UploadAudioNodeData> = {
+  type: CANVAS_NODE_TYPES.uploadAudio,
+  menuLabelKey: 'node.menu.uploadAudio',
+  menuIcon: 'audio',
+  visibleInMenu: true,
+  capabilities: {
+    toolbar: true,
+    promptInput: false,
+  },
+  connectivity: {
+    sourceHandle: true,
+    targetHandle: false,
+    connectMenu: {
+      fromSource: false,
+      fromTarget: true,
+    },
+  },
+  createDefaultData: () => ({
+    displayName: DEFAULT_NODE_DISPLAY_NAME[CANVAS_NODE_TYPES.uploadAudio],
+    imageUrl: null,
+    aspectRatio: '16:3',
+    isSizeManuallyAdjusted: false,
+    sourceFileName: null,
+    mediaKind: 'audio',
   }),
 };
 
@@ -337,6 +365,7 @@ const externalTechNodeDefinition: CanvasNodeDefinition<ExternalTechNodeData> = {
 export const canvasNodeDefinitions: Record<CanvasNodeType, CanvasNodeDefinition> = {
   [CANVAS_NODE_TYPES.upload]: uploadNodeDefinition,
   [CANVAS_NODE_TYPES.uploadVideo]: uploadVideoNodeDefinition,
+  [CANVAS_NODE_TYPES.uploadAudio]: uploadAudioNodeDefinition,
   [CANVAS_NODE_TYPES.imageEdit]: imageEditNodeDefinition,
   [CANVAS_NODE_TYPES.exportImage]: exportImageNodeDefinition,
   [CANVAS_NODE_TYPES.textAnnotation]: textAnnotationNodeDefinition,

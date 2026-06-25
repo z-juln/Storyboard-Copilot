@@ -10,6 +10,7 @@ import { TextAnnotationNode } from './TextAnnotationNode';
 import { TextNode } from './TextNode';
 import { UploadNode } from './UploadNode';
 import { UploadVideoNode } from './UploadVideoNode';
+import { UploadAudioNode } from './UploadAudioNode';
 
 export const nodeTypes: NodeTypes = {
   exportImageNode: ImageNode,
@@ -21,6 +22,7 @@ export const nodeTypes: NodeTypes = {
   textNode: TextNode,
   uploadNode: UploadNode,
   uploadVideoNode: UploadVideoNode,
+  uploadAudioNode: UploadAudioNode,
   externalTechNode: ExternalTechNode,
 };
 
@@ -35,4 +37,5 @@ export {
   TextNode,
   UploadNode,
   UploadVideoNode,
+  UploadAudioNode,
 };

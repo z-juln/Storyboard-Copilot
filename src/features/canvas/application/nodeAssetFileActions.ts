@@ -2,7 +2,7 @@ import type { CanvasNode } from '@/stores/canvasStore';
 
 import { commitProjectAssetReplacement } from './commitProjectAssetReplacement';
 import { isNodeProjectAssetBound, resolveBoundProjectAssetPath } from './nodeAssetBinding';
-import { isTextNode, isUploadNode, isUploadVideoNode } from '@/features/canvas/domain/canvasNodes';
+import { isTextNode, isUploadNode, isUploadVideoNode, isUploadAudioNode } from '@/features/canvas/domain/canvasNodes';
 import {
   getAssetBaseName,
   resolveReplaceableAssetKind,
@@ -10,7 +10,7 @@ import {
 } from '@/features/project/asset';
 import type { AssetManifest } from '@/features/project/asset/types';
 
-export type NodeAssetFileKind = 'image' | 'text' | 'video';
+export type NodeAssetFileKind = 'image' | 'text' | 'video' | 'audio';
 
 export function resolveNodeAssetFileKind(node: CanvasNode): NodeAssetFileKind | null {
   if (isUploadNode(node)) {
@@ -18,6 +18,9 @@ export function resolveNodeAssetFileKind(node: CanvasNode): NodeAssetFileKind | 
   }
   if (isUploadVideoNode(node)) {
     return 'video';
+  }
+  if (isUploadAudioNode(node)) {
+    return 'audio';
   }
   if (isTextNode(node)) {
     return 'text';
@@ -61,7 +64,9 @@ export function resolveNodeAssetFileInputAccept(input: {
     ? 'image/*'
     : input.assetKind === 'video'
       ? 'video/*'
-      : resolveReplaceFileAccept('text');
+      : input.assetKind === 'audio'
+        ? 'audio/*'
+        : resolveReplaceFileAccept('text');
 }
 
 export async function replaceBoundNodeAssetIfNeeded(input: {

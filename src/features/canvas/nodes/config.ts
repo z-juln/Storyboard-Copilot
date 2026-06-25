@@ -11,6 +11,10 @@ export const nodeConfig = {
     width: 320,
     height: 180,
   },
+  uploadAudioNode: {
+    width: 320,
+    height: 120,
+  },
   storyboardNode: {
     width: 'auto' as const,
   },
