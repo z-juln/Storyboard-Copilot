@@ -95,7 +95,7 @@ export const GitTextDiffViewer = memo(({
       <div className="mb-2 flex shrink-0 justify-end">
         <DiffViewLayoutToggle value={layout} onChange={setLayout} />
       </div>
-      <div className="min-h-0 flex-1 overflow-hidden rounded-lg border border-border-dark bg-bg-dark/20 [&_table]:w-full">
+      <div className="min-h-0 flex-1 overflow-auto rounded-lg border border-border-dark bg-bg-dark/20 [&_table]:w-full">
         <ReactDiffViewer
           oldValue={normalized.oldValue}
           newValue={normalized.newValue}
@@ -108,10 +108,6 @@ export const GitTextDiffViewer = memo(({
           leftTitle={leftTitle}
           rightTitle={rightTitle}
           styles={DIFF_VIEWER_STYLES}
-          infiniteLoading={{
-            pageSize: 30,
-            containerHeight: '100%',
-          }}
         />
       </div>
     </div>
