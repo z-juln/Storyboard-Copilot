@@ -1,10 +1,10 @@
 import { resolveAssetPreviewKind } from './assetPreviewUtils';
 
-export type ReplaceableAssetKind = 'image' | 'text';
+export type ReplaceableAssetKind = 'image' | 'text' | 'video';
 
 export function resolveReplaceableAssetKind(fileName: string): ReplaceableAssetKind | null {
   const kind = resolveAssetPreviewKind(fileName.trim());
-  if (kind === 'image' || kind === 'text') {
+  if (kind === 'image' || kind === 'text' || kind === 'video') {
     return kind;
   }
   return null;
@@ -23,6 +23,10 @@ export function isReplacementFileCompatible(targetFileName: string, file: File):
 
   if (targetKind === 'image') {
     return file.type.startsWith('image/');
+  }
+
+  if (targetKind === 'video') {
+    return file.type.startsWith('video/') || resolveAssetPreviewKind(file.name) === 'video';
   }
 
   return file.type.startsWith('text/')

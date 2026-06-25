@@ -28,7 +28,12 @@ export async function replaceProjectAssetFile(input: {
   }
 
   if (input.file instanceof File && !isReplacementFileCompatible(targetFileName, input.file)) {
-    throw new Error(targetKind === 'image' ? '只能使用图片文件替换' : '只能使用文本文件替换');
+    const message = targetKind === 'image'
+      ? '只能使用图片文件替换'
+      : targetKind === 'video'
+        ? '只能使用视频文件替换'
+        : '只能使用文本文件替换';
+    throw new Error(message);
   }
 
   if (input.file instanceof File) {
@@ -48,5 +53,11 @@ export async function replaceProjectAssetFile(input: {
 }
 
 export function resolveReplaceFileAccept(kind: ReplaceableAssetKind): string {
-  return kind === 'image' ? 'image/*' : '.txt,.md,.markdown,text/plain';
+  if (kind === 'image') {
+    return 'image/*';
+  }
+  if (kind === 'video') {
+    return 'video/*';
+  }
+  return '.txt,.md,.markdown,text/plain';
 }

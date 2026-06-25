@@ -7,6 +7,10 @@ export const nodeConfig = {
     width: 200,
     height: 200,
   },
+  uploadVideoNode: {
+    width: 320,
+    height: 180,
+  },
   storyboardNode: {
     width: 'auto' as const,
   },

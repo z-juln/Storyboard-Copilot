@@ -108,6 +108,16 @@ export async function refreshCanvasNodesAfterAssetReplace(input: {
     return;
   }
 
+  if (input.kind === 'video') {
+    canvasEventBus.publish('asset-file/replaced', {
+      path: normalizedPath,
+      fileAssetId: input.fileAssetId,
+      updatedAt: input.updatedAt,
+    });
+    persistActiveProjectGraphFromCanvas();
+    return;
+  }
+
   const aspectRatio = await resolveImageAspectRatio(normalizedPath, input.fileAssetId);
 
   for (const node of nodes) {

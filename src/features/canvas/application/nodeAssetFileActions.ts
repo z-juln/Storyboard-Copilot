@@ -2,7 +2,7 @@ import type { CanvasNode } from '@/stores/canvasStore';
 
 import { commitProjectAssetReplacement } from './commitProjectAssetReplacement';
 import { isNodeProjectAssetBound, resolveBoundProjectAssetPath } from './nodeAssetBinding';
-import { isTextNode, isUploadNode } from '@/features/canvas/domain/canvasNodes';
+import { isTextNode, isUploadNode, isUploadVideoNode } from '@/features/canvas/domain/canvasNodes';
 import {
   getAssetBaseName,
   resolveReplaceableAssetKind,
@@ -10,11 +10,14 @@ import {
 } from '@/features/project/asset';
 import type { AssetManifest } from '@/features/project/asset/types';
 
-export type NodeAssetFileKind = 'image' | 'text';
+export type NodeAssetFileKind = 'image' | 'text' | 'video';
 
 export function resolveNodeAssetFileKind(node: CanvasNode): NodeAssetFileKind | null {
   if (isUploadNode(node)) {
     return 'image';
+  }
+  if (isUploadVideoNode(node)) {
+    return 'video';
   }
   if (isTextNode(node)) {
     return 'text';
@@ -54,7 +57,11 @@ export function resolveNodeAssetFileInputAccept(input: {
     }
   }
 
-  return input.assetKind === 'image' ? 'image/*' : resolveReplaceFileAccept('text');
+  return input.assetKind === 'image'
+    ? 'image/*'
+    : input.assetKind === 'video'
+      ? 'video/*'
+      : resolveReplaceFileAccept('text');
 }
 
 export async function replaceBoundNodeAssetIfNeeded(input: {

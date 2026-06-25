@@ -6,22 +6,20 @@ import {
   useRef,
   useState,
   type DragEvent,
-  type SyntheticEvent,
 } from 'react';
 import {
   Handle,
   Position,
   useUpdateNodeInternals,
-  useViewport,
   type NodeProps,
 } from '@xyflow/react';
-import { Upload } from 'lucide-react';
+import { Video } from 'lucide-react';
 
 import {
   CANVAS_NODE_TYPES,
   EXPORT_RESULT_NODE_MIN_HEIGHT,
   EXPORT_RESULT_NODE_MIN_WIDTH,
-  type UploadImageNodeData,
+  type UploadVideoNodeData,
 } from '@/features/canvas/domain/canvasNodes';
 import {
   resolveMinEdgeFittedSize,
@@ -34,26 +32,22 @@ import {
 import { replaceBoundNodeAssetIfNeeded } from '@/features/canvas/application/nodeAssetFileActions';
 import { useNodeAssetReplaceFileInput } from '@/features/canvas/hooks/useNodeAssetReplaceFileInput';
 import { subscribeUploadNodePasteImage } from '@/features/canvas/application/uploadNodePasteBridge';
-import { resolveDroppedImageFile } from '@/features/canvas/application/resolveDroppedExternalFile';
+import {
+  importNodeVideoFromFile,
+  isVideoUploadFile,
+} from '@/features/canvas/application/importNodeVideoFromFile';
 import { NodeAssetBindingMeta } from '@/features/canvas/ui/NodeAssetBindingMeta';
 import { NodeHeader, NODE_HEADER_FLOATING_POSITION_CLASS } from '@/features/canvas/ui/NodeHeader';
 import { NodeResizeHandle } from '@/features/canvas/ui/NodeResizeHandle';
-import {
-  prepareNodeImageFromFile,
-  resolveNodeImageDisplayUrl,
-  shouldUseOriginalImageByZoom,
-  toPreparedNodeImageFields,
-} from '@/features/canvas/application/imageData';
 import { UploadNodeMediaBody } from '@/features/canvas/nodes/UploadNodeMediaBody';
 import { useCanvasStore } from '@/stores/canvasStore';
 import { useProjectStore } from '@/stores/projectStore';
 import { useSettingsStore } from '@/stores/settingsStore';
-import { resolveFileAssetDisplayUrl } from '@/features/project/asset';
-import { fetchAssetTextContent } from '@/features/project/asset/assetPreviewUtils';
+import { createEmptyAssetManifest, resolveFileAssetDisplayUrl } from '@/features/project/asset';
 
-type UploadNodeProps = NodeProps & {
+type UploadVideoNodeProps = NodeProps & {
   id: string;
-  data: UploadImageNodeData;
+  data: UploadVideoNodeData;
   selected?: boolean;
 };
 
@@ -64,7 +58,7 @@ function resolveNodeDimension(value: number | undefined, fallback: number): numb
   return fallback;
 }
 
-export const UploadNode = memo(({ id, data, selected, width, height }: UploadNodeProps) => {
+export const UploadVideoNode = memo(({ id, data, selected, width, height }: UploadVideoNodeProps) => {
   const updateNodeInternals = useUpdateNodeInternals();
   const setSelectedNode = useCanvasStore((state) => state.setSelectedNode);
   const updateNodeData = useCanvasStore((state) => state.updateNodeData);
@@ -72,18 +66,9 @@ export const UploadNode = memo(({ id, data, selected, width, height }: UploadNod
   const assetManifest = useProjectStore((state) => state.currentProject?.assetManifest);
   const commitAssetManifest = useProjectStore((state) => state.commitAssetManifest);
   const useUploadFilenameAsNodeTitle = useSettingsStore((state) => state.useUploadFilenameAsNodeTitle);
-  const { zoom } = useViewport();
   const uploadSequenceRef = useRef(0);
-  const uploadPerfRef = useRef<{
-    sequence: number;
-    name: string;
-    size: number;
-    startedAt: number;
-    transientLoaded: boolean;
-    stableLoaded: boolean;
-  } | null>(null);
   const [transientPreviewUrl, setTransientPreviewUrl] = useState<string | null>(null);
-  const resolvedAspectRatio = data.aspectRatio || '1:1';
+  const resolvedAspectRatio = data.aspectRatio || '16:9';
   const compactSize = resolveMinEdgeFittedSize(resolvedAspectRatio, {
     minWidth: EXPORT_RESULT_NODE_MIN_WIDTH,
     minHeight: EXPORT_RESULT_NODE_MIN_HEIGHT,
@@ -94,19 +79,17 @@ export const UploadNode = memo(({ id, data, selected, width, height }: UploadNod
     minWidth: EXPORT_RESULT_NODE_MIN_WIDTH,
     minHeight: EXPORT_RESULT_NODE_MIN_HEIGHT,
   });
-  const resizeMinWidth = resizeConstraints.minWidth;
-  const resizeMinHeight = resizeConstraints.minHeight;
   const resolvedTitle = useMemo(() => {
     const sourceFileName = typeof data.sourceFileName === 'string' ? data.sourceFileName.trim() : '';
     if (
       useUploadFilenameAsNodeTitle
       && sourceFileName
-      && isNodeUsingDefaultDisplayName(CANVAS_NODE_TYPES.upload, data)
+      && isNodeUsingDefaultDisplayName(CANVAS_NODE_TYPES.uploadVideo, data)
     ) {
       return sourceFileName;
     }
 
-    return resolveNodeDisplayName(CANVAS_NODE_TYPES.upload, data);
+    return resolveNodeDisplayName(CANVAS_NODE_TYPES.uploadVideo, data);
   }, [data, useUploadFilenameAsNodeTitle]);
 
   const clearTransientPreview = useCallback(() => {
@@ -120,29 +103,15 @@ export const UploadNode = memo(({ id, data, selected, width, height }: UploadNod
 
   const processFile = useCallback(
     async (file: File) => {
+      if (!projectId) {
+        throw new Error('未打开项目，无法上传视频');
+      }
+
       const sequence = uploadSequenceRef.current + 1;
       uploadSequenceRef.current = sequence;
-      const started = performance.now();
       clearTransientPreview();
       const optimisticPreviewUrl = URL.createObjectURL(file);
       setTransientPreviewUrl(optimisticPreviewUrl);
-      uploadPerfRef.current = {
-        sequence,
-        name: file.name,
-        size: file.size,
-        startedAt: started,
-        transientLoaded: false,
-        stableLoaded: false,
-      };
-      requestAnimationFrame(() => {
-        const perf = uploadPerfRef.current;
-        if (!perf || perf.sequence !== sequence) {
-          return;
-        }
-        console.info(
-          `[upload-perf][e2e] preview-state-committed nodeId=${id} name="${file.name}" elapsed=${Math.round(performance.now() - started)}ms`
-        );
-      });
 
       try {
         const replaced = await replaceBoundNodeAssetIfNeeded({
@@ -158,42 +127,55 @@ export const UploadNode = memo(({ id, data, selected, width, height }: UploadNod
           if (uploadSequenceRef.current === sequence) {
             clearTransientPreview();
           }
-
-          console.info(
-            `[upload-perf][node] replaceFile success nodeId=${id} name="${file.name}" size=${file.size}B elapsed=${Math.round(performance.now() - started)}ms`
-          );
           return;
         }
 
-        if (!file.type.startsWith('image/')) {
-          throw new Error('只能上传图片文件');
+        if (!isVideoUploadFile(file)) {
+          throw new Error('只能上传视频文件');
         }
 
-        const prepared = await prepareNodeImageFromFile(file);
-        const nextData: Partial<UploadImageNodeData> = {
-          ...toPreparedNodeImageFields(prepared),
+        const manifest = assetManifest ?? createEmptyAssetManifest();
+        const imported = await importNodeVideoFromFile({
+          projectId,
+          file,
+          manifest,
+        });
+        commitAssetManifest(imported.manifest);
+
+        const nextData: Partial<UploadVideoNodeData> = {
+          imageUrl: imported.path,
+          fileAssetId: imported.fileAssetId,
           sourceFileName: file.name,
+          mediaKind: 'video',
+          aspectRatio: '16:9',
         };
         if (useUploadFilenameAsNodeTitle) {
           nextData.displayName = file.name;
         }
         updateNodeData(id, nextData);
 
-        console.info(
-          `[upload-perf][node] processFile success nodeId=${id} name="${file.name}" size=${file.size}B elapsed=${Math.round(performance.now() - started)}ms`
-        );
+        if (uploadSequenceRef.current === sequence) {
+          clearTransientPreview();
+        }
       } catch (error) {
         if (uploadSequenceRef.current === sequence) {
           clearTransientPreview();
         }
-        console.error(
-          `[upload-perf][node] processFile failed nodeId=${id} name="${file.name}" size=${file.size}B elapsed=${Math.round(performance.now() - started)}ms`,
-          error
-        );
+        console.error('[upload-video] processFile failed', error);
         throw error;
       }
     },
-    [assetManifest, clearTransientPreview, commitAssetManifest, data.fileAssetId, data.imageUrl, id, projectId, updateNodeData, useUploadFilenameAsNodeTitle]
+    [
+      assetManifest,
+      clearTransientPreview,
+      commitAssetManifest,
+      data.fileAssetId,
+      data.imageUrl,
+      id,
+      projectId,
+      updateNodeData,
+      useUploadFilenameAsNodeTitle,
+    ]
   );
 
   const {
@@ -203,65 +185,18 @@ export const UploadNode = memo(({ id, data, selected, width, height }: UploadNod
     handleFileChange,
   } = useNodeAssetReplaceFileInput({
     nodeId: id,
-    assetKind: 'image',
+    assetKind: 'video',
     imageUrl: data.imageUrl,
     fileAssetId: data.fileAssetId,
     onFileSelected: processFile,
   });
 
-  const handleImageLoad = useCallback((event: SyntheticEvent<HTMLImageElement>) => {
-    const perf = uploadPerfRef.current;
-    if (!perf) {
-      return;
-    }
-
-    const displayedSrc = event.currentTarget.currentSrc || event.currentTarget.src || '';
-    const isTransient = displayedSrc.startsWith('blob:');
-    const now = performance.now();
-
-    if (isTransient && !perf.transientLoaded) {
-      perf.transientLoaded = true;
-      console.info(
-        `[upload-perf][e2e] first-visible transient nodeId=${id} name="${perf.name}" size=${perf.size}B elapsed=${Math.round(now - perf.startedAt)}ms`
-      );
-      requestAnimationFrame(() => {
-        const nextPerf = uploadPerfRef.current;
-        if (!nextPerf || nextPerf.sequence !== perf.sequence) {
-          return;
-        }
-        console.info(
-          `[upload-perf][e2e] first-painted transient nodeId=${id} name="${nextPerf.name}" elapsed=${Math.round(performance.now() - nextPerf.startedAt)}ms`
-        );
-      });
-      return;
-    }
-
-    if (!isTransient && !perf.stableLoaded) {
-      perf.stableLoaded = true;
-      console.info(
-        `[upload-perf][e2e] stable-visible nodeId=${id} name="${perf.name}" size=${perf.size}B elapsed=${Math.round(now - perf.startedAt)}ms`
-      );
-      if (uploadSequenceRef.current === perf.sequence) {
-        clearTransientPreview();
-      }
-      requestAnimationFrame(() => {
-        const nextPerf = uploadPerfRef.current;
-        if (!nextPerf || nextPerf.sequence !== perf.sequence) {
-          return;
-        }
-        console.info(
-          `[upload-perf][e2e] stable-painted nodeId=${id} name="${nextPerf.name}" elapsed=${Math.round(performance.now() - nextPerf.startedAt)}ms`
-        );
-      });
-    }
-  }, [clearTransientPreview, id]);
-
   const handleDrop = useCallback(
     async (event: DragEvent<HTMLElement>) => {
       event.preventDefault();
       event.stopPropagation();
-      const file = resolveDroppedImageFile(event);
-      if (!file || !file.type.startsWith('image/')) {
+      const file = event.dataTransfer.files?.[0];
+      if (!file || !isVideoUploadFile(file)) {
         return;
       }
 
@@ -277,7 +212,7 @@ export const UploadNode = memo(({ id, data, selected, width, height }: UploadNod
 
   useEffect(() => {
     return subscribeUploadNodePasteImage(id, (file) => {
-      if (!file.type.startsWith('image/')) {
+      if (!isVideoUploadFile(file)) {
         return;
       }
       void processFile(file);
@@ -286,39 +221,19 @@ export const UploadNode = memo(({ id, data, selected, width, height }: UploadNod
 
   const handleNodeClick = useCallback(() => {
     setSelectedNode(id);
-    const mediaKind = data.mediaKind ?? (data.imageUrl ? 'image' : null);
-    const hasBoundAsset = Boolean(data.imageUrl || transientPreviewUrl || data.textContent);
-    if (!hasBoundAsset && (!mediaKind || mediaKind === 'image')) {
+    const hasBoundAsset = Boolean(data.imageUrl || transientPreviewUrl);
+    if (!hasBoundAsset) {
       openFilePicker();
     }
-  }, [data.imageUrl, data.mediaKind, data.textContent, id, openFilePicker, setSelectedNode, transientPreviewUrl]);
+  }, [data.imageUrl, id, openFilePicker, setSelectedNode, transientPreviewUrl]);
 
   useEffect(() => () => {
-    uploadPerfRef.current = null;
     clearTransientPreview();
   }, [clearTransientPreview]);
 
-  const imageSource = useMemo(() => {
+  const assetMediaUrl = useMemo(() => {
     if (transientPreviewUrl) {
       return transientPreviewUrl;
-    }
-    return resolveNodeImageDisplayUrl({
-      imageUrl: data.imageUrl,
-      fileAssetId: data.fileAssetId,
-      preferOriginal: shouldUseOriginalImageByZoom(zoom),
-    });
-  }, [
-    assetManifest,
-    data.fileAssetId,
-    data.imageUrl,
-    transientPreviewUrl,
-    zoom,
-  ]);
-
-  const resolvedMediaKind = data.mediaKind ?? (data.imageUrl ? 'image' : null);
-  const assetMediaUrl = useMemo(() => {
-    if (!resolvedMediaKind || resolvedMediaKind === 'text') {
-      return '';
     }
     return resolveFileAssetDisplayUrl({
       projectId,
@@ -326,7 +241,7 @@ export const UploadNode = memo(({ id, data, selected, width, height }: UploadNod
       imageUrl: data.imageUrl,
       assetManifest,
     });
-  }, [assetManifest, data.fileAssetId, data.imageUrl, projectId, resolvedMediaKind]);
+  }, [assetManifest, data.fileAssetId, data.imageUrl, projectId, transientPreviewUrl]);
 
   const assetBinding = useMemo(
     () => ({
@@ -336,33 +251,7 @@ export const UploadNode = memo(({ id, data, selected, width, height }: UploadNod
     [data.fileAssetId, data.imageUrl]
   );
 
-  const hasMediaContent = Boolean(
-    transientPreviewUrl
-    || data.textContent
-    || (resolvedMediaKind === 'image' && data.imageUrl)
-    || (resolvedMediaKind && resolvedMediaKind !== 'image' && data.imageUrl)
-  );
-
-  useEffect(() => {
-    if (resolvedMediaKind !== 'text' || data.textContent || !projectId || !data.imageUrl) {
-      return;
-    }
-
-    let cancelled = false;
-    const assetPath = data.imageUrl;
-
-    void (async () => {
-      const nextContent = await fetchAssetTextContent(projectId, assetPath);
-      if (cancelled || nextContent === null) {
-        return;
-      }
-      updateNodeData(id, { textContent: nextContent });
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [data.imageUrl, data.textContent, id, projectId, resolvedMediaKind, updateNodeData]);
+  const hasMediaContent = Boolean(transientPreviewUrl || data.imageUrl);
 
   useEffect(() => {
     updateNodeInternals(id);
@@ -385,7 +274,7 @@ export const UploadNode = memo(({ id, data, selected, width, height }: UploadNod
     >
       <NodeHeader
         className={NODE_HEADER_FLOATING_POSITION_CLASS}
-        icon={<Upload className="h-4 w-4" />}
+        icon={<Video className="h-4 w-4" />}
         titleText={resolvedTitle}
         meta={hasMediaContent ? (
           <NodeAssetBindingMeta
@@ -399,26 +288,20 @@ export const UploadNode = memo(({ id, data, selected, width, height }: UploadNod
 
       {hasMediaContent ? (
         <UploadNodeMediaBody
-          mediaKind={resolvedMediaKind}
+          mediaKind="video"
           assetBinding={assetBinding}
           assetMediaUrl={assetMediaUrl}
-          imageSource={imageSource}
-          imageViewerSourceUrl={resolveNodeImageDisplayUrl({
-            imageUrl: data.imageUrl,
-            fileAssetId: data.fileAssetId,
-            preferOriginal: true,
-          })}
-          textContent={data.textContent}
-          onImageLoad={handleImageLoad}
+          imageSource={null}
+          imageViewerSourceUrl={null}
+          textContent={null}
+          onImageLoad={() => {}}
           nodeSelected={selected}
         />
       ) : (
-        <label
-          className="block h-full w-full overflow-hidden rounded-[var(--node-radius)] bg-bg-dark"
-        >
+        <label className="block h-full w-full overflow-hidden rounded-[var(--node-radius)] bg-bg-dark">
           <div className="flex h-full w-full cursor-pointer flex-col items-center justify-center gap-2 text-text-muted/85">
-            <Upload className="h-7 w-7 opacity-60" />
-            <span className="px-3 text-center text-[12px] leading-6">点击或拖拽上传图片</span>
+            <Video className="h-7 w-7 opacity-60" />
+            <span className="px-3 text-center text-[12px] leading-6">点击或拖拽上传视频</span>
           </div>
         </label>
       )}
@@ -437,8 +320,8 @@ export const UploadNode = memo(({ id, data, selected, width, height }: UploadNod
         className="!h-2 !w-2 !border-surface-dark !bg-accent"
       />
       <NodeResizeHandle
-        minWidth={resizeMinWidth}
-        minHeight={resizeMinHeight}
+        minWidth={resizeConstraints.minWidth}
+        minHeight={resizeConstraints.minHeight}
         maxWidth={1400}
         maxHeight={1400}
       />
@@ -446,4 +329,4 @@ export const UploadNode = memo(({ id, data, selected, width, height }: UploadNod
   );
 });
 
-UploadNode.displayName = 'UploadNode';
+UploadVideoNode.displayName = 'UploadVideoNode';

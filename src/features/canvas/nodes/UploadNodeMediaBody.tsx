@@ -2,6 +2,7 @@ import { memo, type SyntheticEvent } from 'react';
 
 import type { UploadMediaKind } from '@/features/canvas/domain/canvasNodes';
 import { CanvasNodeImage } from '@/features/canvas/ui/CanvasNodeImage';
+import { CanvasNodeVideo } from '@/features/canvas/ui/CanvasNodeVideo';
 import { NodeAssetUnavailableNotice } from '@/features/canvas/ui/NodeAssetUnavailableNotice';
 import {
   PROJECT_ASSET_UNAVAILABLE_MESSAGE,
@@ -17,6 +18,7 @@ interface UploadNodeMediaBodyProps {
   imageViewerSourceUrl: string | null;
   textContent: string | null | undefined;
   onImageLoad: (event: SyntheticEvent<HTMLImageElement>) => void;
+  nodeSelected?: boolean;
 }
 
 export const UploadNodeMediaBody = memo(({
@@ -27,6 +29,7 @@ export const UploadNodeMediaBody = memo(({
   imageViewerSourceUrl,
   textContent,
   onImageLoad,
+  nodeSelected,
 }: UploadNodeMediaBodyProps) => {
   const isAssetUnavailable = useIsProjectAssetUnavailable(assetBinding);
   const isNonImageMedia = mediaKind === 'video' || mediaKind === 'audio' || mediaKind === 'text';
@@ -36,12 +39,7 @@ export const UploadNodeMediaBody = memo(({
       {isAssetUnavailable && isNonImageMedia ? (
         <NodeAssetUnavailableNotice message={PROJECT_ASSET_UNAVAILABLE_MESSAGE} />
       ) : mediaKind === 'video' && assetMediaUrl ? (
-        <video
-          src={assetMediaUrl}
-          controls
-          className="h-full w-full object-contain"
-          onClick={(event) => event.stopPropagation()}
-        />
+        <CanvasNodeVideo src={assetMediaUrl} selected={nodeSelected} />
       ) : mediaKind === 'audio' && assetMediaUrl ? (
         <div
           className="flex h-full w-full items-center justify-center px-4"

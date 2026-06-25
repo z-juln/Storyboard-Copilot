@@ -13,6 +13,7 @@ import {
   type TextAnnotationNodeData,
   type TextNodeData,
   type UploadImageNodeData,
+  type UploadVideoNodeData,
   type ExternalTechNodeData,
 } from './canvasNodes';
 import { DEFAULT_NODE_DISPLAY_NAME } from './nodeDisplay';
@@ -20,7 +21,7 @@ import { DEFAULT_IMAGE_MODEL_ID } from '../models';
 import { DEFAULT_ZIMAGE_SIZE, estimateZImageDurationMs } from '@/features/local-zimage/zimageOptions';
 import { getDefaultExternalTechProviderId } from '../external-tech/registry';
 
-export type MenuIconKey = 'upload' | 'sparkles' | 'layout' | 'text' | 'globe';
+export type MenuIconKey = 'upload' | 'video' | 'sparkles' | 'layout' | 'text' | 'globe';
 
 export interface CanvasNodeCapabilities {
   toolbar: boolean;
@@ -69,6 +70,33 @@ const uploadNodeDefinition: CanvasNodeDefinition<UploadImageNodeData> = {
     aspectRatio: '1:1',
     isSizeManuallyAdjusted: false,
     sourceFileName: null,
+  }),
+};
+
+const uploadVideoNodeDefinition: CanvasNodeDefinition<UploadVideoNodeData> = {
+  type: CANVAS_NODE_TYPES.uploadVideo,
+  menuLabelKey: 'node.menu.uploadVideo',
+  menuIcon: 'video',
+  visibleInMenu: true,
+  capabilities: {
+    toolbar: true,
+    promptInput: false,
+  },
+  connectivity: {
+    sourceHandle: true,
+    targetHandle: false,
+    connectMenu: {
+      fromSource: false,
+      fromTarget: true,
+    },
+  },
+  createDefaultData: () => ({
+    displayName: DEFAULT_NODE_DISPLAY_NAME[CANVAS_NODE_TYPES.uploadVideo],
+    imageUrl: null,
+    aspectRatio: '16:9',
+    isSizeManuallyAdjusted: false,
+    sourceFileName: null,
+    mediaKind: 'video',
   }),
 };
 
@@ -308,6 +336,7 @@ const externalTechNodeDefinition: CanvasNodeDefinition<ExternalTechNodeData> = {
 
 export const canvasNodeDefinitions: Record<CanvasNodeType, CanvasNodeDefinition> = {
   [CANVAS_NODE_TYPES.upload]: uploadNodeDefinition,
+  [CANVAS_NODE_TYPES.uploadVideo]: uploadVideoNodeDefinition,
   [CANVAS_NODE_TYPES.imageEdit]: imageEditNodeDefinition,
   [CANVAS_NODE_TYPES.exportImage]: exportImageNodeDefinition,
   [CANVAS_NODE_TYPES.textAnnotation]: textAnnotationNodeDefinition,

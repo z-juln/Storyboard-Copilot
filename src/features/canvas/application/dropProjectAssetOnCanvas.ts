@@ -1,6 +1,6 @@
 import type { XYPosition } from '@xyflow/react';
 
-import { revealProjectAsset } from '@/features/canvas/application/assetExplorerRevealBridge';
+import { notifyProjectAssetsImported } from '@/features/canvas/application/notifyProjectAssetsImported';
 import { CANVAS_NODE_TYPES, type CanvasNodeType } from '@/features/canvas/domain/canvasNodes';
 import type { AssetManifest } from '@/features/project/asset';
 import { createEmptyAssetManifest } from '@/features/project/asset';
@@ -64,10 +64,13 @@ export async function dropProjectAssetOnCanvas(
     input.commitAssetManifest(nextManifest);
   }
 
-  input.markAssetPathsAvailable([input.payload.path]);
+  notifyProjectAssetsImported([input.payload.path]);
 
-  const nodeId = input.addNode(CANVAS_NODE_TYPES.upload, input.position, nodeData);
+  const nodeType = input.payload.mediaKind === 'video'
+    ? CANVAS_NODE_TYPES.uploadVideo
+    : CANVAS_NODE_TYPES.upload;
+
+  const nodeId = input.addNode(nodeType, input.position, nodeData);
   input.setSelectedNode(nodeId);
-  revealProjectAsset(input.payload.path);
   return nodeId;
 }

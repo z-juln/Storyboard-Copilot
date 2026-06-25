@@ -1,5 +1,5 @@
 import { useMemo, useCallback, useEffect, useRef, useState } from 'react';
-import { Image, Upload, Sparkles, LayoutGrid, Type, Globe } from 'lucide-react';
+import { Image, Upload, Sparkles, LayoutGrid, Type, Globe, Video } from 'lucide-react';
 import { UI_POPOVER_TRANSITION_MS } from '@/components/ui/motion';
 
 import type { CanvasNodeType } from '@/features/canvas/domain/canvasNodes';
@@ -15,6 +15,7 @@ interface NodeSelectionMenuProps {
 
 const iconMap: Record<MenuIconKey, typeof Upload> = {
   upload: Upload,
+  video: Video,
   sparkles: Sparkles,
   layout: LayoutGrid,
   text: Type,
@@ -23,6 +24,7 @@ const iconMap: Record<MenuIconKey, typeof Upload> = {
 
 const MENU_LABELS: Record<string, string> = {
   'node.menu.uploadImage': '上传图片',
+  'node.menu.uploadVideo': '上传视频',
   'node.menu.aiImageGeneration': 'AI 图片',
   'node.menu.storyboard': '分镜节点',
   'node.menu.storyboardGen': '分镜生成',

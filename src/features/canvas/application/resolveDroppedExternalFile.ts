@@ -1,4 +1,4 @@
-import { isBindableTextAssetFileName } from '@/features/project/asset/assetPreviewUtils';
+import { isBindableTextAssetFileName, resolveAssetPreviewKind } from '@/features/project/asset/assetPreviewUtils';
 
 interface DragTransferEvent {
   dataTransfer: DataTransfer | null;
@@ -35,6 +35,10 @@ export function resolveDroppedExternalFile(event: DragTransferEvent): File | nul
   }
 
   if (file.type.startsWith('image/')) {
+    return file;
+  }
+
+  if (file.type.startsWith('video/') || resolveAssetPreviewKind(file.name) === 'video') {
     return file;
   }
 

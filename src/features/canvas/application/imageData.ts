@@ -11,7 +11,7 @@ import {
 } from '@/features/project/projectPaths';
 import { resolveFileAssetDisplayUrl } from '@/features/project/asset';
 import { useProjectStore } from '@/stores/projectStore';
-import { revealProjectAsset } from '@/features/canvas/application/assetExplorerRevealBridge';
+import { notifyProjectAssetsImported } from '@/features/canvas/application/notifyProjectAssetsImported';
 
 function requireCurrentProjectId(): string {
   const projectId = useProjectStore.getState().currentProjectId;
@@ -365,7 +365,7 @@ function maybeRevealPreparedAsset(
   revealInExplorer: boolean
 ): PreparedNodeImage {
   if (revealInExplorer && isProjectRelativeAssetPath(prepared.imageUrl)) {
-    revealProjectAsset(prepared.imageUrl);
+    notifyProjectAssetsImported([prepared.imageUrl]);
   }
   return prepared;
 }

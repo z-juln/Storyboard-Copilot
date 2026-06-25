@@ -9,6 +9,7 @@ import { StoryboardNode } from './StoryboardNode';
 import { TextAnnotationNode } from './TextAnnotationNode';
 import { TextNode } from './TextNode';
 import { UploadNode } from './UploadNode';
+import { UploadVideoNode } from './UploadVideoNode';
 
 export const nodeTypes: NodeTypes = {
   exportImageNode: ImageNode,
@@ -19,6 +20,7 @@ export const nodeTypes: NodeTypes = {
   textAnnotationNode: TextAnnotationNode,
   textNode: TextNode,
   uploadNode: UploadNode,
+  uploadVideoNode: UploadVideoNode,
   externalTechNode: ExternalTechNode,
 };
 
@@ -32,4 +34,5 @@ export {
   TextAnnotationNode,
   TextNode,
   UploadNode,
+  UploadVideoNode,
 };

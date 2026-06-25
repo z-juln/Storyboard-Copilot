@@ -1,6 +1,7 @@
 import type { XYPosition } from '@xyflow/react';
 
 import { publishUploadNodePasteImage } from '@/features/canvas/application/uploadNodePasteBridge';
+import { isVideoUploadFile } from '@/features/canvas/application/importNodeVideoFromFile';
 import { CANVAS_NODE_TYPES, type CanvasNodeType } from '@/features/canvas/domain/canvasNodes';
 import type { AssetManifest } from '@/features/project/asset';
 import { createEmptyAssetManifest } from '@/features/project/asset';
@@ -57,6 +58,13 @@ export async function dropExternalFileOnCanvas(
 
   if (input.file.type.startsWith('image/')) {
     const nodeId = input.addNode(CANVAS_NODE_TYPES.upload, input.position, {});
+    input.setSelectedNode(nodeId);
+    publishUploadNodePasteImage(nodeId, input.file);
+    return nodeId;
+  }
+
+  if (isVideoUploadFile(input.file)) {
+    const nodeId = input.addNode(CANVAS_NODE_TYPES.uploadVideo, input.position, {});
     input.setSelectedNode(nodeId);
     publishUploadNodePasteImage(nodeId, input.file);
     return nodeId;

@@ -2,6 +2,7 @@ import type { Edge, Node, XYPosition } from '@xyflow/react';
 
 export const CANVAS_NODE_TYPES = {
   upload: 'uploadNode',
+  uploadVideo: 'uploadVideoNode',
   imageEdit: 'imageNode',
   exportImage: 'exportImageNode',
   textAnnotation: 'textAnnotationNode',
@@ -53,6 +54,11 @@ export interface UploadImageNodeData extends NodeImageData {
   sourceFileName?: string | null;
   mediaKind?: UploadMediaKind | null;
   textContent?: string | null;
+}
+
+export interface UploadVideoNodeData extends NodeImageData {
+  sourceFileName?: string | null;
+  mediaKind?: 'video' | null;
 }
 
 export type ExportImageNodeResultKind =
@@ -168,6 +174,7 @@ export interface ExternalTechNodeData extends NodeDisplayData {
 
 export type CanvasNodeData =
   | UploadImageNodeData
+  | UploadVideoNodeData
   | ExportImageNodeData
   | TextAnnotationNodeData
   | TextNodeData
@@ -210,6 +217,12 @@ export function isUploadNode(
   node: CanvasNode | null | undefined
 ): node is Node<UploadImageNodeData, typeof CANVAS_NODE_TYPES.upload> {
   return node?.type === CANVAS_NODE_TYPES.upload;
+}
+
+export function isUploadVideoNode(
+  node: CanvasNode | null | undefined
+): node is Node<UploadVideoNodeData, typeof CANVAS_NODE_TYPES.uploadVideo> {
+  return node?.type === CANVAS_NODE_TYPES.uploadVideo;
 }
 
 export function isImageEditNode(
